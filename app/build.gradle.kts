@@ -7,11 +7,11 @@ plugins {
 }
 
 android {
-    namespace = "com.example.weeboo_habittrackerfriend"
+    namespace = "com.example.choreboo_habittrackerfriend"
     compileSdk = 36
 
     defaultConfig {
-        applicationId = "com.example.weeboo_habittrackerfriend"
+        applicationId = "com.example.choreboo_habittrackerfriend"
         minSdk = 24
         targetSdk = 36
         versionCode = 1

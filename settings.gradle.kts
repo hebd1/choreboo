@@ -22,6 +22,6 @@ dependencyResolutionManagement {
     }
 }
 
-rootProject.name = "Weeboo - Habit Tracker Friend"
+rootProject.name = "ChorebooHabitTrackerFriend"
 include(":app")
  
