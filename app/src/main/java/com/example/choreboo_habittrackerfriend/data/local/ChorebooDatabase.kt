@@ -28,7 +28,7 @@ import com.example.choreboo_habittrackerfriend.data.local.entity.ChorebooEntity
         InventoryItemEntity::class,
         EquippedItemEntity::class,
     ],
-    version = 1,
+    version = 2,
     exportSchema = true,
 )
 @TypeConverters(Converters::class)

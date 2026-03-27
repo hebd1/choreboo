@@ -7,10 +7,11 @@ data class HabitEntity(
     val title: String,
     val description: String? = null,
     val iconName: String = "CheckCircle",
-    val frequency: String = "DAILY",
-    val customDays: String? = null,
+    val customDays: String = "MON,TUE,WED,THU,FRI,SAT,SUN",
     val targetCount: Int = 1,
     val baseXp: Int = 10,
+    val reminderEnabled: Boolean = false,
+    val reminderTime: String? = null,
     val createdAt: Long = System.currentTimeMillis(),
     val isArchived: Boolean = false,
 )

@@ -39,24 +39,24 @@ import androidx.compose.material.icons.filled.SelfImprovement
 import androidx.compose.material.icons.filled.WaterDrop
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
-import androidx.compose.material3.DropdownMenuItem
-import androidx.compose.material3.ExperimentalMaterial3Api
-import androidx.compose.material3.ExposedDropdownMenuBox
-import androidx.compose.material3.ExposedDropdownMenuDefaults
 import androidx.compose.material3.FilterChip
 import androidx.compose.material3.FilterChipDefaults
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.MenuAnchorType
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Slider
 import androidx.compose.material3.SnackbarHost
 import androidx.compose.material3.SnackbarHostState
+import androidx.compose.material3.SuggestionChip
+import androidx.compose.material3.Switch
 import androidx.compose.material3.Text
+import androidx.compose.material3.TimePicker
 import androidx.compose.material3.TopAppBar
 import androidx.compose.material3.TopAppBarDefaults
+import androidx.compose.material3.rememberTimePickerState
+import androidx.compose.material3.AlertDialog
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
@@ -71,7 +71,7 @@ import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
-import com.example.choreboo_habittrackerfriend.domain.model.HabitFrequency
+import java.time.LocalTime
 
 private data class IconOption(val name: String, val icon: ImageVector, val label: String)
 
@@ -95,7 +95,7 @@ private val iconOptions = listOf(
 
 private val daysOfWeek = listOf("MON", "TUE", "WED", "THU", "FRI", "SAT", "SUN")
 
-@OptIn(ExperimentalMaterial3Api::class, ExperimentalLayoutApi::class)
+@OptIn(ExperimentalLayoutApi::class)
 @Composable
 fun AddEditHabitScreen(
     onNavigateBack: () -> Unit,
@@ -103,7 +103,7 @@ fun AddEditHabitScreen(
 ) {
     val formState by viewModel.formState.collectAsState()
     val snackbarHostState = remember { SnackbarHostState() }
-    var frequencyExpanded by remember { mutableStateOf(false) }
+    var showTimePicker by remember { mutableStateOf(false) }
 
     LaunchedEffect(Unit) {
         viewModel.events.collect { event ->
@@ -213,60 +213,26 @@ fun AddEditHabitScreen(
 
             Spacer(modifier = Modifier.height(24.dp))
 
-            // Frequency
+            // Schedule (Days of Week)
             Text(
-                text = "Frequency",
+                text = "Schedule",
                 style = MaterialTheme.typography.titleSmall,
                 fontWeight = FontWeight.SemiBold,
             )
             Spacer(modifier = Modifier.height(8.dp))
-            ExposedDropdownMenuBox(
-                expanded = frequencyExpanded,
-                onExpandedChange = { frequencyExpanded = it },
+            FlowRow(
+                horizontalArrangement = Arrangement.spacedBy(8.dp),
+                verticalArrangement = Arrangement.spacedBy(4.dp),
             ) {
-                OutlinedTextField(
-                    value = formState.frequency.name.lowercase().replaceFirstChar { it.uppercase() },
-                    onValueChange = {},
-                    readOnly = true,
-                    trailingIcon = { ExposedDropdownMenuDefaults.TrailingIcon(expanded = frequencyExpanded) },
-                    shape = RoundedCornerShape(12.dp),
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .menuAnchor(MenuAnchorType.PrimaryNotEditable),
-                )
-                ExposedDropdownMenu(
-                    expanded = frequencyExpanded,
-                    onDismissRequest = { frequencyExpanded = false },
-                ) {
-                    HabitFrequency.entries.forEach { freq ->
-                        DropdownMenuItem(
-                            text = { Text(freq.name.lowercase().replaceFirstChar { it.uppercase() }) },
-                            onClick = {
-                                viewModel.updateFrequency(freq)
-                                frequencyExpanded = false
-                            },
-                        )
-                    }
-                }
-            }
-
-            // Custom days
-            if (formState.frequency == HabitFrequency.CUSTOM) {
-                Spacer(modifier = Modifier.height(12.dp))
-                FlowRow(
-                    horizontalArrangement = Arrangement.spacedBy(8.dp),
-                    verticalArrangement = Arrangement.spacedBy(4.dp),
-                ) {
-                    daysOfWeek.forEach { day ->
-                        FilterChip(
-                            selected = day in formState.customDays,
-                            onClick = { viewModel.toggleCustomDay(day) },
-                            label = { Text(day) },
-                            colors = FilterChipDefaults.filterChipColors(
-                                selectedContainerColor = MaterialTheme.colorScheme.primaryContainer,
-                            ),
-                        )
-                    }
+                daysOfWeek.forEach { day ->
+                    FilterChip(
+                        selected = day in formState.customDays,
+                        onClick = { viewModel.toggleCustomDay(day) },
+                        label = { Text(day) },
+                        colors = FilterChipDefaults.filterChipColors(
+                            selectedContainerColor = MaterialTheme.colorScheme.primaryContainer,
+                        ),
+                    )
                 }
             }
 
@@ -288,17 +254,79 @@ fun AddEditHabitScreen(
             Spacer(modifier = Modifier.height(16.dp))
 
             // XP reward
-            Text(
-                text = "XP Reward: ${formState.baseXp}",
-                style = MaterialTheme.typography.titleSmall,
-                fontWeight = FontWeight.SemiBold,
-            )
+            Row(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(horizontal = 8.dp),
+                horizontalArrangement = Arrangement.SpaceBetween,
+                verticalAlignment = Alignment.CenterVertically,
+            ) {
+                Text(
+                    text = "XP Reward: ${formState.baseXp}",
+                    style = MaterialTheme.typography.titleSmall,
+                    fontWeight = FontWeight.SemiBold,
+                )
+                // XP Suggestion Chip
+                if (formState.suggestedXp != null && formState.suggestedXp != formState.baseXp) {
+                    SuggestionChip(
+                        onClick = { viewModel.applySuggestedXp() },
+                        label = { Text("${formState.suggestedXp} XP") },
+                    )
+                }
+            }
             Slider(
                 value = formState.baseXp.toFloat(),
                 onValueChange = { viewModel.updateBaseXp(it.toInt()) },
                 valueRange = 5f..50f,
                 steps = 8,
             )
+
+            Spacer(modifier = Modifier.height(24.dp))
+
+            // Reminder Section
+            Row(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(horizontal = 8.dp),
+                horizontalArrangement = Arrangement.SpaceBetween,
+                verticalAlignment = Alignment.CenterVertically,
+            ) {
+                Text(
+                    text = "Remind me",
+                    style = MaterialTheme.typography.titleSmall,
+                    fontWeight = FontWeight.SemiBold,
+                )
+                Switch(
+                    checked = formState.reminderEnabled,
+                    onCheckedChange = viewModel::updateReminderEnabled,
+                )
+            }
+
+            if (formState.reminderEnabled) {
+                Spacer(modifier = Modifier.height(12.dp))
+                Button(
+                    onClick = { showTimePicker = true },
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .height(48.dp),
+                    shape = RoundedCornerShape(12.dp),
+                ) {
+                    Text(
+                        formState.reminderTime.format(java.time.format.DateTimeFormatter.ofPattern("hh:mm a")),
+                    )
+                }
+
+                if (showTimePicker) {
+                    TimePickerDialog(
+                        initialTime = formState.reminderTime,
+                        onTimeSelected = { time ->
+                            viewModel.updateReminderTime(time)
+                            showTimePicker = false
+                        },
+                        onDismiss = { showTimePicker = false },
+                    )
+                }
+            }
 
             Spacer(modifier = Modifier.height(32.dp))
 
@@ -323,5 +351,39 @@ fun AddEditHabitScreen(
             Spacer(modifier = Modifier.height(32.dp))
         }
     }
+}
+
+@Composable
+private fun TimePickerDialog(
+    initialTime: LocalTime,
+    onTimeSelected: (LocalTime) -> Unit,
+    onDismiss: () -> Unit,
+) {
+    val state = rememberTimePickerState(
+        initialHour = initialTime.hour,
+        initialMinute = initialTime.minute,
+    )
+
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        title = { Text("Select Time") },
+        text = {
+            TimePicker(state = state)
+        },
+        confirmButton = {
+            Button(
+                onClick = {
+                    onTimeSelected(LocalTime.of(state.hour, state.minute))
+                },
+            ) {
+                Text("OK")
+            }
+        },
+        dismissButton = {
+            Button(onClick = onDismiss) {
+                Text("Cancel")
+            }
+        },
+    )
 }
 

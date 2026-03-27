@@ -7,10 +7,10 @@ import com.example.choreboo_habittrackerfriend.data.local.dao.HabitLogWithName
 import com.example.choreboo_habittrackerfriend.data.local.entity.HabitLogEntity
 import com.example.choreboo_habittrackerfriend.data.datastore.UserPreferences
 import com.example.choreboo_habittrackerfriend.domain.model.Habit
-import com.example.choreboo_habittrackerfriend.domain.model.HabitFrequency
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.map
 import java.time.LocalDate
+import java.time.LocalTime
 import java.time.format.DateTimeFormatter
 import javax.inject.Inject
 import javax.inject.Singleton
@@ -129,10 +129,17 @@ private fun HabitEntity.toDomain() = Habit(
     title = title,
     description = description,
     iconName = iconName,
-    frequency = try { HabitFrequency.valueOf(frequency) } catch (_: Exception) { HabitFrequency.DAILY },
-    customDays = customDays?.split(",")?.map { it.trim() },
+    customDays = customDays.split(",").map { it.trim() },
     targetCount = targetCount,
     baseXp = baseXp,
+    reminderEnabled = reminderEnabled,
+    reminderTime = reminderTime?.let { timeStr ->
+        try {
+            LocalTime.parse(timeStr)
+        } catch (_: Exception) {
+            null
+        }
+    },
     createdAt = createdAt,
     isArchived = isArchived,
 )
@@ -142,10 +149,11 @@ private fun Habit.toEntity() = HabitEntity(
     title = title,
     description = description,
     iconName = iconName,
-    frequency = frequency.name,
-    customDays = customDays?.joinToString(","),
+    customDays = customDays.joinToString(","),
     targetCount = targetCount,
     baseXp = baseXp,
+    reminderEnabled = reminderEnabled,
+    reminderTime = reminderTime?.toString(),
     createdAt = createdAt,
     isArchived = isArchived,
 )

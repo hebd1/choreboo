@@ -1,29 +1,24 @@
 package com.example.choreboo_habittrackerfriend.domain.model
 
 import java.time.LocalDate
+import java.time.LocalTime
 
 data class Habit(
     val id: Long = 0,
     val title: String,
     val description: String? = null,
     val iconName: String = "CheckCircle",
-    val frequency: HabitFrequency = HabitFrequency.DAILY,
-    val customDays: List<String>? = null,
+    val customDays: List<String> = listOf("MON", "TUE", "WED", "THU", "FRI", "SAT", "SUN"),
     val targetCount: Int = 1,
     val baseXp: Int = 10,
+    val reminderEnabled: Boolean = false,
+    val reminderTime: LocalTime? = null,
     val createdAt: Long = System.currentTimeMillis(),
     val isArchived: Boolean = false,
 ) {
     fun isScheduledForToday(): Boolean {
-        return when (frequency) {
-            HabitFrequency.DAILY -> true
-            HabitFrequency.WEEKLY -> true // any day of the week
-            HabitFrequency.CUSTOM -> {
-                if (customDays.isNullOrEmpty()) return true
-                val todayShort = LocalDate.now().dayOfWeek.name
-                    .take(3).uppercase() // "MON", "TUE", etc.
-                customDays.any { it.uppercase() == todayShort }
-            }
-        }
+        val todayShort = LocalDate.now().dayOfWeek.name
+            .take(3).uppercase()
+        return customDays.any { it.uppercase() == todayShort }
     }
 }
