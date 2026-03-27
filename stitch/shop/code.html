@@ -1,0 +1,269 @@
+<!DOCTYPE html>
+
+<html lang="en"><head>
+<meta charset="utf-8"/>
+<meta content="width=device-width, initial-scale=1.0" name="viewport"/>
+<title>Choreboo Shop</title>
+<script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
+<link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<script id="tailwind-config">
+      tailwind.config = {
+        darkMode: "class",
+        theme: {
+          extend: {
+            colors: {
+              "on-surface-variant": "#3f4a3c",
+              "surface-tint": "#006e1c",
+              "on-secondary": "#ffffff",
+              "surface-bright": "#f6fafe",
+              "on-background": "#171c1f",
+              "primary": "#006e1c",
+              "surface-variant": "#dfe3e7",
+              "on-surface": "#171c1f",
+              "on-error-container": "#93000a",
+              "on-secondary-fixed": "#2c1600",
+              "inverse-on-surface": "#edf1f5",
+              "on-tertiary-fixed-variant": "#4f00d0",
+              "secondary": "#8b5000",
+              "on-primary-fixed": "#002204",
+              "surface-dim": "#d6dade",
+              "on-primary-fixed-variant": "#005313",
+              "surface-container": "#eaeef2",
+              "secondary-fixed": "#ffdcbe",
+              "tertiary-container": "#a488ff",
+              "error": "#ba1a1a",
+              "on-tertiary-container": "#39009c",
+              "surface-container-highest": "#dfe3e7",
+              "background": "#f6fafe",
+              "secondary-container": "#ff9800",
+              "on-error": "#ffffff",
+              "outline-variant": "#becab9",
+              "surface": "#f6fafe",
+              "surface-container-lowest": "#ffffff",
+              "tertiary-fixed": "#e8deff",
+              "inverse-primary": "#78dc77",
+              "tertiary": "#6833ea",
+              "primary-fixed": "#94f990",
+              "on-tertiary-fixed": "#20005f",
+              "on-primary-container": "#003c0b",
+              "on-tertiary": "#ffffff",
+              "outline": "#6f7a6b",
+              "tertiary-fixed-dim": "#cdbdff",
+              "primary-container": "#4caf50",
+              "on-secondary-container": "#653900",
+              "inverse-surface": "#2c3134",
+              "on-primary": "#ffffff",
+              "surface-container-low": "#f0f4f8",
+              "surface-container-high": "#e4e9ed",
+              "primary-fixed-dim": "#78dc77",
+              "on-secondary-fixed-variant": "#693c00",
+              "error-container": "#ffdad6",
+              "secondary-fixed-dim": "#ffb870"
+            },
+            fontFamily: {
+              "headline": ["Plus Jakarta Sans"],
+              "body": ["Plus Jakarta Sans"],
+              "label": ["Plus Jakarta Sans"]
+            },
+            borderRadius: {"DEFAULT": "1rem", "lg": "2rem", "xl": "3rem", "full": "9999px"},
+          },
+        },
+      }
+    </script>
+<style>
+      .material-symbols-outlined {
+        font-variation-settings: 'FILL' 0, 'wght' 400, 'GRAD' 0, 'opsz' 24;
+      }
+      .glass-panel {
+        background: rgba(255, 255, 255, 0.6);
+        backdrop-filter: blur(20px);
+      }
+      .gradient-button {
+        background: linear-gradient(135deg, #006e1c 0%, #4caf50 100%);
+      }
+      .custom-scrollbar::-webkit-scrollbar {
+        display: none;
+      }
+      .custom-scrollbar {
+        -ms-overflow-style: none;
+        scrollbar-width: none;
+      }
+    </style>
+<style>
+    body {
+      min-height: max(884px, 100dvh);
+    }
+  </style>
+  </head>
+<body class="bg-surface text-on-surface font-body selection:bg-primary-container/30">
+<!-- TopAppBar from JSON Authority -->
+<header class="bg-[#f6fafe] dark:bg-[#171c1f] flex justify-between items-center w-full px-6 py-4 sticky top-0 z-40">
+<div class="flex items-center gap-3">
+<div class="w-10 h-10 rounded-full bg-primary-container flex items-center justify-center overflow-hidden">
+<img alt="Pet Avatar" class="w-8 h-8" data-alt="Cute stylized 3D rendered cartoon pet avatar with friendly eyes and soft lighting" src="https://lh3.googleusercontent.com/aida-public/AB6AXuAmXxS9N-J5UMnBJT5YUZg_5ehNAHTGq5ykZFpCL0VdiX_6OsLEvVrsU6e7AfoOlYWlEhUQu7_YjS5xz0J9Lrp-d66vIMmGzJjAIh0TrZ9KxGAsGddkqvgCCStOBE4XDskw2rfE7K3zns_gI5sVnJpv0Ejj0M46bMs_PXUuKftrQVMaU5MoOYIw2E8Vt6xIgJFg-E-MMEBbIn2ZKCS8c_jHWPUN6Ja1ylOePLg7MNV4llqm-2-4M5aCb-TE4wr5FkrX8xdgGUqaCSf_"/>
+</div>
+<h1 class="font-['Plus_Jakarta_Sans'] tracking-tight text-3xl font-bold">Shop</h1>
+</div>
+<div class="flex items-center gap-2 bg-secondary-container px-4 py-2 rounded-full shadow-sm active:scale-95 transition-transform duration-150">
+<span class="material-symbols-outlined text-white" style="font-variation-settings: 'FILL' 1;">star</span>
+<span class="font-bold text-white text-lg">540</span>
+</div>
+</header>
+<main class="max-w-2xl mx-auto px-4 pb-32">
+<!-- Horizontal Scrollable Category Tabs -->
+<section class="mt-4 mb-8">
+<div class="flex gap-3 overflow-x-auto py-2 custom-scrollbar">
+<button class="bg-primary text-on-primary px-6 py-2 rounded-full font-bold shadow-md flex-shrink-0 transition-all active:scale-95">All</button>
+<button class="bg-surface-container-high text-on-surface px-6 py-2 rounded-full font-medium flex-shrink-0 hover:bg-surface-variant transition-all active:scale-95">Food</button>
+<button class="bg-surface-container-high text-on-surface px-6 py-2 rounded-full font-medium flex-shrink-0 hover:bg-surface-variant transition-all active:scale-95">Hats</button>
+<button class="bg-surface-container-high text-on-surface px-6 py-2 rounded-full font-medium flex-shrink-0 hover:bg-surface-variant transition-all active:scale-95">Clothes</button>
+<button class="bg-surface-container-high text-on-surface px-6 py-2 rounded-full font-medium flex-shrink-0 hover:bg-surface-variant transition-all active:scale-95">Backgrounds</button>
+</div>
+</section>
+<!-- Featured Section (Bento Style) -->
+<section class="mb-8">
+<div class="relative overflow-hidden rounded-xl bg-tertiary h-48 flex flex-col justify-end p-6 group">
+<div class="absolute top-0 left-0 w-full h-full opacity-20">
+<img alt="Promo Background" class="w-full h-full object-cover" data-alt="Abstract mystical purple background with floating glowing particles and soft bokeh effects" src="https://lh3.googleusercontent.com/aida-public/AB6AXuA2NY89SH7-X0mKU4MTpMpdhETIPb89JHXdYf-ZIgXg538dtqeF-LeLp-JqF4n8vyFwUm5wWl1hhnZ3I1vg2fRlBMfkzm1Y1JUoQj3NqmAGyqSIgl2zvpat6_GzKV_-QQHaDSp13wqm-SF6IFiEM6HZuXUsLetTxLwaP5YzkH1YA8yqckAeCGXIba6CuFjaNNlLfrrtT0uZsrFR2txO4ga_6F2ZbumqsirZd4Z9YodjrusyDAteLxwX515Etk37oX9QDOmw3WUgr1Im"/>
+</div>
+<div class="relative z-10">
+<span class="text-xs font-bold uppercase tracking-widest text-tertiary-fixed mb-1 block">Limited Edition</span>
+<h2 class="text-2xl font-extrabold text-white leading-tight">Cosmic Background</h2>
+<p class="text-tertiary-fixed text-sm">Level up your pet's room with stars.</p>
+</div>
+<div class="absolute top-4 right-4 text-6xl transform group-hover:scale-110 transition-transform">🖼️</div>
+</div>
+</section>
+<!-- 2-Column Grid of Item Cards -->
+<div class="grid grid-cols-2 gap-4">
+<!-- Item 1: Food -->
+<div class="bg-surface-container-lowest rounded-xl p-4 shadow-sm flex flex-col relative overflow-hidden group">
+<div class="absolute -top-4 -left-4 text-[42px] opacity-20 transform -rotate-12 group-hover:rotate-0 transition-transform">🍽️</div>
+<div class="mt-4 flex flex-col h-full">
+<div class="text-[36px] mb-2">🍽️</div>
+<div class="flex justify-between items-start mb-1">
+<h3 class="font-bold text-on-surface leading-tight">Golden Apple</h3>
+<span class="text-[10px] px-2 py-0.5 rounded-full bg-secondary-container/20 text-secondary-fixed-dim font-bold uppercase tracking-tighter">Gold</span>
+</div>
+<p class="text-xs text-on-surface-variant line-clamp-2 mb-2">A legendary fruit that glows with ancient magic.</p>
+<div class="mt-auto">
+<div class="bg-primary-container/10 text-primary font-bold text-[10px] py-1 px-2 rounded-lg inline-block mb-3">+50 Hunger</div>
+<button class="w-full gradient-button text-white font-bold py-2 rounded-lg flex items-center justify-center gap-1 shadow-md active:scale-95 transition-all">
+<span class="material-symbols-outlined text-sm" style="font-variation-settings: 'FILL' 1;">star</span>
+<span>250</span>
+</button>
+</div>
+</div>
+</div>
+<!-- Item 2: Hat -->
+<div class="bg-surface-container-lowest rounded-xl p-4 shadow-sm flex flex-col relative overflow-hidden group">
+<div class="absolute -top-4 -left-4 text-[42px] opacity-20 transform -rotate-12 group-hover:rotate-0 transition-transform">🎩</div>
+<div class="mt-4 flex flex-col h-full">
+<div class="text-[36px] mb-2">🎩</div>
+<div class="flex justify-between items-start mb-1">
+<h3 class="font-bold text-on-surface leading-tight">Wizard Hat</h3>
+<span class="text-[10px] px-2 py-0.5 rounded-full bg-tertiary-container/20 text-tertiary font-bold uppercase tracking-tighter">Purple</span>
+</div>
+<p class="text-xs text-on-surface-variant line-clamp-2 mb-2">Channel your inner mage with this pointy classic.</p>
+<div class="mt-auto">
+<button class="w-full gradient-button text-white font-bold py-2 rounded-lg flex items-center justify-center gap-1 shadow-md active:scale-95 transition-all">
+<span class="material-symbols-outlined text-sm" style="font-variation-settings: 'FILL' 1;">star</span>
+<span>400</span>
+</button>
+</div>
+</div>
+</div>
+<!-- Item 3: Clothes -->
+<div class="bg-surface-container-lowest rounded-xl p-4 shadow-sm flex flex-col relative overflow-hidden group">
+<div class="absolute -top-4 -left-4 text-[42px] opacity-20 transform -rotate-12 group-hover:rotate-0 transition-transform">👕</div>
+<div class="mt-4 flex flex-col h-full">
+<div class="text-[36px] mb-2">👕</div>
+<div class="flex justify-between items-start mb-1">
+<h3 class="font-bold text-on-surface leading-tight">Raincoat</h3>
+<span class="text-[10px] px-2 py-0.5 rounded-full bg-surface-variant text-outline font-bold uppercase tracking-tighter">Default</span>
+</div>
+<p class="text-xs text-on-surface-variant line-clamp-2 mb-2">Keep your Boo dry during digital storms.</p>
+<div class="mt-auto">
+<button class="w-full gradient-button text-white font-bold py-2 rounded-lg flex items-center justify-center gap-1 shadow-md active:scale-95 transition-all">
+<span class="material-symbols-outlined text-sm" style="font-variation-settings: 'FILL' 1;">star</span>
+<span>120</span>
+</button>
+</div>
+</div>
+</div>
+<!-- Item 4: Background (Disabled/Expensive) -->
+<div class="bg-surface-container-lowest rounded-xl p-4 shadow-sm flex flex-col relative overflow-hidden group">
+<div class="absolute -top-4 -left-4 text-[42px] opacity-20 transform -rotate-12 group-hover:rotate-0 transition-transform">🖼️</div>
+<div class="mt-4 flex flex-col h-full">
+<div class="text-[36px] mb-2">🖼️</div>
+<div class="flex justify-between items-start mb-1">
+<h3 class="font-bold text-on-surface leading-tight">Zen Garden</h3>
+<span class="text-[10px] px-2 py-0.5 rounded-full bg-secondary-container/20 text-secondary-fixed-dim font-bold uppercase tracking-tighter">Gold</span>
+</div>
+<p class="text-xs text-on-surface-variant line-clamp-2 mb-2">Peaceful rocks and raked sand for your pet.</p>
+<div class="mt-auto">
+<button class="w-full bg-surface-variant text-outline font-bold py-2 rounded-lg flex items-center justify-center gap-1 cursor-not-allowed">
+<span class="material-symbols-outlined text-sm" style="font-variation-settings: 'FILL' 1;">star</span>
+<span>800</span>
+</button>
+</div>
+</div>
+</div>
+<!-- Item 5: Food -->
+<div class="bg-surface-container-lowest rounded-xl p-4 shadow-sm flex flex-col relative overflow-hidden group">
+<div class="absolute -top-4 -left-4 text-[42px] opacity-20 transform -rotate-12 group-hover:rotate-0 transition-transform">🍽️</div>
+<div class="mt-4 flex flex-col h-full">
+<div class="text-[36px] mb-2">🍽️</div>
+<div class="flex justify-between items-start mb-1">
+<h3 class="font-bold text-on-surface leading-tight">Mochi Ball</h3>
+<span class="text-[10px] px-2 py-0.5 rounded-full bg-surface-variant text-outline font-bold uppercase tracking-tighter">Default</span>
+</div>
+<p class="text-xs text-on-surface-variant line-clamp-2 mb-2">A squishy, sweet treat that boosts happiness.</p>
+<div class="mt-auto">
+<div class="bg-primary-container/10 text-primary font-bold text-[10px] py-1 px-2 rounded-lg inline-block mb-3">+15 Mood</div>
+<button class="w-full gradient-button text-white font-bold py-2 rounded-lg flex items-center justify-center gap-1 shadow-md active:scale-95 transition-all">
+<span class="material-symbols-outlined text-sm" style="font-variation-settings: 'FILL' 1;">star</span>
+<span>45</span>
+</button>
+</div>
+</div>
+</div>
+<!-- Item 6: Clothes -->
+<div class="bg-surface-container-lowest rounded-xl p-4 shadow-sm flex flex-col relative overflow-hidden group">
+<div class="absolute -top-4 -left-4 text-[42px] opacity-20 transform -rotate-12 group-hover:rotate-0 transition-transform">👕</div>
+<div class="mt-4 flex flex-col h-full">
+<div class="text-[36px] mb-2">👕</div>
+<div class="flex justify-between items-start mb-1">
+<h3 class="font-bold text-on-surface leading-tight">Red Bow</h3>
+<span class="text-[10px] px-2 py-0.5 rounded-full bg-surface-variant text-outline font-bold uppercase tracking-tighter">Default</span>
+</div>
+<p class="text-xs text-on-surface-variant line-clamp-2 mb-2">Simple yet elegant. Fits all sizes.</p>
+<div class="mt-auto">
+<button class="w-full gradient-button text-white font-bold py-2 rounded-lg flex items-center justify-center gap-1 shadow-md active:scale-95 transition-all">
+<span class="material-symbols-outlined text-sm" style="font-variation-settings: 'FILL' 1;">star</span>
+<span>80</span>
+</button>
+</div>
+</div>
+</div>
+</div>
+</main>
+<!-- BottomNavBar from JSON Authority -->
+<nav class="fixed bottom-0 left-0 w-full z-50 flex justify-around items-end px-4 pb-6 bg-white/80 dark:bg-[#171c1f]/80 backdrop-blur-md shadow-[0_-4px_24px_rgba(0,110,28,0.06)] rounded-t-[3rem] border-t-0">
+<div class="flex flex-col items-center justify-center text-[#44474a] dark:text-[#c4c7ca] p-4 hover:text-[#006e1c] dark:hover:text-[#4caf50] active:scale-90 transition-all duration-200">
+<span class="material-symbols-outlined">home</span>
+</div>
+<div class="flex flex-col items-center justify-center text-[#44474a] dark:text-[#c4c7ca] p-4 hover:text-[#006e1c] dark:hover:text-[#4caf50] active:scale-90 transition-all duration-200">
+<span class="material-symbols-outlined">pets</span>
+</div>
+<!-- Active Tab: Shopping Bag for Shop Screen -->
+<div class="flex flex-col items-center justify-center bg-[#4caf50] text-white rounded-full p-4 scale-110 -translate-y-2 transition-all shadow-lg">
+<span class="material-symbols-outlined" style="font-variation-settings: 'FILL' 1;">shopping_bag</span>
+</div>
+<div class="flex flex-col items-center justify-center text-[#44474a] dark:text-[#c4c7ca] p-4 hover:text-[#006e1c] dark:hover:text-[#4caf50] active:scale-90 transition-all duration-200">
+<span class="material-symbols-outlined">calendar_month</span>
+</div>
+</nav>
+</body></html>

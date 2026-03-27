@@ -1,0 +1,178 @@
+<!DOCTYPE html>
+
+<html class="light" lang="en"><head>
+<meta charset="utf-8"/>
+<meta content="width=device-width, initial-scale=1.0" name="viewport"/>
+<title>Welcome to Choreboo</title>
+<script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
+<link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<script id="tailwind-config">
+      tailwind.config = {
+        darkMode: "class",
+        theme: {
+          extend: {
+            colors: {
+              "on-surface-variant": "#3f4a3c",
+              "surface-tint": "#006e1c",
+              "on-secondary": "#ffffff",
+              "surface-bright": "#f6fafe",
+              "on-background": "#171c1f",
+              "primary": "#006e1c",
+              "surface-variant": "#dfe3e7",
+              "on-surface": "#171c1f",
+              "on-error-container": "#93000a",
+              "on-secondary-fixed": "#2c1600",
+              "inverse-on-surface": "#edf1f5",
+              "on-tertiary-fixed-variant": "#4f00d0",
+              "secondary": "#8b5000",
+              "on-primary-fixed": "#002204",
+              "surface-dim": "#d6dade",
+              "on-primary-fixed-variant": "#005313",
+              "surface-container": "#eaeef2",
+              "secondary-fixed": "#ffdcbe",
+              "tertiary-container": "#a488ff",
+              "error": "#ba1a1a",
+              "on-tertiary-container": "#39009c",
+              "surface-container-highest": "#dfe3e7",
+              "background": "#f6fafe",
+              "secondary-container": "#ff9800",
+              "on-error": "#ffffff",
+              "outline-variant": "#becab9",
+              "surface": "#f6fafe",
+              "surface-container-lowest": "#ffffff",
+              "tertiary-fixed": "#e8deff",
+              "inverse-primary": "#78dc77",
+              "tertiary": "#6833ea",
+              "primary-fixed": "#94f990",
+              "on-tertiary-fixed": "#20005f",
+              "on-primary-container": "#003c0b",
+              "on-tertiary": "#ffffff",
+              "outline": "#6f7a6b",
+              "tertiary-fixed-dim": "#cdbdff",
+              "primary-container": "#4caf50",
+              "on-secondary-container": "#653900",
+              "inverse-surface": "#2c3134",
+              "on-primary": "#ffffff",
+              "surface-container-low": "#f0f4f8",
+              "surface-container-high": "#e4e9ed",
+              "primary-fixed-dim": "#78dc77",
+              "on-secondary-fixed-variant": "#693c00",
+              "error-container": "#ffdad6",
+              "secondary-fixed-dim": "#ffb870"
+            },
+            fontFamily: {
+              "headline": ["Plus Jakarta Sans"],
+              "body": ["Plus Jakarta Sans"],
+              "label": ["Plus Jakarta Sans"]
+            },
+            borderRadius: {"DEFAULT": "1rem", "lg": "2rem", "xl": "3rem", "full": "9999px"},
+          },
+        },
+      }
+    </script>
+<style>
+        .material-symbols-outlined {
+            font-variation-settings: 'FILL' 0, 'wght' 400, 'GRAD' 0, 'opsz' 24;
+        }
+        .bg-mesh {
+            background-color: #f6fafe;
+            background-image: 
+                radial-gradient(at 0% 0%, hsla(135, 100%, 95%, 1) 0, transparent 50%), 
+                radial-gradient(at 100% 0%, hsla(210, 100%, 96%, 1) 0, transparent 50%),
+                radial-gradient(at 50% 100%, hsla(135, 70%, 92%, 1) 0, transparent 50%);
+        }
+        .glass-card {
+            background: rgba(255, 255, 255, 0.6);
+            backdrop-filter: blur(20px);
+            -webkit-backdrop-filter: blur(20px);
+        }
+    </style>
+<style>
+    body {
+      min-height: max(884px, 100dvh);
+    }
+  </style>
+  </head>
+<body class="font-body bg-mesh text-on-surface min-h-screen flex flex-col items-center justify-center p-6 overflow-hidden">
+<!-- Top Navigation Suppressed for Onboarding Flow -->
+<main class="w-full max-w-md flex flex-col items-center gap-8 relative">
+<!-- Decorative Background Element -->
+<div class="absolute -top-24 -left-24 w-64 h-64 bg-primary/5 rounded-full blur-3xl"></div>
+<div class="absolute -bottom-24 -right-24 w-64 h-64 bg-secondary/5 rounded-full blur-3xl"></div>
+<!-- Hero Section: The Egg -->
+<div class="relative flex flex-col items-center">
+<!-- Asymmetric Glow -->
+<div class="absolute inset-0 bg-primary-container/20 rounded-full blur-2xl scale-150"></div>
+<div class="relative text-[96px] leading-none mb-4 select-none drop-shadow-2xl">
+                🥚
+                <!-- Dynamic Floating Particles -->
+<span class="absolute -top-2 -right-4 text-2xl animate-bounce">✨</span>
+<span class="absolute bottom-4 -left-6 text-xl opacity-60">🍃</span>
+</div>
+<div class="inline-flex items-center gap-2 bg-tertiary-container px-4 py-1.5 rounded-full shadow-sm">
+<span class="text-[10px] font-bold tracking-widest text-on-tertiary-container uppercase">Adventure Awaits</span>
+</div>
+</div>
+<!-- Content Stack -->
+<div class="text-center space-y-4 z-10">
+<h1 class="font-headline text-4xl md:text-5xl font-extrabold text-primary tracking-tight leading-[1.1]">
+                Welcome to Choreboo!
+            </h1>
+<p class="text-on-surface-variant text-lg leading-relaxed px-4">
+                The magical way to turn your daily chores into a growing journey. Hatch your companion and start your lore.
+            </p>
+</div>
+<!-- Interactive Form -->
+<div class="w-full space-y-8 glass-card p-8 rounded-xl shadow-[0_24px_48px_-12px_rgba(0,110,28,0.08)]">
+<div class="space-y-3">
+<label class="block font-bold text-sm text-primary ml-1" for="pet-name">
+                    What will you name your Choreboo?
+                </label>
+<div class="relative group">
+<input class="w-full bg-surface-container-high border-none rounded-2xl py-5 px-6 text-lg font-medium placeholder:text-outline focus:ring-4 focus:ring-primary/10 focus:bg-surface-container-lowest transition-all duration-300 outline-none" id="pet-name" maxlength="20" placeholder="e.g. Sprout, Mochi, Pixel..." type="text"/>
+<div class="absolute right-4 top-1/2 -translate-y-1/2 flex items-center gap-1.5 pointer-events-none opacity-40 group-focus-within:opacity-100 transition-opacity">
+<span class="text-xs font-bold text-primary">0/20</span>
+</div>
+</div>
+</div>
+<!-- CTA Section -->
+<div class="space-y-4">
+<button class="w-full relative overflow-hidden group py-5 px-8 rounded-2xl bg-gradient-to-br from-primary to-primary-container text-on-primary font-bold text-xl shadow-[0_12px_24px_-8px_rgba(0,110,28,0.4)] active:scale-95 transition-all duration-200">
+<!-- Subtle Inner Glow -->
+<div class="absolute inset-x-0 top-0 h-px bg-white/20"></div>
+<span class="flex items-center justify-center gap-3">
+                        Hatch My Choreboo! 🐣
+                    </span>
+</button>
+<p class="text-[11px] text-center text-outline font-medium px-8 leading-tight">
+                    By hatching, you agree to our playful Terms of Adventure and Privacy Garden.
+                </p>
+</div>
+</div>
+<!-- Feature Bento Preview (Subtle) -->
+<div class="grid grid-cols-2 gap-4 w-full">
+<div class="bg-surface-container-low p-5 rounded-lg flex flex-col gap-2">
+<span class="material-symbols-outlined text-secondary" style="font-variation-settings: 'FILL' 1;">star</span>
+<span class="font-bold text-sm">Earn XP</span>
+<p class="text-[10px] text-on-surface-variant leading-tight">Completing chores levels up your friend.</p>
+</div>
+<div class="bg-surface-container-low p-5 rounded-lg flex flex-col gap-2">
+<span class="material-symbols-outlined text-tertiary" style="font-variation-settings: 'FILL' 1;">auto_awesome</span>
+<span class="font-bold text-sm">Unlock Lore</span>
+<p class="text-[10px] text-on-surface-variant leading-tight">Discover the secret history of your pet.</p>
+</div>
+</div>
+</main>
+<!-- Bottom Navigation Suppressed for Onboarding Flow -->
+<!-- Decorative Image for Context (Hidden on small screens to focus on form) -->
+<div class="hidden lg:block fixed right-12 top-1/2 -translate-y-1/2 w-96 h-[600px] rounded-xl overflow-hidden shadow-2xl border-8 border-white">
+<img alt="Whimsical digital art of a cozy mystical garden with soft floating spores and glowing plants" class="w-full h-full object-cover" data-alt="A whimsical digital art piece showing a cozy mystical garden with soft floating spores and glowing pastel plants in morning fog" src="https://lh3.googleusercontent.com/aida-public/AB6AXuDe3d7uXffCZ620QYZGzecs-PTbQVNgVaz6m0H5bfDobftNDG42TAI_XuTR4Tg4qQ64CZEWLTs2C7M5ErfoCwFrz0Vap4GCVDqZ1OLrMy1Qrh73nytKskRgsu7HrFXAv1l_mfw9x4lQQPTgm9zXlzC0Yjx_4kPMhOFgAdDKCBRPXMYe73yhnq-zi91AD1c-uPcggRvR5mlFJjMYBAASjz_MLidCiw71XxZb9BlvscKbqtDrUlMJhfRLii62M4is4-f1g2OWDXhNlLJm"/>
+<div class="absolute inset-0 bg-gradient-to-t from-primary/40 to-transparent"></div>
+<div class="absolute bottom-6 left-6 right-6 p-4 glass-card rounded-lg">
+<p class="text-on-surface font-bold text-sm">"Every clean room is a new room for magic to grow."</p>
+<p class="text-xs opacity-70 mt-1">— The Caretaker</p>
+</div>
+</div>
+</body></html>

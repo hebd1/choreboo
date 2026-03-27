@@ -14,7 +14,8 @@ import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.asSharedFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.debounce
-import kotlinx.coroutines.flow.snapshotFlow
+import kotlinx.coroutines.flow.distinctUntilChanged
+import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
 import java.time.LocalTime
@@ -71,7 +72,9 @@ class AddEditHabitViewModel @Inject constructor(
 
         // Watch title and description for XP suggestion updates
         viewModelScope.launch {
-            snapshotFlow { _formState.value.let { it.title to it.description } }
+            _formState
+                .map { it.title to it.description }
+                .distinctUntilChanged()
                 .debounce(300)
                 .collect { (title, description) ->
                     val suggested = calculateSuggestedXp(title, description)

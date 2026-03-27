@@ -1,0 +1,212 @@
+<!DOCTYPE html>
+
+<html class="light" lang="en"><head>
+<meta charset="utf-8"/>
+<meta content="width=device-width, initial-scale=1.0" name="viewport"/>
+<title>Settings - My Choreboo</title>
+<script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
+<link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<script id="tailwind-config">
+      tailwind.config = {
+        darkMode: "class",
+        theme: {
+          extend: {
+            colors: {
+              "on-surface-variant": "#3f4a3c",
+              "surface-tint": "#006e1c",
+              "on-secondary": "#ffffff",
+              "surface-bright": "#f6fafe",
+              "on-background": "#171c1f",
+              "primary": "#006e1c",
+              "surface-variant": "#dfe3e7",
+              "on-surface": "#171c1f",
+              "on-error-container": "#93000a",
+              "on-secondary-fixed": "#2c1600",
+              "inverse-on-surface": "#edf1f5",
+              "on-tertiary-fixed-variant": "#4f00d0",
+              "secondary": "#8b5000",
+              "on-primary-fixed": "#002204",
+              "surface-dim": "#d6dade",
+              "on-primary-fixed-variant": "#005313",
+              "surface-container": "#eaeef2",
+              "secondary-fixed": "#ffdcbe",
+              "tertiary-container": "#a488ff",
+              "error": "#ba1a1a",
+              "on-tertiary-container": "#39009c",
+              "surface-container-highest": "#dfe3e7",
+              "background": "#f6fafe",
+              "secondary-container": "#ff9800",
+              "on-error": "#ffffff",
+              "outline-variant": "#becab9",
+              "surface": "#f6fafe",
+              "surface-container-lowest": "#ffffff",
+              "tertiary-fixed": "#e8deff",
+              "inverse-primary": "#78dc77",
+              "tertiary": "#6833ea",
+              "primary-fixed": "#94f990",
+              "on-tertiary-fixed": "#20005f",
+              "on-primary-container": "#003c0b",
+              "on-tertiary": "#ffffff",
+              "outline": "#6f7a6b",
+              "tertiary-fixed-dim": "#cdbdff",
+              "primary-container": "#4caf50",
+              "on-secondary-container": "#653900",
+              "inverse-surface": "#2c3134",
+              "on-primary": "#ffffff",
+              "surface-container-low": "#f0f4f8",
+              "surface-container-high": "#e4e9ed",
+              "primary-fixed-dim": "#78dc77",
+              "on-secondary-fixed-variant": "#693c00",
+              "error-container": "#ffdad6",
+              "secondary-fixed-dim": "#ffb870"
+            },
+            fontFamily: {
+              "headline": ["Plus Jakarta Sans"],
+              "body": ["Plus Jakarta Sans"],
+              "label": ["Plus Jakarta Sans"]
+            },
+            borderRadius: {"DEFAULT": "1rem", "lg": "2rem", "xl": "3rem", "full": "9999px"},
+          },
+        },
+      }
+    </script>
+<style>
+        body { font-family: 'Plus Jakarta Sans', sans-serif; }
+        .material-symbols-outlined {
+            font-variation-settings: 'FILL' 0, 'wght' 400, 'GRAD' 0, 'opsz' 24;
+        }
+    </style>
+<style>
+    body {
+      min-height: max(884px, 100dvh);
+    }
+  </style>
+  </head>
+<body class="bg-surface text-on-surface min-h-screen pb-32">
+<!-- TopAppBar -->
+<header class="bg-[#f6fafe] dark:bg-[#171c1f] flex justify-between items-center w-full px-6 py-4 sticky top-0 z-40">
+<div class="flex items-center gap-3">
+<div class="w-10 h-10 rounded-full bg-primary-container flex items-center justify-center overflow-hidden">
+<img alt="Pet Avatar" data-alt="cute stylized 3D rendered puppy avatar with big eyes and a friendly expression on a soft green background" src="https://lh3.googleusercontent.com/aida-public/AB6AXuB63lblhBAeS9KQgll-TMdd7_QqxdSN9l-K2tpXLtp-xEd-CBu7_IaH3ARbMetkOw6wMSx5MAXEcC27XnNYX7dDBnhMmd5PJGF0sjArcq8ncVWBtEuDpB0x0lXZ7ASg8XF11LAn4cNJCZQDmKYTGIhHivZAypRUSfyiZDQDal4L5ouAq1d1RQnC_ZMioB0lJFfINrXG-FWocCJN59eBhuiz4mrg7cjEvmQxs0DR5fO7UUcP4zUnViODjSwA6B5YVZ6nVcrE4ytGmX-v"/>
+</div>
+<h1 class="text-[#006e1c] dark:text-[#4caf50] font-['Plus_Jakarta_Sans'] tracking-tight text-3xl font-bold">Settings</h1>
+</div>
+<div class="flex items-center gap-2 px-3 py-1.5 bg-surface-container-low rounded-full">
+<span class="material-symbols-outlined text-[#ff9800]" data-icon="stars" style="font-variation-settings: 'FILL' 1;">stars</span>
+<span class="font-bold text-[#006e1c] dark:text-[#4caf50]">540</span>
+</div>
+</header>
+<main class="max-w-2xl mx-auto px-6 mt-6 space-y-6">
+<!-- Appearance Section -->
+<section class="space-y-4">
+<h2 class="text-label-md font-bold text-on-surface-variant px-2 flex items-center gap-2">
+<span class="material-symbols-outlined text-primary" data-icon="palette">palette</span>
+                Appearance
+            </h2>
+<div class="bg-surface-container-lowest p-6 rounded-DEFAULT shadow-sm border border-outline-variant/15">
+<p class="text-body-lg font-semibold mb-4">Choose your vibe</p>
+<!-- SegmentedButtonRow -->
+<div class="flex p-1 bg-surface-container-high rounded-full items-center">
+<button class="flex-1 py-2 px-4 rounded-full text-sm font-bold bg-white shadow-sm text-primary transition-all">
+                        System
+                    </button>
+<button class="flex-1 py-2 px-4 rounded-full text-sm font-medium text-on-surface-variant hover:bg-surface-variant/50 transition-all">
+                        Light
+                    </button>
+<button class="flex-1 py-2 px-4 rounded-full text-sm font-medium text-on-surface-variant hover:bg-surface-variant/50 transition-all">
+                        Dark
+                    </button>
+</div>
+</div>
+</section>
+<!-- Notifications Section -->
+<section class="space-y-4">
+<h2 class="text-label-md font-bold text-on-surface-variant px-2 flex items-center gap-2">
+<span class="material-symbols-outlined text-primary" data-icon="notifications">notifications</span>
+                Notifications
+            </h2>
+<div class="bg-surface-container-lowest p-6 rounded-DEFAULT shadow-sm border border-outline-variant/15 flex items-center justify-between">
+<div>
+<p class="text-body-lg font-semibold">Daily Reminders</p>
+<p class="text-sm text-on-surface-variant">Don't forget to feed your Boo</p>
+</div>
+<!-- Toggle Switch -->
+<button class="w-14 h-8 bg-primary rounded-full relative p-1 transition-colors">
+<div class="absolute right-1 top-1 bg-white w-6 h-6 rounded-full shadow-md"></div>
+</button>
+</div>
+</section>
+<!-- Sound Section -->
+<section class="space-y-4">
+<h2 class="text-label-md font-bold text-on-surface-variant px-2 flex items-center gap-2">
+<span class="material-symbols-outlined text-primary" data-icon="volume_up">volume_up</span>
+                Sound
+            </h2>
+<div class="bg-surface-container-lowest p-6 rounded-DEFAULT shadow-sm border border-outline-variant/15 flex items-center justify-between">
+<div>
+<p class="text-body-lg font-semibold">Sound Effects</p>
+<p class="text-sm text-on-surface-variant">Play magic chimes on task complete</p>
+</div>
+<!-- Toggle Switch (Off state) -->
+<button class="w-14 h-8 bg-outline-variant rounded-full relative p-1 transition-colors">
+<div class="absolute left-1 top-1 bg-white w-6 h-6 rounded-full shadow-md"></div>
+</button>
+</div>
+</section>
+<!-- Profile/Account Card (Bento Style Extra) -->
+<div class="grid grid-cols-2 gap-4">
+<div class="bg-tertiary-container/20 p-6 rounded-lg border border-tertiary-container/30 flex flex-col justify-between aspect-square">
+<span class="material-symbols-outlined text-tertiary text-4xl" data-icon="auto_awesome">auto_awesome</span>
+<div>
+<p class="text-tertiary font-bold text-xl">Pro Plan</p>
+<p class="text-on-tertiary-container text-sm">Unlocked until 2025</p>
+</div>
+</div>
+<div class="bg-secondary-container/10 p-6 rounded-lg border border-secondary-container/30 flex flex-col justify-between aspect-square">
+<span class="material-symbols-outlined text-secondary text-4xl" data-icon="history">history</span>
+<div>
+<p class="text-secondary font-bold text-xl">History</p>
+<p class="text-on-secondary-container text-sm">342 tasks finished</p>
+</div>
+</div>
+</div>
+<!-- About Section -->
+<section class="pt-8 pb-12 text-center space-y-4">
+<div class="inline-flex items-center justify-center p-4 bg-primary-container rounded-xl shadow-inner mb-2">
+<span class="text-3xl">🧹</span>
+</div>
+<div>
+<h3 class="text-xl font-extrabold tracking-tight text-primary">My Choreboo</h3>
+<p class="text-sm font-medium text-on-surface-variant">Version 1.0.0 (Build 2024)</p>
+</div>
+<div class="flex justify-center gap-4 text-xs font-bold text-primary/60 uppercase tracking-widest">
+<a class="hover:text-primary transition-colors" href="#">Privacy</a>
+<span>•</span>
+<a class="hover:text-primary transition-colors" href="#">Terms</a>
+<span>•</span>
+<a class="hover:text-primary transition-colors" href="#">Credits</a>
+</div>
+</section>
+</main>
+<!-- BottomNavBar -->
+<nav class="fixed bottom-0 left-0 w-full z-50 flex justify-around items-end px-4 pb-6 bg-white/80 dark:bg-[#171c1f]/80 backdrop-blur-md shadow-[0_-4px_24px_rgba(0,110,28,0.06)] rounded-t-[3rem]">
+<a class="flex flex-col items-center justify-center text-[#44474a] dark:text-[#c4c7ca] p-4 hover:text-[#006e1c] transition-all" href="#">
+<span class="material-symbols-outlined" data-icon="home">home</span>
+</a>
+<a class="flex flex-col items-center justify-center text-[#44474a] dark:text-[#c4c7ca] p-4 hover:text-[#006e1c] transition-all" href="#">
+<span class="material-symbols-outlined" data-icon="pets">pets</span>
+</a>
+<a class="flex flex-col items-center justify-center text-[#44474a] dark:text-[#c4c7ca] p-4 hover:text-[#006e1c] transition-all" href="#">
+<span class="material-symbols-outlined" data-icon="shopping_bag">shopping_bag</span>
+</a>
+<a class="flex flex-col items-center justify-center text-[#44474a] dark:text-[#c4c7ca] p-4 hover:text-[#006e1c] transition-all" href="#">
+<span class="material-symbols-outlined" data-icon="calendar_month">calendar_month</span>
+</a>
+<!-- Active state for Settings is represented by the TopAppBar title, but since it's not in the bottom nav, we highlight nothing here or map to home if desired. Guidelines say strictly map labels. Settings is not in the JSON BottomNav icons, but usually Settings is a trailing action. Following rule 8.2: If designing a user settings page, "Profile" is active. Assuming user icon is settings/profile. -->
+<div class="absolute -top-16 right-8">
+<!-- FAB Suppressed on Settings screen per mandate -->
+</div>
+</nav>
+</body></html>
