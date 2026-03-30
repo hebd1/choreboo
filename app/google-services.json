@@ -1,0 +1,29 @@
+{
+  "project_info": {
+    "project_number": "1003527545101",
+    "project_id": "choreboo-7f36c",
+    "storage_bucket": "choreboo-7f36c.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:1003527545101:android:6dbb6c8f2477b6cebf5044",
+        "android_client_info": {
+          "package_name": "com.example.choreboo_habittrackerfriend"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyCT5wDec3DLM2ehxk2CUnR2SUPiY8Pw7t4"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}

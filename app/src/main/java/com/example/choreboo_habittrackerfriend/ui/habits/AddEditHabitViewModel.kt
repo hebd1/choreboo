@@ -24,7 +24,7 @@ import javax.inject.Inject
 data class HabitFormState(
     val title: String = "",
     val description: String = "",
-    val iconName: String = "CheckCircle",
+    val iconName: String = "emoji_salad",
     val customDays: List<String> = listOf("MON", "TUE", "WED", "THU", "FRI", "SAT", "SUN"),
     val targetCount: Int = 1,
     val baseXp: Int = 10,

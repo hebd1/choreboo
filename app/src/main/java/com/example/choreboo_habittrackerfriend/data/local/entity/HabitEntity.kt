@@ -6,7 +6,7 @@ data class HabitEntity(
     @PrimaryKey(autoGenerate = true) val id: Long = 0,
     val title: String,
     val description: String? = null,
-    val iconName: String = "CheckCircle",
+    val iconName: String = "emoji_salad",
     val customDays: String = "MON,TUE,WED,THU,FRI,SAT,SUN",
     val targetCount: Int = 1,
     val baseXp: Int = 10,
