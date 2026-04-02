@@ -1,10 +1,13 @@
 package com.example.choreboo_habittrackerfriend.data.repository
 
+import com.example.choreboo_habittrackerfriend.data.datastore.UserPreferences
 import com.example.choreboo_habittrackerfriend.data.local.dao.ChorebooDao
 import com.example.choreboo_habittrackerfriend.data.local.entity.ChorebooEntity
 import com.example.choreboo_habittrackerfriend.domain.model.ChorebooStage
 import com.example.choreboo_habittrackerfriend.domain.model.ChorebooStats
+import com.example.choreboo_habittrackerfriend.domain.model.PetType
 import kotlinx.coroutines.flow.Flow
+import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.map
 import javax.inject.Inject
 import javax.inject.Singleton
@@ -25,7 +28,7 @@ class ChorebooRepository @Inject constructor(
 
     suspend fun getChorebooSync(): ChorebooStats? = chorebooDao.getChorebooSync()?.toDomain()
 
-    suspend fun getOrCreateChoreboo(name: String = "Choreboo"): ChorebooEntity {
+    suspend fun getOrCreateChoreboo(name: String = "Choreboo", petType: PetType = PetType.FOX): ChorebooEntity {
         val existing = chorebooDao.getChorebooSync()
         if (existing != null) return existing
 
@@ -35,6 +38,7 @@ class ChorebooRepository @Inject constructor(
             hunger = 80,
             happiness = 80,
             energy = 80,
+            petType = petType.name,
         )
         val id = chorebooDao.insertChoreboo(newChoreboo)
         return newChoreboo.copy(id = id)
@@ -43,9 +47,30 @@ class ChorebooRepository @Inject constructor(
     suspend fun applyStatDecay() {
         val choreboo = chorebooDao.getChorebooSync() ?: return
         val now = System.currentTimeMillis()
-        val hoursSinceInteraction = (now - choreboo.lastInteractionAt) / (1000 * 60 * 60)
 
-        if (hoursSinceInteraction <= 0) return
+        // If sleeping, keep lastInteractionAt current to prevent decay accumulation
+        if (choreboo.sleepUntil > now) {
+            // Pet is still sleeping, update lastInteractionAt to now to prevent decay
+            chorebooDao.updateChoreboo(choreboo.copy(lastInteractionAt = now))
+            return
+        }
+
+        // If sleep just expired, set lastInteractionAt to sleepUntil time for proper decay calc
+        val decayFromTime = if (choreboo.sleepUntil > 0 && choreboo.sleepUntil <= now) {
+            choreboo.sleepUntil
+        } else {
+            choreboo.lastInteractionAt
+        }
+
+        val hoursSinceInteraction = (now - decayFromTime) / (1000 * 60 * 60)
+
+        if (hoursSinceInteraction <= 0) {
+            // Clear sleep if it's expired
+            if (choreboo.sleepUntil > 0 && choreboo.sleepUntil <= now) {
+                chorebooDao.updateChoreboo(choreboo.copy(sleepUntil = 0, lastInteractionAt = now))
+            }
+            return
+        }
 
         val decayAmount = hoursSinceInteraction.toInt().coerceAtMost(50) // cap decay
         val updated = choreboo.copy(
@@ -53,6 +78,7 @@ class ChorebooRepository @Inject constructor(
             happiness = max(0, choreboo.happiness - (decayAmount / 2)),
             energy = max(0, choreboo.energy - (decayAmount / 2)),
             lastInteractionAt = now,
+            sleepUntil = 0, // Clear sleep when it expires
         )
         chorebooDao.updateChoreboo(updated)
     }
@@ -92,15 +118,45 @@ class ChorebooRepository @Inject constructor(
         )
     }
 
-    suspend fun feedChoreboo(stat: String, value: Int) {
+    /** Manual feed from pet screen: +20 hunger, costs 10 points (already deducted by caller). */
+    suspend fun feedChoreboo() {
         val choreboo = chorebooDao.getChorebooSync() ?: return
-        val updated = when (stat.uppercase()) {
-            "HUNGER" -> choreboo.copy(hunger = (choreboo.hunger + value).coerceAtMost(100))
-            "HAPPINESS" -> choreboo.copy(happiness = (choreboo.happiness + value).coerceAtMost(100))
-            "ENERGY" -> choreboo.copy(energy = (choreboo.energy + value).coerceAtMost(100))
-            else -> choreboo
-        }.copy(lastInteractionAt = System.currentTimeMillis())
+        val updated = choreboo.copy(
+            hunger = (choreboo.hunger + 20).coerceAtMost(100),
+            lastInteractionAt = System.currentTimeMillis(),
+        )
         chorebooDao.updateChoreboo(updated)
+    }
+
+    /** Put pet to sleep for 24 hours — freezes all stat decay during sleep. */
+    suspend fun putToSleep() {
+        val choreboo = chorebooDao.getChorebooSync() ?: return
+        val now = System.currentTimeMillis()
+        val sleepUntilTime = now + (24 * 60 * 60 * 1000) // 24 hours from now
+        val updated = choreboo.copy(
+            sleepUntil = sleepUntilTime,
+            lastInteractionAt = now,
+        )
+        chorebooDao.updateChoreboo(updated)
+    }
+
+    /**
+     * Auto-feed: called silently after habit completion.
+     * If hunger < 30 AND user has >= 10 points, deduct 10 points and add +20 hunger.
+     * No animation triggered — purely background operation.
+     */
+    suspend fun autoFeedIfNeeded(userPreferences: UserPreferences) {
+        val choreboo = chorebooDao.getChorebooSync() ?: return
+        if (choreboo.hunger >= 30) return
+        val points = userPreferences.totalPoints.first()
+        if (points < 10) return
+        val deducted = userPreferences.deductPoints(10)
+        if (deducted) {
+            val updated = choreboo.copy(
+                hunger = (choreboo.hunger + 20).coerceAtMost(100),
+            )
+            chorebooDao.updateChoreboo(updated)
+        }
     }
 
     suspend fun updateName(name: String) {
@@ -118,7 +174,8 @@ private fun ChorebooEntity.toDomain() = ChorebooStats(
     hunger = hunger,
     happiness = happiness,
     energy = energy,
+    petType = try { PetType.valueOf(petType) } catch (_: Exception) { PetType.FOX },
     lastInteractionAt = lastInteractionAt,
     createdAt = createdAt,
+    sleepUntil = sleepUntil,
 )
-

@@ -65,9 +65,9 @@ class HabitRepository @Inject constructor(
         val habitEntity = habitDao.getHabitByIdSync(habitId)
             ?: return CompletionResult(xpEarned = 0, newStreak = 0, alreadyComplete = true)
 
-        // Check target count — prevent over-completion
+        // Ensure habit is only completed once per day
         val todayCount = habitLogDao.getCompletionCountForDate(habitId, today)
-        if (todayCount >= habitEntity.targetCount) {
+        if (todayCount >= 1) {
             return CompletionResult(xpEarned = 0, newStreak = 0, alreadyComplete = true)
         }
 
@@ -130,7 +130,7 @@ private fun HabitEntity.toDomain() = Habit(
     description = description,
     iconName = iconName,
     customDays = customDays.split(",").map { it.trim() },
-    targetCount = targetCount,
+    difficulty = difficulty,
     baseXp = baseXp,
     reminderEnabled = reminderEnabled,
     reminderTime = reminderTime?.let { timeStr ->
@@ -150,7 +150,7 @@ private fun Habit.toEntity() = HabitEntity(
     description = description,
     iconName = iconName,
     customDays = customDays.joinToString(","),
-    targetCount = targetCount,
+    difficulty = difficulty,
     baseXp = baseXp,
     reminderEnabled = reminderEnabled,
     reminderTime = reminderTime?.toString(),

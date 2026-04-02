@@ -8,9 +8,9 @@ import com.example.choreboo_habittrackerfriend.data.datastore.dataStore
 import com.example.choreboo_habittrackerfriend.data.local.ChorebooDatabase
 import com.example.choreboo_habittrackerfriend.data.local.dao.HabitDao
 import com.example.choreboo_habittrackerfriend.data.local.dao.HabitLogDao
-import com.example.choreboo_habittrackerfriend.data.local.dao.InventoryDao
-import com.example.choreboo_habittrackerfriend.data.local.dao.ItemDao
 import com.example.choreboo_habittrackerfriend.data.local.dao.ChorebooDao
+import com.google.firebase.auth.FirebaseAuth
+
 import dagger.Module
 import dagger.Provides
 import dagger.hilt.InstallIn
@@ -38,12 +38,6 @@ object AppModule {
     fun provideChorebooDao(db: ChorebooDatabase): ChorebooDao = db.chorebooDao()
 
     @Provides
-    fun provideItemDao(db: ChorebooDatabase): ItemDao = db.itemDao()
-
-    @Provides
-    fun provideInventoryDao(db: ChorebooDatabase): InventoryDao = db.inventoryDao()
-
-    @Provides
     @Singleton
     fun provideDataStore(@ApplicationContext context: Context): DataStore<Preferences> {
         return context.dataStore
@@ -54,5 +48,9 @@ object AppModule {
     fun provideUserPreferences(dataStore: DataStore<Preferences>): UserPreferences {
         return UserPreferences(dataStore)
     }
+
+    @Provides
+    @Singleton
+    fun provideFirebaseAuth(): FirebaseAuth = FirebaseAuth.getInstance()
 }
 

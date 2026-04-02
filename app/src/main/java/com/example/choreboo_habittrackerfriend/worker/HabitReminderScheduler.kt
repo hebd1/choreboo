@@ -25,6 +25,8 @@ object HabitReminderScheduler {
             action = "com.example.choreboo_habittrackerfriend.HABIT_REMINDER"
             putExtra("habitId", habitId)
             putExtra("habitTitle", habitTitle)
+            putExtra("reminderTime", reminderTime.toString())
+            putExtra("scheduledDays", scheduledDays.toTypedArray())
         }
 
         val pendingIntent = PendingIntent.getBroadcast(
@@ -75,27 +77,109 @@ object HabitReminderScheduler {
         if (scheduledDays.isEmpty()) return null
 
         val today = LocalDate.now()
-        val dayNames = listOf("MON", "TUE", "WED", "THU", "FRI", "SAT", "SUN")
-        val todayIndex = today.dayOfWeek.value % 7  // 0=Mon, 6=Sun
+        
+        // Check if any scheduled day is a weekly pattern (MON-SUN)
+        val weeklyDays = scheduledDays.filter { it.length == 3 && it.all { c -> c.isLetter() } }
+        // Check if any scheduled day is a monthly pattern (D1-D31)
+        val monthlyDays = scheduledDays.filter { it.startsWith("D") }.mapNotNull { it.drop(1).toIntOrNull() }
 
+        // Try to find the next occurrence
+        val nextWeeklyTrigger = if (weeklyDays.isNotEmpty()) {
+            calculateNextWeeklyTrigger(reminderTime, weeklyDays)
+        } else null
+
+        val nextMonthlyTrigger = if (monthlyDays.isNotEmpty()) {
+            calculateNextMonthlyTrigger(reminderTime, monthlyDays)
+        } else null
+
+        // Return whichever is sooner
+        return when {
+            nextWeeklyTrigger != null && nextMonthlyTrigger != null -> {
+                if (nextWeeklyTrigger.isBefore(nextMonthlyTrigger)) nextWeeklyTrigger else nextMonthlyTrigger
+            }
+            nextWeeklyTrigger != null -> nextWeeklyTrigger
+            nextMonthlyTrigger != null -> nextMonthlyTrigger
+            else -> null
+        }
+    }
+
+    private fun calculateNextWeeklyTrigger(
+        reminderTime: LocalTime,
+        weeklyDays: List<String>,
+    ): ZonedDateTime? {
+        val today = LocalDate.now()
+        
         // First, try today if it's a scheduled day
         val todayShort = today.dayOfWeek.name.take(3).uppercase()
-        if (scheduledDays.any { it.uppercase() == todayShort }) {
+        if (weeklyDays.any { it.uppercase() == todayShort }) {
             val todayTrigger = today.atTime(reminderTime).atZone(java.time.ZoneId.systemDefault())
             if (todayTrigger.isAfter(ZonedDateTime.now())) {
                 return todayTrigger
             }
         }
 
-        // Find the next scheduled day
+        // Find the next scheduled day within 7 days
         for (i in 1..7) {
             val checkDate = today.plusDays(i.toLong())
             val dayShort = checkDate.dayOfWeek.name.take(3).uppercase()
-            if (scheduledDays.any { it.uppercase() == dayShort }) {
+            if (weeklyDays.any { it.uppercase() == dayShort }) {
                 return checkDate.atTime(reminderTime).atZone(java.time.ZoneId.systemDefault())
             }
         }
 
         return null
+    }
+
+    private fun calculateNextMonthlyTrigger(
+        reminderTime: LocalTime,
+        monthlyDays: List<Int>,
+    ): ZonedDateTime? {
+        val today = LocalDate.now()
+        val now = ZonedDateTime.now()
+        
+        // Normalize day-of-month: D31 on months with fewer days becomes the last day
+        val validDaysThisMonth = monthlyDays.filter { day ->
+            when {
+                day <= 0 -> false
+                day <= 28 -> true  // Valid in all months
+                day == 29 -> today.month.maxLength() >= 29
+                day == 30 -> today.month.maxLength() >= 30
+                day == 31 -> today.month.maxLength() == 31
+                else -> false
+            }
+        }
+
+        val lastDayOfMonth = today.month.maxLength()
+        val normalizedDays = monthlyDays.map { day ->
+            if (day > lastDayOfMonth) lastDayOfMonth else day
+        }.distinct()
+
+        // Check if today is a scheduled day
+        if (today.dayOfMonth in normalizedDays) {
+            val todayTrigger = today.atTime(reminderTime).atZone(java.time.ZoneId.systemDefault())
+            if (todayTrigger.isAfter(now)) {
+                return todayTrigger
+            }
+        }
+
+        // Find the next scheduled day in this month
+        for (day in normalizedDays) {
+            if (day > today.dayOfMonth) {
+                return today.withDayOfMonth(day).atTime(reminderTime).atZone(java.time.ZoneId.systemDefault())
+            }
+        }
+
+        // If no match this month, try next month
+        val nextMonth = today.plusMonths(1)
+        val nextMonthLastDay = nextMonth.month.maxLength()
+        val nextMonthNormalizedDays = monthlyDays.map { day ->
+            if (day > nextMonthLastDay) nextMonthLastDay else day
+        }.distinct().sorted()
+
+        return if (nextMonthNormalizedDays.isNotEmpty()) {
+            nextMonth.withDayOfMonth(nextMonthNormalizedDays.first())
+                .atTime(reminderTime)
+                .atZone(java.time.ZoneId.systemDefault())
+        } else null
     }
 }

@@ -36,7 +36,6 @@ import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
-import androidx.compose.material3.LinearProgressIndicator
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
@@ -59,9 +58,8 @@ fun HabitCard(
     onEdit: () -> Unit,
     onDelete: () -> Unit,
 ) {
-    val isComplete = completedToday >= habit.targetCount
+    val isComplete = completedToday >= 1
     val emoji = getEmojiForIconName(habit.iconName)
-    val isMultiStep = habit.targetCount > 1
 
     Card(
         modifier = Modifier
@@ -150,16 +148,25 @@ fun HabitCard(
                         // Frequency label
                         Text(
                             text = run {
-                                val allDays = setOf("MON", "TUE", "WED", "THU", "FRI", "SAT", "SUN")
-                                val weekdays = setOf("MON", "TUE", "WED", "THU", "FRI")
-                                val weekends = setOf("SAT", "SUN")
-                                val days = habit.customDays.map { it.uppercase() }.toSet()
-                                when {
-                                    days == allDays -> "Daily"
-                                    days == weekdays -> "Weekdays"
-                                    days == weekends -> "Weekends"
-                                    !isScheduledToday -> "Not today"
-                                    else -> "Custom"
+                                val days = habit.customDays
+                                
+                                // Check for monthly pattern (days starting with "D")
+                                val monthlyDays = days.filter { it.startsWith("D") }
+                                if (monthlyDays.isNotEmpty()) {
+                                    "Monthly"
+                                } else {
+                                    // Handle weekly pattern
+                                    val allDays = setOf("MON", "TUE", "WED", "THU", "FRI", "SAT", "SUN")
+                                    val weekdays = setOf("MON", "TUE", "WED", "THU", "FRI")
+                                    val weekends = setOf("SAT", "SUN")
+                                    val daysUpper = days.map { it.uppercase() }.toSet()
+                                    when {
+                                        daysUpper == allDays -> "Daily"
+                                        daysUpper == weekdays -> "Weekdays"
+                                        daysUpper == weekends -> "Weekends"
+                                        !isScheduledToday -> "Not today"
+                                        else -> "Custom"
+                                    }
                                 }
                             },
                             style = MaterialTheme.typography.labelSmall,
@@ -189,19 +196,11 @@ fun HabitCard(
                     }
                 }
 
-                // Right side: progress + complete button
+                // Right side: complete button
                 Column(
                     horizontalAlignment = Alignment.End,
                     verticalArrangement = Arrangement.spacedBy(6.dp),
                 ) {
-                    // Progress count
-                    Text(
-                        text = "$completedToday / ${habit.targetCount}",
-                        style = MaterialTheme.typography.labelSmall,
-                        fontWeight = FontWeight.Bold,
-                        color = if (isComplete) MaterialTheme.colorScheme.primary
-                        else MaterialTheme.colorScheme.onSurfaceVariant,
-                    )
                     // Complete button — filled primary circle vs outlined
                     Row(verticalAlignment = Alignment.CenterVertically) {
                         IconButton(
@@ -284,20 +283,6 @@ fun HabitCard(
                     }
                 }
             }
-
-            // Multi-step progress bar
-            if (isMultiStep && isScheduledToday) {
-                Spacer(modifier = Modifier.height(10.dp))
-                LinearProgressIndicator(
-                    progress = { (completedToday.toFloat() / habit.targetCount).coerceIn(0f, 1f) },
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .height(6.dp)
-                        .clip(RoundedCornerShape(3.dp)),
-                    color = MaterialTheme.colorScheme.primaryContainer,
-                    trackColor = MaterialTheme.colorScheme.surfaceContainerHighest,
-                )
-            }
         }
     }
 }
@@ -319,6 +304,6 @@ fun getEmojiForIconName(name: String): String {
         "emoji_yoga" -> "🧘"
         "emoji_walk" -> "🚶"
         "emoji_study" -> "📖"
-        else -> "🥗"
+        else -> name
     }
 }

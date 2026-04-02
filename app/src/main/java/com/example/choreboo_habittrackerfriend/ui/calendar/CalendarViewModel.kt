@@ -3,7 +3,9 @@ package com.example.choreboo_habittrackerfriend.ui.calendar
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.example.choreboo_habittrackerfriend.data.local.dao.HabitLogWithName
+import com.example.choreboo_habittrackerfriend.data.datastore.UserPreferences
 import com.example.choreboo_habittrackerfriend.data.repository.HabitRepository
+import com.example.choreboo_habittrackerfriend.data.repository.AuthRepository
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -22,6 +24,8 @@ import javax.inject.Inject
 @HiltViewModel
 class CalendarViewModel @Inject constructor(
     private val habitRepository: HabitRepository,
+    private val userPreferences: UserPreferences,
+    private val authRepository: AuthRepository,
 ) : ViewModel() {
 
     private val _selectedMonth = MutableStateFlow(YearMonth.now())
@@ -29,6 +33,15 @@ class CalendarViewModel @Inject constructor(
 
     private val _selectedDate = MutableStateFlow<LocalDate?>(LocalDate.now())
     val selectedDate: StateFlow<LocalDate?> = _selectedDate.asStateFlow()
+
+    val totalPoints: StateFlow<Int> = userPreferences.totalPoints
+        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), 0)
+
+    val profilePhotoUri: StateFlow<String?> = userPreferences.profilePhotoUri
+        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), null)
+
+    val googlePhotoUrl: String?
+        get() = authRepository.currentFirebaseUser?.photoUrl?.toString()
 
     /** Map of date → number of completions for the currently selected month */
     val completionsForMonth: StateFlow<Map<LocalDate, Int>> = _selectedMonth

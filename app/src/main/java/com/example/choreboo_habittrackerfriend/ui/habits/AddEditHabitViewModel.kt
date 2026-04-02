@@ -5,17 +5,23 @@ import androidx.lifecycle.SavedStateHandle
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.example.choreboo_habittrackerfriend.data.repository.HabitRepository
+import com.example.choreboo_habittrackerfriend.data.datastore.UserPreferences
+import com.example.choreboo_habittrackerfriend.data.repository.AuthRepository
 import com.example.choreboo_habittrackerfriend.domain.model.Habit
 import com.example.choreboo_habittrackerfriend.worker.HabitReminderScheduler
 import dagger.hilt.android.lifecycle.HiltViewModel
 import dagger.hilt.android.qualifiers.ApplicationContext
 import kotlinx.coroutines.flow.MutableSharedFlow
 import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.SharingStarted
+import kotlinx.coroutines.flow.SharedFlow
+import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asSharedFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.debounce
 import kotlinx.coroutines.flow.distinctUntilChanged
 import kotlinx.coroutines.flow.map
+import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
 import java.time.LocalTime
@@ -26,18 +32,25 @@ data class HabitFormState(
     val description: String = "",
     val iconName: String = "emoji_salad",
     val customDays: List<String> = listOf("MON", "TUE", "WED", "THU", "FRI", "SAT", "SUN"),
-    val targetCount: Int = 1,
+    val difficulty: Int = 1,
     val baseXp: Int = 10,
     val reminderEnabled: Boolean = false,
     val reminderTime: LocalTime = LocalTime.of(9, 0),
+    val frequencyMode: FrequencyMode = FrequencyMode.WEEKLY,
     val suggestedXp: Int? = null,
     val isEditing: Boolean = false,
 )
+
+enum class FrequencyMode {
+    WEEKLY, MONTHLY,
+}
 
 @HiltViewModel
 class AddEditHabitViewModel @Inject constructor(
     savedStateHandle: SavedStateHandle,
     private val habitRepository: HabitRepository,
+    private val userPreferences: UserPreferences,
+    private val authRepository: AuthRepository,
     @ApplicationContext private val context: Context,
 ) : ViewModel() {
 
@@ -49,6 +62,12 @@ class AddEditHabitViewModel @Inject constructor(
     private val _events = MutableSharedFlow<AddEditHabitEvent>()
     val events = _events.asSharedFlow()
 
+    val profilePhotoUri: StateFlow<String?> = userPreferences.profilePhotoUri
+        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), null)
+
+    val googlePhotoUrl: String?
+        get() = authRepository.currentFirebaseUser?.photoUrl?.toString()
+
     init {
         if (habitId > 0) {
             viewModelScope.launch {
@@ -59,7 +78,7 @@ class AddEditHabitViewModel @Inject constructor(
                             description = habit.description ?: "",
                             iconName = habit.iconName,
                             customDays = habit.customDays,
-                            targetCount = habit.targetCount,
+                            difficulty = habit.difficulty,
                             baseXp = habit.baseXp,
                             reminderEnabled = habit.reminderEnabled,
                             reminderTime = habit.reminderTime ?: LocalTime.of(9, 0),
@@ -103,12 +122,59 @@ class AddEditHabitViewModel @Inject constructor(
         }
     }
 
-    fun updateTargetCount(count: Int) {
-        _formState.update { it.copy(targetCount = count.coerceIn(1, 20)) }
+    fun updateDifficulty(difficulty: Int) {
+        _formState.update { state ->
+            val newDifficulty = difficulty.coerceIn(1, 3)
+            val newXp = xpForDifficulty(newDifficulty)
+            state.copy(difficulty = newDifficulty, baseXp = newXp)
+        }
     }
 
     fun updateBaseXp(xp: Int) {
-        _formState.update { it.copy(baseXp = xp.coerceIn(1, 100)) }
+        // Deprecated: XP is now auto-calculated from difficulty
+        // Kept for backward compatibility but will be overridden by updateTargetCount
+    }
+
+    private fun xpForDifficulty(difficulty: Int): Int {
+        return when (difficulty) {
+            1 -> 10      // Easy
+            2 -> 25      // Medium
+            3 -> 40      // Hard
+            else -> 10
+        }
+    }
+
+    fun updateFrequencyMode(mode: FrequencyMode) {
+        _formState.update { state ->
+            val newDays = when (mode) {
+                FrequencyMode.WEEKLY -> {
+                    // Switch to weekly: use existing days or default to all days
+                    if (state.frequencyMode == FrequencyMode.MONTHLY) {
+                        listOf("MON", "TUE", "WED", "THU", "FRI", "SAT", "SUN")
+                    } else {
+                        state.customDays
+                    }
+                }
+                FrequencyMode.MONTHLY -> {
+                    // Switch to monthly: convert or default to 1st and 15th
+                    if (state.frequencyMode == FrequencyMode.WEEKLY) {
+                        listOf("D1", "D15")
+                    } else {
+                        state.customDays
+                    }
+                }
+            }
+            state.copy(frequencyMode = mode, customDays = newDays)
+        }
+    }
+
+    fun toggleMonthlyDay(dayOfMonth: Int) {
+        _formState.update { state ->
+            val dayKey = "D$dayOfMonth"
+            val days = state.customDays.toMutableList()
+            if (dayKey in days) days.remove(dayKey) else days.add(dayKey)
+            state.copy(customDays = days.sorted())
+        }
     }
 
     fun updateReminderEnabled(enabled: Boolean) {
@@ -145,24 +211,24 @@ class AddEditHabitViewModel @Inject constructor(
                 description = state.description.trim().ifBlank { null },
                 iconName = state.iconName,
                 customDays = state.customDays,
-                targetCount = state.targetCount,
+                difficulty = state.difficulty,
                 baseXp = state.baseXp,
                 reminderEnabled = state.reminderEnabled,
                 reminderTime = if (state.reminderEnabled) state.reminderTime else null,
             )
-            habitRepository.upsertHabit(habit)
+            val savedHabitId = habitRepository.upsertHabit(habit)
 
-            // Schedule or cancel reminder
-            if (habit.reminderEnabled && habit.reminderTime != null) {
+            // Schedule or cancel reminder (use the returned ID for new habits)
+            if (state.reminderEnabled && state.reminderTime != null) {
                 HabitReminderScheduler.scheduleReminder(
                     context,
-                    habit.id,
-                    habit.title,
-                    habit.reminderTime,
-                    habit.customDays,
+                    savedHabitId,
+                    state.title.trim(),
+                    state.reminderTime,
+                    state.customDays,
                 )
             } else {
-                HabitReminderScheduler.cancelReminder(context, habit.id)
+                HabitReminderScheduler.cancelReminder(context, savedHabitId)
             }
 
             _events.emit(AddEditHabitEvent.Saved)

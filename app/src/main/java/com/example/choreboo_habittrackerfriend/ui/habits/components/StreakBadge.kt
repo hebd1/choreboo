@@ -18,7 +18,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
-import com.example.choreboo_habittrackerfriend.ui.theme.StreakFlame
+import androidx.compose.ui.unit.sp
 
 @Composable
 fun StreakBadge(
@@ -29,24 +29,24 @@ fun StreakBadge(
 
     Row(
         modifier = modifier
-            .clip(RoundedCornerShape(8.dp))
-            .background(StreakFlame.copy(alpha = 0.15f))
-            .padding(horizontal = 6.dp, vertical = 2.dp),
+            .clip(RoundedCornerShape(50.dp))
+            .background(MaterialTheme.colorScheme.secondary.copy(alpha = 0.12f))
+            .padding(horizontal = 8.dp, vertical = 3.dp),
         verticalAlignment = Alignment.CenterVertically,
     ) {
         Icon(
             imageVector = Icons.Default.LocalFireDepartment,
             contentDescription = "Streak",
-            tint = StreakFlame,
-            modifier = Modifier.size(14.dp),
+            tint = MaterialTheme.colorScheme.secondary,
+            modifier = Modifier.size(13.dp),
         )
-        Spacer(modifier = Modifier.width(2.dp))
+        Spacer(modifier = Modifier.width(3.dp))
         Text(
             text = "$streak",
             style = MaterialTheme.typography.labelSmall,
             fontWeight = FontWeight.Bold,
-            color = StreakFlame,
+            color = MaterialTheme.colorScheme.secondary,
+            fontSize = 11.sp,
         )
     }
 }
-

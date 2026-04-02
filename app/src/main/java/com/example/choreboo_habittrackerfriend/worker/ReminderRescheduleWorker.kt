@@ -7,6 +7,7 @@ import androidx.work.WorkerParameters
 import com.example.choreboo_habittrackerfriend.data.repository.HabitRepository
 import dagger.assisted.Assisted
 import dagger.assisted.AssistedInject
+import kotlinx.coroutines.flow.first
 
 @HiltWorker
 class ReminderRescheduleWorker @AssistedInject constructor(
@@ -17,17 +18,16 @@ class ReminderRescheduleWorker @AssistedInject constructor(
 
     override suspend fun doWork(): Result {
         return try {
-            habitRepository.getAllHabits().collect { habits ->
-                habits.forEach { habit ->
-                    if (habit.reminderEnabled && habit.reminderTime != null) {
-                        HabitReminderScheduler.scheduleReminder(
-                            applicationContext,
-                            habit.id,
-                            habit.title,
-                            habit.reminderTime,
-                            habit.customDays,
-                        )
-                    }
+            val habits = habitRepository.getAllHabits().first()
+            habits.forEach { habit ->
+                if (habit.reminderEnabled && habit.reminderTime != null) {
+                    HabitReminderScheduler.scheduleReminder(
+                        applicationContext,
+                        habit.id,
+                        habit.title,
+                        habit.reminderTime,
+                        habit.customDays,
+                    )
                 }
             }
             Result.success()

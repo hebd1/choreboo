@@ -1,0 +1,254 @@
+<!DOCTYPE html>
+
+<html class="light" lang="en"><head>
+<meta charset="utf-8"/>
+<meta content="width=device-width, initial-scale=1.0" name="viewport"/>
+<link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:ital,wght@0,400;0,500;0,600;0,700;0,800;1,800&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
+<script id="tailwind-config">
+      tailwind.config = {
+        darkMode: "class",
+        theme: {
+          extend: {
+            colors: {
+              "primary-container": "#4caf50",
+              "inverse-primary": "#78dc77",
+              "surface-container-low": "#f0f4f8",
+              "tertiary-fixed": "#e8deff",
+              "outline-variant": "#becab9",
+              "secondary-fixed-dim": "#ffb870",
+              "surface-container-lowest": "#ffffff",
+              "secondary-container": "#ff9800",
+              "on-tertiary-container": "#39009c",
+              "surface-bright": "#f6fafe",
+              "on-background": "#171c1f",
+              "tertiary-container": "#a488ff",
+              "primary-fixed-dim": "#78dc77",
+              "surface-container-highest": "#dfe3e7",
+              "secondary-fixed": "#ffdcbe",
+              "secondary": "#8b5000",
+              "surface-dim": "#d6dade",
+              "on-secondary-fixed-variant": "#693c00",
+              "primary-fixed": "#94f990",
+              "on-error": "#ffffff",
+              "tertiary": "#6833ea",
+              "on-tertiary-fixed": "#20005f",
+              "on-error-container": "#93000a",
+              "inverse-surface": "#2c3134",
+              "surface-tint": "#006e1c",
+              "on-primary-fixed-variant": "#005313",
+              "error": "#ba1a1a",
+              "on-secondary-fixed": "#2c1600",
+              "surface-container-high": "#e4e9ed",
+              "on-secondary-container": "#653900",
+              "on-primary-fixed": "#002204",
+              "error-container": "#ffdad6",
+              "surface": "#f6fafe",
+              "on-secondary": "#ffffff",
+              "on-primary-container": "#003c0b",
+              "surface-container": "#eaeef2",
+              "on-surface": "#171c1f",
+              "on-surface-variant": "#3f4a3c",
+              "on-primary": "#ffffff",
+              "outline": "#6f7a6b",
+              "tertiary-fixed-dim": "#cdbdff",
+              "background": "#f6fafe",
+              "surface-variant": "#dfe3e7",
+              "inverse-on-surface": "#edf1f5",
+              "primary": "#006e1c",
+              "on-tertiary-fixed-variant": "#4f00d0",
+              "on-tertiary": "#ffffff"
+            },
+            fontFamily: {
+              "headline": ["Plus Jakarta Sans"],
+              "body": ["Plus Jakarta Sans"],
+              "label": ["Plus Jakarta Sans"]
+            },
+            borderRadius: {"DEFAULT": "1rem", "lg": "2rem", "xl": "3rem", "full": "9999px"},
+          },
+        },
+      }
+    </script>
+<style>
+        .material-symbols-outlined {
+            font-variation-settings: 'FILL' 0, 'wght' 400, 'GRAD' 0, 'opsz' 24;
+        }
+        .bg-mesh {
+            background-color: #f6fafe;
+            background-image: radial-gradient(at 0% 0%, rgba(76, 175, 80, 0.05) 0px, transparent 50%),
+                              radial-gradient(at 100% 0%, rgba(104, 51, 234, 0.05) 0px, transparent 50%);
+        }
+    </style>
+<style>
+    body {
+      min-height: max(884px, 100dvh);
+    }
+  </style>
+  </head>
+<body class="bg-background font-body text-on-surface min-h-screen pb-32 bg-mesh">
+<!-- Top App Bar -->
+<header class="w-full top-0 px-4 pt-4 pb-2 bg-[#f6fafe] dark:bg-slate-950">
+<div class="flex justify-between items-center w-full max-w-md mx-auto">
+<div class="flex items-center gap-3 scale-95 active:scale-90 transition-transform">
+<div class="w-10 h-10 rounded-full bg-primary-container flex items-center justify-center overflow-hidden ring-2 ring-primary/20">
+<img alt="User pet avatar" data-alt="close-up 3D rendered cute Shiba Inu puppy avatar with soft lighting and vibrant green background" src="https://lh3.googleusercontent.com/aida-public/AB6AXuDxXzTobv8_lKukqL-3c5kHqvqzfl0JNq5OR4d4GglDhCOdWwE5OAHNia7pQysYVHVnXEF8NYZsCGyuZtR8yYwcJEdF6kaevGBW0FLi0XTjgEcH4EjBimeTDK1jgaVZUNDrIWegvUe1wHItl2049KhY6EGkzCs-1NJl5hiO2ds4maFGD2sSFp1ro1LTIEBYac8WHCnsOsV32YU8fc--gZbRepiEv4XAIshBbJQrCuzUN5nuYATOYnlXGVPvsnjwOIiERjkUi1dT318q"/>
+</div>
+<h1 class="font-['Plus_Jakarta_Sans'] font-black italic text-2xl text-[#006e1c] dark:text-[#4caf50] tracking-tight">Choreboo</h1>
+</div>
+<button class="material-symbols-outlined text-slate-500 dark:text-slate-400 hover:opacity-80 transition-opacity p-2">
+                notifications
+            </button>
+</div>
+</header>
+<main class="max-w-md mx-auto px-4 mt-6 space-y-8">
+<!-- Weekly Narrative Banner -->
+<section class="relative overflow-hidden rounded-xl bg-gradient-to-br from-primary to-primary-container p-6 text-on-primary shadow-lg">
+<div class="relative z-10">
+<div class="flex justify-between items-start mb-4">
+<span class="bg-white/20 backdrop-blur-md px-3 py-1 rounded-full text-[10px] font-bold uppercase tracking-widest">The Verdant Forest</span>
+<span class="text-3xl">🌳</span>
+</div>
+<h2 class="text-display-lg font-headline font-extrabold text-2xl leading-tight mb-2">The Chapter of Renewal</h2>
+<p class="text-body-lg opacity-90 leading-relaxed font-medium">Your garden thrives! Complete 3 more chores to unlock the <span class="underline decoration-secondary-fixed decoration-2 underline-offset-4">Golden Seed</span> for your pet.</p>
+<div class="mt-6 h-3 w-full bg-white/20 rounded-full overflow-hidden">
+<div class="h-full bg-white rounded-full w-[65%]" style="box-shadow: 0 0 12px rgba(255,255,255,0.5)"></div>
+</div>
+<div class="mt-2 flex justify-between text-[10px] font-bold uppercase tracking-tighter opacity-80">
+<span>Level 14 Progress</span>
+<span>65%</span>
+</div>
+</div>
+<!-- Decorative Elements -->
+<div class="absolute -right-4 -bottom-4 w-32 h-32 bg-white/10 rounded-full blur-3xl"></div>
+</section>
+<!-- Dynamic Asymmetry Bento Grid for Quick Stats -->
+<section class="grid grid-cols-2 gap-4">
+<div class="bg-surface-container-low p-5 rounded-lg flex flex-col justify-between aspect-square">
+<span class="text-3xl mb-2">🔥</span>
+<div>
+<div class="text-headline-sm font-black text-3xl tracking-tighter">12</div>
+<div class="text-label-md font-bold text-outline uppercase tracking-widest text-[10px]">Day Streak</div>
+</div>
+</div>
+<div class="space-y-4">
+<div class="bg-tertiary-fixed p-4 rounded-lg flex items-center gap-3">
+<span class="text-2xl">✨</span>
+<div>
+<div class="font-bold text-on-tertiary-container">+250</div>
+<div class="text-[10px] uppercase font-bold text-on-tertiary-container/60">XP Today</div>
+</div>
+</div>
+<div class="bg-secondary-fixed p-4 rounded-lg flex items-center gap-3">
+<span class="text-2xl">⭐</span>
+<div>
+<div class="font-bold text-on-secondary-fixed">840</div>
+<div class="text-[10px] uppercase font-bold text-on-secondary-fixed/60">Star Points</div>
+</div>
+</div>
+</div>
+</section>
+<!-- Habit List -->
+<section class="space-y-6">
+<div class="flex justify-between items-end">
+<h3 class="font-headline font-extrabold text-xl tracking-tight">Today's Narrative</h3>
+<span class="text-primary font-bold text-sm">View Lore</span>
+</div>
+<div class="space-y-4">
+<!-- Habit Item 1 -->
+<div class="group relative bg-surface-container-lowest p-5 rounded-lg flex items-center justify-between transition-all hover:translate-y-[-2px]">
+<div class="flex items-center gap-4">
+<div class="relative">
+<span class="text-3xl absolute -top-4 -left-3 rotate-[-15deg] transition-transform group-hover:scale-110">🍖</span>
+<div class="w-12 h-12 bg-surface-container-high rounded-full flex items-center justify-center">
+<span class="material-symbols-outlined text-primary">restaurant</span>
+</div>
+</div>
+<div>
+<h4 class="font-bold text-on-surface">Feed the Pet</h4>
+<div class="flex items-center gap-2 mt-1">
+<span class="bg-tertiary-container text-on-tertiary-container text-[10px] font-bold px-2 py-0.5 rounded-full uppercase">50 XP</span>
+<span class="text-[10px] text-outline font-bold uppercase tracking-wider">Morning</span>
+</div>
+</div>
+</div>
+<button class="w-10 h-10 rounded-full border-2 border-outline-variant flex items-center justify-center transition-colors hover:bg-primary-container/10 group-active:scale-95">
+<span class="material-symbols-outlined text-outline-variant">check</span>
+</button>
+</div>
+<!-- Habit Item 2 -->
+<div class="group relative bg-surface-container-lowest p-5 rounded-lg flex items-center justify-between transition-all hover:translate-y-[-2px]">
+<div class="flex items-center gap-4">
+<div class="relative">
+<span class="text-3xl absolute -top-4 -left-3 rotate-[10deg] transition-transform group-hover:scale-110">🥚</span>
+<div class="w-12 h-12 bg-surface-container-high rounded-full flex items-center justify-center">
+<span class="material-symbols-outlined text-primary">cleaning_services</span>
+</div>
+</div>
+<div>
+<h4 class="font-bold text-on-surface">Tidy the Nest</h4>
+<div class="flex items-center gap-2 mt-1">
+<span class="bg-tertiary-container text-on-tertiary-container text-[10px] font-bold px-2 py-0.5 rounded-full uppercase">120 XP</span>
+<span class="text-[10px] text-outline font-bold uppercase tracking-wider">Afternoon</span>
+</div>
+</div>
+</div>
+<button class="w-10 h-10 rounded-full bg-gradient-to-br from-primary to-primary-container flex items-center justify-center shadow-lg shadow-primary/20 transition-transform group-active:scale-95">
+<span class="material-symbols-outlined text-white" style="font-variation-settings: 'FILL' 1;">check</span>
+</button>
+</div>
+<!-- Habit Item 3 -->
+<div class="group relative bg-surface-container-lowest p-5 rounded-lg flex items-center justify-between transition-all hover:translate-y-[-2px]">
+<div class="flex items-center gap-4">
+<div class="relative">
+<span class="text-3xl absolute -top-4 -left-3 rotate-[-5deg] transition-transform group-hover:scale-110">💧</span>
+<div class="w-12 h-12 bg-surface-container-high rounded-full flex items-center justify-center">
+<span class="material-symbols-outlined text-primary">water_drop</span>
+</div>
+</div>
+<div>
+<h4 class="font-bold text-on-surface">Water the Sprout</h4>
+<div class="flex items-center gap-2 mt-1">
+<span class="bg-tertiary-container text-on-tertiary-container text-[10px] font-bold px-2 py-0.5 rounded-full uppercase">30 XP</span>
+<span class="text-[10px] text-outline font-bold uppercase tracking-wider">Anytime</span>
+</div>
+</div>
+</div>
+<button class="w-10 h-10 rounded-full border-2 border-outline-variant flex items-center justify-center transition-colors hover:bg-primary-container/10 group-active:scale-95">
+<span class="material-symbols-outlined text-outline-variant">check</span>
+</button>
+</div>
+</div>
+</section>
+</main>
+<!-- Bottom Navigation Shell -->
+<nav class="fixed bottom-0 left-0 w-full flex justify-around items-center pb-8 z-50">
+<div class="bg-[#dfe3e7]/80 dark:bg-slate-900/80 backdrop-blur-xl fixed bottom-6 left-1/2 -translate-x-1/2 w-[90%] max-w-sm rounded-full py-3 px-6 shadow-[0_24px_48px_-12px_rgba(0,110,28,0.15)] flex justify-between items-center transition-all duration-300 ease-out">
+<!-- Habits (Active) -->
+<a class="flex flex-col items-center justify-center bg-gradient-to-br from-[#006e1c] to-[#4caf50] text-white rounded-full p-3 -mt-8 shadow-lg ring-4 ring-[#f6fafe] dark:ring-slate-950 scale-110 transition-all duration-300 ease-out hover:scale-105 active:scale-95" href="#">
+<span class="material-symbols-outlined" style="font-variation-settings: 'FILL' 1;">checklist</span>
+<span class="font-['Plus_Jakarta_Sans'] font-medium text-[10px] uppercase tracking-wider mt-1">Habits</span>
+</a>
+<!-- Pet -->
+<a class="flex flex-col items-center justify-center text-slate-500 dark:text-slate-400 p-2 transition-all duration-300 ease-out hover:scale-105 active:scale-95 hover:text-[#006e1c] dark:hover:text-[#4caf50]" href="#">
+<span class="material-symbols-outlined">pets</span>
+<span class="font-['Plus_Jakarta_Sans'] font-medium text-[10px] uppercase tracking-wider mt-1">Pet</span>
+</a>
+<!-- Calendar -->
+<a class="flex flex-col items-center justify-center text-slate-500 dark:text-slate-400 p-2 transition-all duration-300 ease-out hover:scale-105 active:scale-95 hover:text-[#006e1c] dark:hover:text-[#4caf50]" href="#">
+<span class="material-symbols-outlined">calendar_month</span>
+<span class="font-['Plus_Jakarta_Sans'] font-medium text-[10px] uppercase tracking-wider mt-1">Calendar</span>
+</a>
+<!-- Settings -->
+<a class="flex flex-col items-center justify-center text-slate-500 dark:text-slate-400 p-2 transition-all duration-300 ease-out hover:scale-105 active:scale-95 hover:text-[#006e1c] dark:hover:text-[#4caf50]" href="#">
+<span class="material-symbols-outlined">settings</span>
+<span class="font-['Plus_Jakarta_Sans'] font-medium text-[10px] uppercase tracking-wider mt-1">Settings</span>
+</a>
+</div>
+</nav>
+<!-- FAB for adding new chores (contextual to Habits screen) -->
+<button class="fixed bottom-28 right-6 w-14 h-14 bg-gradient-to-br from-secondary to-secondary-container text-white rounded-full shadow-2xl flex items-center justify-center transition-transform hover:scale-110 active:scale-90 z-40">
+<span class="material-symbols-outlined text-3xl">add_task</span>
+</button>
+</body></html>

@@ -4,11 +4,13 @@ plugins {
     alias(libs.plugins.kotlin.compose)
     alias(libs.plugins.ksp)
     alias(libs.plugins.hilt)
+    id("com.google.gms.google-services")
 }
 
 android {
     namespace = "com.example.choreboo_habittrackerfriend"
     compileSdk = 36
+    buildToolsVersion = "37.0.0"
 
     defaultConfig {
         applicationId = "com.example.choreboo_habittrackerfriend"
@@ -56,6 +58,11 @@ dependencies {
     implementation(libs.androidx.compose.ui.tooling.preview)
     implementation(libs.androidx.compose.material3)
 
+    implementation(platform("com.google.firebase:firebase-bom:33.13.0"))
+    implementation("com.google.firebase:firebase-analytics")
+    implementation("com.google.firebase:firebase-auth")
+    implementation("com.google.android.gms:play-services-auth:21.2.0")
+
     // Hilt
     implementation(libs.hilt.android)
     ksp(libs.hilt.compiler)
@@ -95,6 +102,9 @@ dependencies {
 
     // Splash Screen
     implementation(libs.splashscreen)
+
+    // Emoji Picker
+    implementation(libs.emoji.picker)
 
     // Desugaring (java.time support for minSdk 24)
     coreLibraryDesugaring(libs.desugar.jdk.libs)

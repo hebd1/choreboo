@@ -4,10 +4,10 @@ import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.example.choreboo_habittrackerfriend.data.datastore.UserPreferences
 import com.example.choreboo_habittrackerfriend.data.repository.HabitRepository
-import com.example.choreboo_habittrackerfriend.data.repository.InventoryRepository
-import com.example.choreboo_habittrackerfriend.data.repository.ShopRepository
+import com.example.choreboo_habittrackerfriend.data.repository.AuthRepository
 import com.example.choreboo_habittrackerfriend.data.repository.ChorebooRepository
 import com.example.choreboo_habittrackerfriend.domain.model.Habit
+import com.example.choreboo_habittrackerfriend.domain.model.PetType
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.flow.MutableSharedFlow
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -15,6 +15,7 @@ import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asSharedFlow
 import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.launch
 import java.time.LocalDate
@@ -25,9 +26,8 @@ import javax.inject.Inject
 class HabitListViewModel @Inject constructor(
     private val habitRepository: HabitRepository,
     private val chorebooRepository: ChorebooRepository,
-    private val shopRepository: ShopRepository,
-    private val inventoryRepository: InventoryRepository,
     private val userPreferences: UserPreferences,
+    private val authRepository: AuthRepository,
 ) : ViewModel() {
 
     val habits: StateFlow<List<Habit>> = habitRepository.getAllHabits()
@@ -36,11 +36,21 @@ class HabitListViewModel @Inject constructor(
     val totalPoints: StateFlow<Int> = userPreferences.totalPoints
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), 0)
 
+    val profilePhotoUri: StateFlow<String?> = userPreferences.profilePhotoUri
+        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), null)
+
+    val googlePhotoUrl: String?
+        get() = authRepository.currentFirebaseUser?.photoUrl?.toString()
+
     private val _todayCompletions = MutableStateFlow<Map<Long, Int>>(emptyMap())
     val todayCompletions: StateFlow<Map<Long, Int>> = _todayCompletions.asStateFlow()
 
     val streaks: StateFlow<Map<Long, Int>> = habitRepository.getStreaksForToday()
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), emptyMap())
+
+    val petType: StateFlow<PetType> = chorebooRepository.getChoreboo()
+        .map { it?.petType ?: PetType.FOX }
+        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), PetType.FOX)
 
     private val _events = MutableSharedFlow<HabitListEvent>()
     val events = _events.asSharedFlow()
@@ -68,21 +78,13 @@ class HabitListViewModel @Inject constructor(
             }
             val xpResult = chorebooRepository.addXp(result.xpEarned)
 
-            // 30% chance to earn a random food item as a reward
-            var foodRewardName: String? = null
-            if ((1..100).random() <= 30) {
-                val foodItem = shopRepository.getRandomFoodItem()
-                if (foodItem != null) {
-                    inventoryRepository.addItemToInventory(foodItem.id)
-                    foodRewardName = foodItem.name
-                }
-            }
+            // Auto-feed: if hunger < 30 and user has enough points, silently feed
+            chorebooRepository.autoFeedIfNeeded(userPreferences)
 
             _events.emit(
                 HabitListEvent.HabitCompleted(
                     xpEarned = result.xpEarned,
                     streak = result.newStreak,
-                    foodReward = foodRewardName,
                     leveledUp = xpResult.levelsGained > 0,
                     newLevel = xpResult.newLevel,
                     evolved = xpResult.evolved,
@@ -103,7 +105,6 @@ sealed class HabitListEvent {
     data class HabitCompleted(
         val xpEarned: Int,
         val streak: Int,
-        val foodReward: String? = null,
         val leveledUp: Boolean = false,
         val newLevel: Int = 0,
         val evolved: Boolean = false,
@@ -111,4 +112,3 @@ sealed class HabitListEvent {
     ) : HabitListEvent()
     data object AlreadyComplete : HabitListEvent()
 }
-

@@ -1,0 +1,238 @@
+<!DOCTYPE html>
+
+<html lang="en"><head>
+<meta charset="utf-8"/>
+<meta content="width=device-width, initial-scale=1.0" name="viewport"/>
+<title>Choreboo - Fox Companion</title>
+<script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
+<link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:ital,wght@0,400;0,500;0,600;0,700;0,800;1,800&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<script id="tailwind-config">
+      tailwind.config = {
+        darkMode: "class",
+        theme: {
+          extend: {
+            colors: {
+              "primary-container": "#4caf50",
+              "inverse-primary": "#78dc77",
+              "surface-container-low": "#f0f4f8",
+              "tertiary-fixed": "#e8deff",
+              "outline-variant": "#becab9",
+              "secondary-fixed-dim": "#ffb870",
+              "surface-container-lowest": "#ffffff",
+              "secondary-container": "#ff9800",
+              "on-tertiary-container": "#39009c",
+              "surface-bright": "#f6fafe",
+              "on-background": "#171c1f",
+              "tertiary-container": "#a488ff",
+              "primary-fixed-dim": "#78dc77",
+              "surface-container-highest": "#dfe3e7",
+              "secondary-fixed": "#ffdcbe",
+              "secondary": "#8b5000",
+              "surface-dim": "#d6dade",
+              "on-secondary-fixed-variant": "#693c00",
+              "primary-fixed": "#94f990",
+              "on-error": "#ffffff",
+              "tertiary": "#6833ea",
+              "on-tertiary-fixed": "#20005f",
+              "on-error-container": "#93000a",
+              "inverse-surface": "#2c3134",
+              "surface-tint": "#006e1c",
+              "on-primary-fixed-variant": "#005313",
+              "error": "#ba1a1a",
+              "on-secondary-fixed": "#2c1600",
+              "surface-container-high": "#e4e9ed",
+              "on-secondary-container": "#653900",
+              "on-primary-fixed": "#002204",
+              "error-container": "#ffdad6",
+              "surface": "#f6fafe",
+              "on-secondary": "#ffffff",
+              "on-primary-container": "#003c0b",
+              "surface-container": "#eaeef2",
+              "on-surface": "#171c1f",
+              "on-surface-variant": "#3f4a3c",
+              "on-primary": "#ffffff",
+              "outline": "#6f7a6b",
+              "tertiary-fixed-dim": "#cdbdff",
+              "background": "#f6fafe",
+              "surface-variant": "#dfe3e7",
+              "inverse-on-surface": "#edf1f5",
+              "primary": "#006e1c",
+              "on-tertiary-fixed-variant": "#4f00d0",
+              "on-tertiary": "#ffffff"
+            },
+            fontFamily: {
+              "headline": ["Plus Jakarta Sans"],
+              "body": ["Plus Jakarta Sans"],
+              "label": ["Plus Jakarta Sans"]
+            },
+            borderRadius: {"DEFAULT": "1rem", "lg": "2rem", "xl": "3rem", "full": "9999px"},
+          },
+        },
+      }
+    </script>
+<style>
+        .material-symbols-outlined {
+            font-variation-settings: 'FILL' 0, 'wght' 400, 'GRAD' 0, 'opsz' 24;
+        }
+        body {
+            font-family: 'Plus Jakarta Sans', sans-serif;
+            background-color: #f6fafe;
+        }
+        .glass-panel {
+            background: rgba(255, 255, 255, 0.6);
+            backdrop-filter: blur(20px);
+        }
+        .fox-glow {
+            box-shadow: 0 0 60px -15px rgba(255, 152, 0, 0.3);
+        }
+    </style>
+<style>
+    body {
+      min-height: max(884px, 100dvh);
+    }
+  </style>
+  </head>
+<body class="bg-surface text-on-surface min-h-screen pb-32">
+<!-- TopAppBar -->
+<header class="w-full top-0 px-4 pt-4 pb-2 bg-[#f6fafe] dark:bg-slate-950 flex justify-between items-center max-w-md mx-auto">
+<div class="flex items-center gap-3">
+<div class="w-10 h-10 rounded-full bg-primary-container overflow-hidden ring-2 ring-white">
+<img alt="User pet avatar" class="w-full h-full object-cover" data-alt="Close up portrait of a friendly golden retriever wearing a stylish blue bandana in soft morning sunlight" src="https://lh3.googleusercontent.com/aida-public/AB6AXuAjdtBSiVVgj7AcqnYEc7Eba0qXL9VFzHrsmECVkMma_fAtN5-YCj1mgpvnIp8pWT37NW5C79Yh4_uDs7gL5UxhOmqE_MijIkKdNzfCDxfi_45Omqy9sDN-zEVPE_8-LD7JsA3KIHXP7ZTRO9MvR5mIcxfCtFG_UP9BD4UYFWF3jgXL1AE0nuWTC3o-MlgM1-7Xy5BqmGTsfSJ7PZUjfbU_aKrL8CGgcGM6dRPHCDHFae7AIh7hbGV6OP7-XZmYdXHb-ZETKTimi6WB"/>
+</div>
+<h1 class="font-['Plus_Jakarta_Sans'] font-black italic text-2xl text-[#006e1c] dark:text-[#4caf50]">Choreboo</h1>
+</div>
+<button class="p-2 text-slate-500 dark:text-slate-400 hover:opacity-80 transition-opacity active:scale-90 transition-transform">
+<span class="material-symbols-outlined" data-icon="notifications">notifications</span>
+</button>
+</header>
+<main class="max-w-md mx-auto px-6 pt-8 space-y-8">
+<!-- Fox Hero Section (The Living Narrative) -->
+<section class="relative flex flex-col items-center">
+<!-- Level Indicator (The Achievement Axis) -->
+<div class="absolute -top-4 right-4 z-10 flex flex-col items-end">
+<span class="text-[10px] font-bold uppercase tracking-widest text-on-surface-variant">Level</span>
+<span class="text-6xl font-extrabold tracking-tighter text-tertiary leading-none">14</span>
+<div class="mt-1 px-3 py-1 bg-tertiary-container text-on-tertiary-container rounded-full text-xs font-bold">
+                    840 XP
+                </div>
+</div>
+<!-- Fox Character -->
+<div class="relative w-64 h-64 flex items-center justify-center">
+<!-- Decorative background shapes -->
+<div class="absolute inset-0 bg-secondary-fixed opacity-20 rounded-full blur-3xl animate-pulse"></div>
+<!-- Main Fox Image -->
+<div class="relative z-0 fox-glow rounded-xl overflow-visible">
+<img alt="Fox companion" class="w-56 h-56 object-contain transform -rotate-3 hover:rotate-0 transition-transform duration-500" data-alt="A cute stylized red fox sitting in a sunlit meadow, high-end digital art style with soft fur textures and bright eyes" src="https://lh3.googleusercontent.com/aida-public/AB6AXuCV4PHk8yjrlMH9SgLd_KIAV0Li5VfwwzFNEGPKVN9jEXgaIsWKhrCGL-ZIUUonsAV43HJi5pnTpMgWBxYLxr95f8qrt30L5_gyWjRmM_wbclyTV0wnU1u5kuKTocqFLObhTJ7xT9EeMQ4C5uNSVuK51z0vkPA5vmv-jUSNDejZz-HcQCJMeXtn1H4cXSQF1SYZ2N3EtJ7dzRGtrXMX9_SJTM8Ylqk4hg_GbhOPrKvGW0-LmeIf7dUKwbwdBqRBeOvhYKvGhFVSLYQX"/>
+<!-- Overlapping Emoji (The "Streak" Card Rule) -->
+<div class="absolute -top-4 -left-4 text-5xl drop-shadow-lg">🦊</div>
+<div class="absolute -bottom-2 -right-2 text-4xl drop-shadow-lg">✨</div>
+</div>
+</div>
+<!-- Name and Mood -->
+<div class="text-center mt-6">
+<h2 class="text-3xl font-bold tracking-tight text-on-surface">Rusty</h2>
+<div class="inline-flex items-center gap-2 mt-1 px-4 py-1.5 bg-secondary-container/10 rounded-full border border-secondary-container/20">
+<span class="w-2 h-2 rounded-full bg-secondary-container animate-ping"></span>
+<span class="text-sm font-semibold text-on-secondary-container">Feeling Adventurous</span>
+</div>
+</div>
+</section>
+<!-- Stats Grid (Bento Style) -->
+<section class="grid grid-cols-2 gap-4">
+<!-- Hunger Card -->
+<div class="bg-surface-container-lowest p-5 rounded-lg flex flex-col gap-4">
+<div class="flex justify-between items-start">
+<span class="material-symbols-outlined text-secondary" data-icon="restaurant" style="font-variation-settings: 'FILL' 1;">restaurant</span>
+<span class="text-xs font-bold text-on-surface-variant uppercase tracking-widest">Hunger</span>
+</div>
+<div class="space-y-2">
+<div class="flex justify-between items-end">
+<span class="text-2xl font-bold">85%</span>
+<span class="text-[10px] text-on-surface-variant font-medium">Full</span>
+</div>
+<div class="h-2 w-full bg-surface-container rounded-full overflow-hidden">
+<div class="h-full bg-secondary-container rounded-full" style="width: 85%"></div>
+</div>
+</div>
+</div>
+<!-- Happiness Card -->
+<div class="bg-surface-container-lowest p-5 rounded-lg flex flex-col gap-4">
+<div class="flex justify-between items-start">
+<span class="material-symbols-outlined text-primary" data-icon="favorite" style="font-variation-settings: 'FILL' 1;">favorite</span>
+<span class="text-xs font-bold text-on-surface-variant uppercase tracking-widest">Joy</span>
+</div>
+<div class="space-y-2">
+<div class="flex justify-between items-end">
+<span class="text-2xl font-bold">92%</span>
+<span class="text-[10px] text-on-surface-variant font-medium">Happy</span>
+</div>
+<div class="h-2 w-full bg-surface-container rounded-full overflow-hidden">
+<div class="h-full bg-primary-container rounded-full" style="width: 92%"></div>
+</div>
+</div>
+</div>
+<!-- Energy Card (Double Width) -->
+<div class="col-span-2 bg-surface-container-lowest p-5 rounded-lg flex flex-col gap-4">
+<div class="flex justify-between items-start">
+<div class="flex items-center gap-2">
+<span class="material-symbols-outlined text-tertiary" data-icon="bolt" style="font-variation-settings: 'FILL' 1;">bolt</span>
+<span class="text-xs font-bold text-on-surface-variant uppercase tracking-widest">Energy Levels</span>
+</div>
+<span class="text-xs font-bold text-tertiary">NEEDS NAP SOON</span>
+</div>
+<div class="space-y-2">
+<div class="flex justify-between items-end">
+<span class="text-2xl font-bold">34%</span>
+<span class="text-[10px] text-on-surface-variant font-medium">RECHARGING</span>
+</div>
+<div class="h-3 w-full bg-surface-container rounded-full overflow-hidden">
+<div class="h-full bg-gradient-to-r from-tertiary to-tertiary-container rounded-full" style="width: 34%"></div>
+</div>
+</div>
+</div>
+</section>
+<!-- Quick Actions -->
+<section class="flex gap-4 overflow-x-auto pb-4 -mx-6 px-6 no-scrollbar">
+<button class="flex-shrink-0 bg-primary-container text-on-primary font-bold px-6 py-4 rounded-lg flex items-center gap-3 shadow-lg shadow-primary/20 active:scale-95 transition-transform">
+<span class="material-symbols-outlined" data-icon="restaurant">restaurant</span>
+<span>Feed Rusty</span>
+</button>
+<button class="flex-shrink-0 bg-surface-container-high text-on-surface font-bold px-6 py-4 rounded-lg flex items-center gap-3 active:scale-95 transition-transform">
+<span class="material-symbols-outlined" data-icon="toys">toys</span>
+<span>Play</span>
+</button>
+<button class="flex-shrink-0 bg-surface-container-high text-on-surface font-bold px-6 py-4 rounded-lg flex items-center gap-3 active:scale-95 transition-transform">
+<span class="material-symbols-outlined" data-icon="bed">bed</span>
+<span>Sleep</span>
+</button>
+</section>
+</main>
+<!-- BottomNavBar (The Anchor) -->
+<nav class="fixed bottom-0 left-0 w-full flex justify-around items-center pb-8 z-50">
+<!-- Floating Shell -->
+<div class="bg-[#dfe3e7]/80 dark:bg-slate-900/80 backdrop-blur-xl fixed bottom-6 left-1/2 -translate-x-1/2 w-[90%] max-w-sm rounded-full py-3 px-6 shadow-[0_24px_48px_-12px_rgba(0,110,28,0.15)] flex justify-between items-center">
+<!-- Habits -->
+<div class="flex flex-col items-center justify-center text-slate-500 dark:text-slate-400 p-2 hover:text-[#006e1c] dark:hover:text-[#4caf50] transition-all duration-300 ease-out hover:scale-105 active:scale-95">
+<span class="material-symbols-outlined" data-icon="checklist">checklist</span>
+<span class="font-['Plus_Jakarta_Sans'] font-medium text-[10px] uppercase tracking-wider mt-1">Habits</span>
+</div>
+<!-- Pet (ACTIVE) -->
+<div class="flex flex-col items-center justify-center bg-gradient-to-br from-[#006e1c] to-[#4caf50] text-white rounded-full p-3 -mt-8 shadow-lg ring-4 ring-[#f6fafe] dark:ring-slate-950 scale-110 transition-all duration-300 ease-out hover:scale-115 active:scale-95">
+<span class="material-symbols-outlined" data-icon="pets" style="font-variation-settings: 'FILL' 1;">pets</span>
+<span class="font-['Plus_Jakarta_Sans'] font-medium text-[10px] uppercase tracking-wider mt-1">Pet</span>
+</div>
+<!-- Calendar -->
+<div class="flex flex-col items-center justify-center text-slate-500 dark:text-slate-400 p-2 hover:text-[#006e1c] dark:hover:text-[#4caf50] transition-all duration-300 ease-out hover:scale-105 active:scale-95">
+<span class="material-symbols-outlined" data-icon="calendar_month">calendar_month</span>
+<span class="font-['Plus_Jakarta_Sans'] font-medium text-[10px] uppercase tracking-wider mt-1">Calendar</span>
+</div>
+<!-- Settings -->
+<div class="flex flex-col items-center justify-center text-slate-500 dark:text-slate-400 p-2 hover:text-[#006e1c] dark:hover:text-[#4caf50] transition-all duration-300 ease-out hover:scale-105 active:scale-95">
+<span class="material-symbols-outlined" data-icon="settings">settings</span>
+<span class="font-['Plus_Jakarta_Sans'] font-medium text-[10px] uppercase tracking-wider mt-1">Settings</span>
+</div>
+</div>
+</nav>
+</body></html>

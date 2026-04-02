@@ -14,6 +14,7 @@ import androidx.compose.ui.Modifier
 import androidx.navigation.compose.currentBackStackEntryAsState
 import androidx.navigation.compose.rememberNavController
 import com.example.choreboo_habittrackerfriend.data.datastore.UserPreferences
+import com.example.choreboo_habittrackerfriend.data.repository.AuthRepository
 import com.example.choreboo_habittrackerfriend.data.repository.ChorebooRepository
 import com.example.choreboo_habittrackerfriend.domain.model.ChorebooMood
 import com.example.choreboo_habittrackerfriend.navigation.Screen
@@ -32,6 +33,9 @@ class MainActivity : ComponentActivity() {
     @Inject
     lateinit var chorebooRepository: ChorebooRepository
 
+    @Inject
+    lateinit var authRepository: AuthRepository
+
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         enableEdgeToEdge()
@@ -48,9 +52,13 @@ class MainActivity : ComponentActivity() {
                 when (onboardingComplete) {
                     null -> { /* Loading — blank screen briefly */ }
                     else -> {
+                        val startDestination = when {
+                            !authRepository.isAuthenticated -> Screen.Auth.route
+                            onboardingComplete == false -> Screen.Onboarding.route
+                            else -> Screen.HabitList.route
+                        }
                         ChorebooApp(
-                            startDestination = if (onboardingComplete == true)
-                                Screen.HabitList.route else Screen.Onboarding.route,
+                            startDestination = startDestination,
                             petMood = petMood?.mood ?: ChorebooMood.IDLE,
                         )
                     }
@@ -73,8 +81,8 @@ fun ChorebooApp(
     val bottomNavRoutes = listOf(
         Screen.HabitList.route,
         Screen.Pet.route,
-        Screen.Shop.route,
         Screen.Calendar.route,
+        Screen.Settings.route,
     )
     val showBottomBar = currentRoute in bottomNavRoutes
 

@@ -1,5 +1,13 @@
 package com.example.choreboo_habittrackerfriend.ui.habits
 
+import android.Manifest
+import android.os.Build
+import android.view.ViewGroup
+import androidx.activity.compose.rememberLauncherForActivityResult
+import androidx.activity.result.contract.ActivityResultContracts
+import androidx.compose.animation.AnimatedVisibility
+import androidx.compose.animation.expandVertically
+import androidx.compose.animation.shrinkVertically
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
@@ -23,13 +31,17 @@ import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.Alarm
 import androidx.compose.material.icons.filled.AutoAwesome
+import androidx.compose.material.icons.filled.ChevronRight
 import androidx.compose.material.icons.filled.NotificationsNone
+import androidx.compose.material.icons.filled.Schedule
 import androidx.compose.material.icons.filled.TaskAlt
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
+import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
@@ -42,6 +54,7 @@ import androidx.compose.material3.SnackbarHost
 import androidx.compose.material3.SnackbarHostState
 import androidx.compose.material3.Switch
 import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
 import androidx.compose.material3.TimePicker
 import androidx.compose.material3.rememberTimePickerState
 import androidx.compose.runtime.Composable
@@ -56,11 +69,15 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import androidx.compose.ui.viewinterop.AndroidView
+import androidx.emoji2.emojipicker.EmojiPickerView
 import androidx.hilt.navigation.compose.hiltViewModel
+import com.example.choreboo_habittrackerfriend.ui.components.ProfileAvatar
 import java.time.LocalTime
 
 private data class EmojiIcon(val id: String, val emoji: String, val label: String)
@@ -92,8 +109,10 @@ fun AddEditHabitScreen(
     viewModel: AddEditHabitViewModel = hiltViewModel(),
 ) {
     val formState by viewModel.formState.collectAsState()
+    val profilePhotoUri by viewModel.profilePhotoUri.collectAsState()
     val snackbarHostState = remember { SnackbarHostState() }
     var showTimePicker by remember { mutableStateOf(false) }
+    var showEmojiPicker by remember { mutableStateOf(false) }
 
     LaunchedEffect(Unit) {
         viewModel.events.collect { event ->
@@ -116,7 +135,11 @@ fun AddEditHabitScreen(
                 .verticalScroll(rememberScrollState()),
         ) {
             // Choreboo branded top bar
-            ChorebooTopBar(onNavigateBack = onNavigateBack)
+            ChorebooTopBar(
+                onNavigateBack = onNavigateBack,
+                profilePhotoUri = profilePhotoUri,
+                googlePhotoUrl = viewModel.googlePhotoUrl,
+            )
 
             Column(
                 modifier = Modifier
@@ -162,7 +185,7 @@ fun AddEditHabitScreen(
                     ) {
                         val selectedIcon = emojiIcons.find { it.id == formState.iconName }
                         Text(
-                            text = selectedIcon?.emoji ?: "🥗",
+                            text = selectedIcon?.emoji ?: formState.iconName,
                             fontSize = 44.sp,
                         )
                     }
@@ -244,6 +267,41 @@ fun AddEditHabitScreen(
                             )
                         }
                     }
+                    // Custom emoji "+" button
+                    val isCustomEmoji = emojiIcons.none { it.id == formState.iconName }
+                    Box(
+                        modifier = Modifier
+                            .size(56.dp)
+                            .clip(CircleShape)
+                            .background(
+                                if (isCustomEmoji) MaterialTheme.colorScheme.primaryContainer
+                                else MaterialTheme.colorScheme.surfaceContainerLow,
+                            )
+                            .then(
+                                if (isCustomEmoji) Modifier.border(
+                                    2.dp,
+                                    MaterialTheme.colorScheme.primary,
+                                    CircleShape,
+                                )
+                                else Modifier,
+                            )
+                            .clickable { showEmojiPicker = true },
+                        contentAlignment = Alignment.Center,
+                    ) {
+                        if (isCustomEmoji) {
+                            Text(
+                                text = formState.iconName,
+                                fontSize = 28.sp,
+                            )
+                        } else {
+                            Icon(
+                                imageVector = Icons.Default.Add,
+                                contentDescription = "Add custom emoji",
+                                tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                                modifier = Modifier.size(24.dp),
+                            )
+                        }
+                    }
                     Spacer(modifier = Modifier.width(4.dp))
                 }
 
@@ -251,125 +309,84 @@ fun AddEditHabitScreen(
 
                 // Frequency card
                 FrequencyCard(
+                    frequencyMode = formState.frequencyMode,
                     selectedDays = formState.customDays,
+                    onFrequencyModeChange = viewModel::updateFrequencyMode,
                     onDayToggle = viewModel::toggleCustomDay,
+                    onMonthlyDayToggle = viewModel::toggleMonthlyDay,
                 )
 
                 Spacer(modifier = Modifier.height(20.dp))
 
-                // Sliders bento grid
-                Row(
-                    modifier = Modifier.fillMaxWidth(),
-                    horizontalArrangement = Arrangement.spacedBy(12.dp),
+                // Difficulty card (consolidates XP reward)
+                Box(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .clip(RoundedCornerShape(16.dp))
+                        .background(MaterialTheme.colorScheme.surfaceContainerLow)
+                        .padding(16.dp),
                 ) {
-                    // Difficulty card
-                    Box(
-                        modifier = Modifier
-                            .weight(1f)
-                            .clip(RoundedCornerShape(16.dp))
-                            .background(MaterialTheme.colorScheme.surfaceContainerLow)
-                            .padding(16.dp),
-                    ) {
-                        Column {
-                            Text(
-                                text = "DIFFICULTY",
-                                style = MaterialTheme.typography.labelSmall,
-                                fontWeight = FontWeight.Bold,
-                                color = MaterialTheme.colorScheme.outline,
-                                letterSpacing = 1.sp,
-                            )
-                            Spacer(modifier = Modifier.height(8.dp))
-                            Row(
-                                modifier = Modifier.fillMaxWidth(),
-                                horizontalArrangement = Arrangement.SpaceBetween,
-                                verticalAlignment = Alignment.CenterVertically,
-                            ) {
+                    Column {
+                        Text(
+                            text = "DIFFICULTY",
+                            style = MaterialTheme.typography.labelSmall,
+                            fontWeight = FontWeight.Bold,
+                            color = MaterialTheme.colorScheme.outline,
+                            letterSpacing = 1.sp,
+                        )
+                        Spacer(modifier = Modifier.height(8.dp))
+                        Row(
+                            modifier = Modifier.fillMaxWidth(),
+                            horizontalArrangement = Arrangement.SpaceBetween,
+                            verticalAlignment = Alignment.CenterVertically,
+                        ) {
+                            Column {
                                 Text(
                                     text = "⚡",
                                     fontSize = 24.sp,
                                 )
+                            }
+                            Column(
+                                horizontalAlignment = Alignment.End,
+                            ) {
                                 Text(
-                                    text = getDifficultyLabel(formState.targetCount),
+                                    text = getDifficultyLabel(formState.difficulty),
                                     style = MaterialTheme.typography.titleMedium,
                                     fontWeight = FontWeight.Bold,
                                     color = MaterialTheme.colorScheme.primary,
                                 )
+                                Spacer(modifier = Modifier.height(2.dp))
+                                Row(
+                                    verticalAlignment = Alignment.Bottom,
+                                    horizontalArrangement = Arrangement.End,
+                                ) {
+                                    Text(
+                                        text = "${formState.baseXp}",
+                                        style = MaterialTheme.typography.titleSmall,
+                                        fontWeight = FontWeight.Bold,
+                                        color = MaterialTheme.colorScheme.tertiary,
+                                    )
+                                    Spacer(modifier = Modifier.width(4.dp))
+                                    Text(
+                                        text = "XP",
+                                        style = MaterialTheme.typography.labelSmall,
+                                        fontWeight = FontWeight.SemiBold,
+                                        color = MaterialTheme.colorScheme.tertiary,
+                                    )
+                                }
                             }
-                            Spacer(modifier = Modifier.height(12.dp))
-                            Slider(
-                                value = formState.targetCount.toFloat(),
-                                onValueChange = { viewModel.updateTargetCount(it.toInt()) },
-                                valueRange = 1f..10f,
-                                steps = 8,
-                                colors = SliderDefaults.colors(
-                                    thumbColor = MaterialTheme.colorScheme.primary,
-                                    activeTrackColor = MaterialTheme.colorScheme.primary,
-                                ),
-                            )
                         }
-                    }
-
-                    // XP Reward card
-                    Box(
-                        modifier = Modifier
-                            .weight(1f)
-                            .clip(RoundedCornerShape(16.dp))
-                            .background(MaterialTheme.colorScheme.tertiaryContainer.copy(alpha = 0.2f))
-                            .border(
-                                1.dp,
-                                MaterialTheme.colorScheme.tertiary.copy(alpha = 0.2f),
-                                RoundedCornerShape(16.dp),
-                            )
-                            .padding(16.dp),
-                    ) {
-                        Column(
-                            horizontalAlignment = Alignment.CenterHorizontally,
-                        ) {
-                            Text(
-                                text = "XP REWARD",
-                                style = MaterialTheme.typography.labelSmall,
-                                fontWeight = FontWeight.Bold,
-                                color = MaterialTheme.colorScheme.tertiary,
-                                letterSpacing = 1.sp,
-                            )
-                            Spacer(modifier = Modifier.height(8.dp))
-                            Row(
-                                verticalAlignment = Alignment.Bottom,
-                                horizontalArrangement = Arrangement.Center,
-                            ) {
-                                Text(
-                                    text = "${formState.baseXp}",
-                                    style = MaterialTheme.typography.displaySmall,
-                                    fontWeight = FontWeight.ExtraBold,
-                                    color = MaterialTheme.colorScheme.tertiary,
-                                )
-                                Spacer(modifier = Modifier.width(4.dp))
-                                Text(
-                                    text = "XP",
-                                    style = MaterialTheme.typography.labelSmall,
-                                    fontWeight = FontWeight.Bold,
-                                    color = MaterialTheme.colorScheme.tertiary,
-                                )
-                            }
-                            Spacer(modifier = Modifier.height(6.dp))
-                            Text(
-                                text = "Boosts your pet's energy!",
-                                style = MaterialTheme.typography.labelSmall,
-                                color = MaterialTheme.colorScheme.onTertiaryContainer.copy(alpha = 0.7f),
-                                textAlign = TextAlign.Center,
-                            )
-                            Spacer(modifier = Modifier.height(12.dp))
-                            Slider(
-                                value = formState.baseXp.toFloat(),
-                                onValueChange = { viewModel.updateBaseXp(it.toInt()) },
-                                valueRange = 5f..50f,
-                                steps = 8,
-                                colors = SliderDefaults.colors(
-                                    thumbColor = MaterialTheme.colorScheme.tertiary,
-                                    activeTrackColor = MaterialTheme.colorScheme.tertiary,
-                                ),
-                            )
-                        }
+                        Spacer(modifier = Modifier.height(12.dp))
+                        Slider(
+                            value = formState.difficulty.toFloat(),
+                            onValueChange = { viewModel.updateDifficulty(it.toInt()) },
+                            valueRange = 1f..3f,
+                            steps = 1,
+                            colors = SliderDefaults.colors(
+                                thumbColor = MaterialTheme.colorScheme.primary,
+                                activeTrackColor = MaterialTheme.colorScheme.primary,
+                            ),
+                        )
                     }
                 }
 
@@ -391,6 +408,15 @@ fun AddEditHabitScreen(
                             showTimePicker = false
                         },
                         onDismiss = { showTimePicker = false },
+                    )
+                }
+
+                if (showEmojiPicker) {
+                    EmojiPickerDialog(
+                        onEmojiSelected = { emoji ->
+                            viewModel.updateIconName(emoji)
+                        },
+                        onDismiss = { showEmojiPicker = false },
                     )
                 }
 
@@ -456,7 +482,11 @@ fun AddEditHabitScreen(
 }
 
 @Composable
-private fun ChorebooTopBar(onNavigateBack: () -> Unit) {
+private fun ChorebooTopBar(
+    onNavigateBack: () -> Unit,
+    profilePhotoUri: String?,
+    googlePhotoUrl: String?,
+) {
     Row(
         modifier = Modifier
             .fillMaxWidth()
@@ -470,16 +500,12 @@ private fun ChorebooTopBar(onNavigateBack: () -> Unit) {
             verticalAlignment = Alignment.CenterVertically,
             modifier = Modifier.weight(1f),
         ) {
-            // Pet avatar circle
-            Box(
-                modifier = Modifier
-                    .size(40.dp)
-                    .clip(CircleShape)
-                    .background(MaterialTheme.colorScheme.primaryContainer),
-                contentAlignment = Alignment.Center,
-            ) {
-                Text("🐣", fontSize = 18.sp)
-            }
+            // Profile avatar circle
+            ProfileAvatar(
+                profilePhotoUri = profilePhotoUri,
+                googlePhotoUrl = googlePhotoUrl,
+                size = 40.dp,
+            )
 
             // Logo text
             Text(
@@ -504,8 +530,11 @@ private fun ChorebooTopBar(onNavigateBack: () -> Unit) {
 
 @Composable
 private fun FrequencyCard(
+    frequencyMode: FrequencyMode,
     selectedDays: List<String>,
+    onFrequencyModeChange: (FrequencyMode) -> Unit,
     onDayToggle: (String) -> Unit,
+    onMonthlyDayToggle: (Int) -> Unit,
 ) {
     Box(
         modifier = Modifier
@@ -528,31 +557,176 @@ private fun FrequencyCard(
             )
             Spacer(modifier = Modifier.height(12.dp))
 
-            // Day chips
-            FlowRow(
+            // Frequency mode selector (Weekly / Monthly)
+            Row(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .clip(RoundedCornerShape(12.dp))
+                    .background(MaterialTheme.colorScheme.surfaceContainerHighest),
                 horizontalArrangement = Arrangement.spacedBy(8.dp),
-                verticalArrangement = Arrangement.spacedBy(8.dp),
             ) {
-                daysOfWeek.forEach { day ->
-                    val selected = day in selectedDays
+                FrequencyMode.entries.forEach { mode ->
+                    val isSelected = mode == frequencyMode
                     Box(
                         modifier = Modifier
-                            .clip(RoundedCornerShape(50.dp))
+                            .weight(1f)
+                            .clip(RoundedCornerShape(10.dp))
                             .background(
-                                if (selected) MaterialTheme.colorScheme.primary
-                                else MaterialTheme.colorScheme.surfaceContainerHighest,
+                                if (isSelected) MaterialTheme.colorScheme.primary
+                                else Color.Transparent,
                             )
-                            .clickable { onDayToggle(day) }
-                            .padding(horizontal = 12.dp, vertical = 8.dp),
+                            .clickable { onFrequencyModeChange(mode) }
+                            .padding(vertical = 8.dp),
                         contentAlignment = Alignment.Center,
                     ) {
                         Text(
-                            text = day,
+                            text = mode.name,
                             style = MaterialTheme.typography.labelSmall,
-                            fontWeight = if (selected) FontWeight.Bold else FontWeight.Medium,
-                            color = if (selected) MaterialTheme.colorScheme.onPrimary
+                            fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Medium,
+                            color = if (isSelected) MaterialTheme.colorScheme.onPrimary
                             else MaterialTheme.colorScheme.onSurfaceVariant,
                         )
+                    }
+                }
+            }
+
+            Spacer(modifier = Modifier.height(16.dp))
+
+            // Day/Month selector based on mode
+            when (frequencyMode) {
+                FrequencyMode.WEEKLY -> {
+                    FlowRow(
+                        horizontalArrangement = Arrangement.spacedBy(8.dp),
+                        verticalArrangement = Arrangement.spacedBy(8.dp),
+                    ) {
+                        daysOfWeek.forEach { day ->
+                            val selected = day in selectedDays
+                            Box(
+                                modifier = Modifier
+                                    .clip(RoundedCornerShape(50.dp))
+                                    .background(
+                                        if (selected) MaterialTheme.colorScheme.primary
+                                        else MaterialTheme.colorScheme.surfaceContainerHighest,
+                                    )
+                                    .clickable { onDayToggle(day) }
+                                    .padding(horizontal = 12.dp, vertical = 8.dp),
+                                contentAlignment = Alignment.Center,
+                            ) {
+                                Text(
+                                    text = day,
+                                    style = MaterialTheme.typography.labelSmall,
+                                    fontWeight = if (selected) FontWeight.Bold else FontWeight.Medium,
+                                    color = if (selected) MaterialTheme.colorScheme.onPrimary
+                                    else MaterialTheme.colorScheme.onSurfaceVariant,
+                                )
+                            }
+                        }
+                    }
+                }
+                FrequencyMode.MONTHLY -> {
+                    MonthlyDaySelector(
+                        selectedDays = selectedDays,
+                        onDayToggle = onMonthlyDayToggle,
+                    )
+                }
+            }
+        }
+    }
+}
+
+@Composable
+private fun MonthlyDaySelector(
+    selectedDays: List<String>,
+    onDayToggle: (Int) -> Unit,
+) {
+    Column(
+        modifier = Modifier.fillMaxWidth(),
+    ) {
+        // Preset options
+        Text(
+            text = "Quick select:",
+            style = MaterialTheme.typography.labelSmall,
+            fontWeight = FontWeight.Bold,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+        )
+        Spacer(modifier = Modifier.height(8.dp))
+        
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            horizontalArrangement = Arrangement.spacedBy(8.dp),
+        ) {
+            listOf("1st" to 1, "15th" to 15, "Last" to 31).forEach { (label, day) ->
+                val selected = "D$day" in selectedDays
+                Box(
+                    modifier = Modifier
+                        .weight(1f)
+                        .clip(RoundedCornerShape(50.dp))
+                        .background(
+                            if (selected) MaterialTheme.colorScheme.primary
+                            else MaterialTheme.colorScheme.surfaceContainerHighest,
+                        )
+                        .clickable { onDayToggle(day) }
+                        .padding(vertical = 8.dp),
+                    contentAlignment = Alignment.Center,
+                ) {
+                    Text(
+                        text = label,
+                        style = MaterialTheme.typography.labelSmall,
+                        fontWeight = if (selected) FontWeight.Bold else FontWeight.Medium,
+                        color = if (selected) MaterialTheme.colorScheme.onPrimary
+                        else MaterialTheme.colorScheme.onSurfaceVariant,
+                    )
+                }
+            }
+        }
+
+        Spacer(modifier = Modifier.height(12.dp))
+
+        // Full day grid
+        Text(
+            text = "Or pick specific days:",
+            style = MaterialTheme.typography.labelSmall,
+            fontWeight = FontWeight.Bold,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+        )
+        Spacer(modifier = Modifier.height(8.dp))
+
+        val columns = 7
+        Column(
+            verticalArrangement = Arrangement.spacedBy(8.dp),
+        ) {
+            (1..31).chunked(columns).forEach { daysInRow ->
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.spacedBy(8.dp),
+                ) {
+                    daysInRow.forEach { day ->
+                        val selected = "D$day" in selectedDays
+                        Box(
+                            modifier = Modifier
+                                .weight(1f)
+                                .clip(RoundedCornerShape(8.dp))
+                                .background(
+                                    if (selected) MaterialTheme.colorScheme.primary
+                                    else MaterialTheme.colorScheme.surfaceContainerHighest,
+                                )
+                                .clickable { onDayToggle(day) }
+                                .padding(vertical = 6.dp),
+                            contentAlignment = Alignment.Center,
+                        ) {
+                            Text(
+                                text = "$day",
+                                style = MaterialTheme.typography.labelSmall,
+                                fontWeight = if (selected) FontWeight.Bold else FontWeight.Medium,
+                                color = if (selected) MaterialTheme.colorScheme.onPrimary
+                                else MaterialTheme.colorScheme.onSurfaceVariant,
+                                fontSize = 12.sp,
+                            )
+                        }
+                    }
+                    // Empty space for alignment
+                    repeat(columns - daysInRow.size) {
+                        Spacer(modifier = Modifier.weight(1f))
                     }
                 }
             }
@@ -567,13 +741,39 @@ private fun ReminderCard(
     onToggle: (Boolean) -> Unit,
     onTimeClick: () -> Unit,
 ) {
-    Box(
+    // Permission launcher for POST_NOTIFICATIONS (Android 13+)
+    var showPermissionDialog by remember { mutableStateOf(false) }
+    val notificationPermissionLauncher = rememberLauncherForActivityResult(
+        ActivityResultContracts.RequestPermission(),
+    ) { isGranted ->
+        if (isGranted) {
+            onToggle(true)
+        } else {
+            showPermissionDialog = true
+        }
+    }
+
+    if (showPermissionDialog) {
+        AlertDialog(
+            onDismissRequest = { showPermissionDialog = false },
+            title = { Text("Notification Permission") },
+            text = { Text("We need permission to send you habit reminders. Please enable notifications in settings.") },
+            confirmButton = {
+                Button(onClick = { showPermissionDialog = false }) {
+                    Text("OK")
+                }
+            },
+        )
+    }
+
+    Column(
         modifier = Modifier
             .fillMaxWidth()
             .clip(RoundedCornerShape(16.dp))
             .background(MaterialTheme.colorScheme.surfaceContainerLow)
             .padding(12.dp),
     ) {
+        // Toggle row
         Row(
             modifier = Modifier.fillMaxWidth(),
             horizontalArrangement = Arrangement.SpaceBetween,
@@ -610,31 +810,96 @@ private fun ReminderCard(
                     )
                     Spacer(modifier = Modifier.height(2.dp))
                     Text(
-                        text = if (reminderEnabled) {
-                            "Notify me at ${reminderTime.format(java.time.format.DateTimeFormatter.ofPattern("hh:mm a"))}"
-                        } else {
-                            "Not set"
-                        },
+                        text = if (reminderEnabled) "Enabled" else "Not set",
                         style = MaterialTheme.typography.labelSmall,
                         color = MaterialTheme.colorScheme.onSurfaceVariant,
                     )
                 }
             }
 
-            // Toggle switch
+            // Toggle switch with permission handling
             Switch(
                 checked = reminderEnabled,
-                onCheckedChange = onToggle,
+                onCheckedChange = { isChecked ->
+                    if (isChecked && Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
+                        // Request notification permission on Android 13+
+                        notificationPermissionLauncher.launch(Manifest.permission.POST_NOTIFICATIONS)
+                    } else {
+                        onToggle(isChecked)
+                    }
+                },
             )
+        }
+
+        // Expandable time selector
+        AnimatedVisibility(
+            visible = reminderEnabled,
+            enter = expandVertically(),
+            exit = shrinkVertically(),
+        ) {
+            Column {
+                HorizontalDivider(
+                    modifier = Modifier.padding(vertical = 10.dp),
+                    color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.4f),
+                )
+
+                Row(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .clip(RoundedCornerShape(12.dp))
+                        .background(MaterialTheme.colorScheme.secondaryContainer.copy(alpha = 0.15f))
+                        .clickable(onClick = onTimeClick)
+                        .padding(horizontal = 12.dp, vertical = 10.dp),
+                    horizontalArrangement = Arrangement.SpaceBetween,
+                    verticalAlignment = Alignment.CenterVertically,
+                ) {
+                    Row(
+                        horizontalArrangement = Arrangement.spacedBy(10.dp),
+                        verticalAlignment = Alignment.CenterVertically,
+                    ) {
+                        Icon(
+                            Icons.Default.Schedule,
+                            contentDescription = null,
+                            tint = MaterialTheme.colorScheme.secondary,
+                            modifier = Modifier.size(18.dp),
+                        )
+                        Text(
+                            text = "Remind me at",
+                            style = MaterialTheme.typography.labelMedium,
+                            color = MaterialTheme.colorScheme.onSurface,
+                        )
+                    }
+                    Row(
+                        horizontalArrangement = Arrangement.spacedBy(4.dp),
+                        verticalAlignment = Alignment.CenterVertically,
+                    ) {
+                        Text(
+                            text = reminderTime.format(
+                                java.time.format.DateTimeFormatter.ofPattern("hh:mm a"),
+                            ),
+                            style = MaterialTheme.typography.labelLarge,
+                            fontWeight = FontWeight.Bold,
+                            color = MaterialTheme.colorScheme.primary,
+                        )
+                        Icon(
+                            Icons.Default.ChevronRight,
+                            contentDescription = "Change time",
+                            tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                            modifier = Modifier.size(18.dp),
+                        )
+                    }
+                }
+            }
         }
     }
 }
 
-private fun getDifficultyLabel(targetCount: Int): String {
-    return when {
-        targetCount <= 3 -> "Easy"
-        targetCount <= 6 -> "Medium"
-        else -> "Hard"
+private fun getDifficultyLabel(difficulty: Int): String {
+    return when (difficulty) {
+        1 -> "Easy"
+        2 -> "Medium"
+        3 -> "Hard"
+        else -> "Easy"
     }
 }
 
@@ -667,6 +932,47 @@ private fun TimePickerDialog(
         },
         dismissButton = {
             Button(onClick = onDismiss) {
+                Text("Cancel")
+            }
+        },
+    )
+}
+
+@Composable
+private fun EmojiPickerDialog(
+    onEmojiSelected: (String) -> Unit,
+    onDismiss: () -> Unit,
+) {
+    val context = LocalContext.current
+
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        title = { Text("Pick a custom emoji") },
+        text = {
+            Box(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .height(300.dp),
+            ) {
+                AndroidView(
+                    factory = { ctx ->
+                        EmojiPickerView(ctx).apply {
+                            layoutParams = ViewGroup.LayoutParams(
+                                ViewGroup.LayoutParams.MATCH_PARENT,
+                                ViewGroup.LayoutParams.MATCH_PARENT,
+                            )
+                            setOnEmojiPickedListener { emojiViewItem ->
+                                onEmojiSelected(emojiViewItem.emoji)
+                                onDismiss()
+                            }
+                        }
+                    },
+                    modifier = Modifier.fillMaxSize(),
+                )
+            }
+        },
+        confirmButton = {
+            TextButton(onClick = onDismiss) {
                 Text("Cancel")
             }
         },

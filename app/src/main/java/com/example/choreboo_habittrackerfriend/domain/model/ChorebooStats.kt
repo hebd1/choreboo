@@ -8,8 +8,10 @@ data class ChorebooStats(
     val hunger: Int = 80,
     val happiness: Int = 80,
     val energy: Int = 80,
+    val petType: PetType = PetType.FOX,
     val lastInteractionAt: Long = System.currentTimeMillis(),
     val createdAt: Long = System.currentTimeMillis(),
+    val sleepUntil: Long = 0,
 ) {
     val overallMood: Int
         get() = (hunger + happiness + energy) / 3
@@ -27,4 +29,6 @@ data class ChorebooStats(
     val xpToNextLevel: Int get() = level * 50
     val xpProgressFraction: Float
         get() = if (xpToNextLevel > 0) xp.toFloat() / xpToNextLevel else 0f
+    val isSleeping: Boolean
+        get() = sleepUntil > System.currentTimeMillis()
 }

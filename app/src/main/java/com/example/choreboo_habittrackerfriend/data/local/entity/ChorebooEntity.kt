@@ -11,6 +11,8 @@ data class ChorebooEntity(
     val hunger: Int = 80,
     val happiness: Int = 80,
     val energy: Int = 80,
+    val petType: String = "FOX",
     val lastInteractionAt: Long = System.currentTimeMillis(),
     val createdAt: Long = System.currentTimeMillis(),
+    val sleepUntil: Long = 0,
 )

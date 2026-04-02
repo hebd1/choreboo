@@ -8,7 +8,7 @@ data class HabitEntity(
     val description: String? = null,
     val iconName: String = "emoji_salad",
     val customDays: String = "MON,TUE,WED,THU,FRI,SAT,SUN",
-    val targetCount: Int = 1,
+    val difficulty: Int = 1,
     val baseXp: Int = 10,
     val reminderEnabled: Boolean = false,
     val reminderTime: String? = null,

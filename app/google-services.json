@@ -12,7 +12,20 @@
           "package_name": "com.example.choreboo_habittrackerfriend"
         }
       },
-      "oauth_client": [],
+      "oauth_client": [
+        {
+          "client_id": "1003527545101-vugsienjkf1hu483jtlsnr1d7ivotec8.apps.googleusercontent.com",
+          "client_type": 1,
+          "android_info": {
+            "package_name": "com.example.choreboo_habittrackerfriend",
+            "certificate_hash": "162850fdbaa4c3e32eb21ae7758d9d8aed3298da"
+          }
+        },
+        {
+          "client_id": "1003527545101-5imgnq0g8vf5h62pbcg59bfrr222227g.apps.googleusercontent.com",
+          "client_type": 3
+        }
+      ],
       "api_key": [
         {
           "current_key": "AIzaSyCT5wDec3DLM2ehxk2CUnR2SUPiY8Pw7t4"
@@ -20,7 +33,12 @@
       ],
       "services": {
         "appinvite_service": {
-          "other_platform_oauth_client": []
+          "other_platform_oauth_client": [
+            {
+              "client_id": "1003527545101-5imgnq0g8vf5h62pbcg59bfrr222227g.apps.googleusercontent.com",
+              "client_type": 3
+            }
+          ]
         }
       }
     }

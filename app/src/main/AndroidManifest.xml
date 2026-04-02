@@ -37,12 +37,32 @@
         </receiver>
 
         <receiver
+            android:name=".worker.HabitCompleteReceiver"
+            android:exported="false">
+            <intent-filter>
+                <action android:name="com.example.choreboo_habittrackerfriend.HABIT_COMPLETE" />
+            </intent-filter>
+        </receiver>
+
+        <receiver
             android:name=".worker.BootReceiver"
             android:exported="true">
             <intent-filter>
                 <action android:name="android.intent.action.BOOT_COMPLETED" />
             </intent-filter>
         </receiver>
+
+        <!-- Disable default WorkManager initializer — using Hilt instead -->
+        <provider
+            android:name="androidx.startup.InitializationProvider"
+            android:authorities="${applicationId}.androidx-startup"
+            android:exported="false"
+            tools:node="merge">
+            <meta-data
+                android:name="androidx.work.WorkManagerInitializer"
+                android:value="androidx.startup"
+                tools:node="remove" />
+        </provider>
     </application>
 
 </manifest>

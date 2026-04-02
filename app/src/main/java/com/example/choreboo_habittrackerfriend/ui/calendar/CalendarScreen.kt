@@ -14,6 +14,7 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.CircleShape
@@ -21,6 +22,8 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.KeyboardArrowLeft
 import androidx.compose.material.icons.automirrored.filled.KeyboardArrowRight
+import androidx.compose.material.icons.filled.EmojiEvents
+import androidx.compose.material.icons.filled.Stars
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.ExperimentalMaterial3Api
@@ -37,10 +40,17 @@ import androidx.compose.runtime.getValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.draw.shadow
+import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
 import androidx.hilt.navigation.compose.hiltViewModel
+import com.example.choreboo_habittrackerfriend.ui.theme.HeatmapHigh
+import com.example.choreboo_habittrackerfriend.ui.theme.HeatmapLow
+import com.example.choreboo_habittrackerfriend.ui.theme.XpPurple
+import com.example.choreboo_habittrackerfriend.ui.components.ProfileAvatar
 import java.time.DayOfWeek
 import java.time.LocalDate
 import java.time.format.TextStyle
@@ -55,11 +65,59 @@ fun CalendarScreen(
     val selectedDate by viewModel.selectedDate.collectAsState()
     val completions by viewModel.completionsForMonth.collectAsState()
     val selectedDateLogs by viewModel.selectedDateLogs.collectAsState()
+    val totalPoints by viewModel.totalPoints.collectAsState()
+    val profilePhotoUri by viewModel.profilePhotoUri.collectAsState()
+
+    // Calculate monthly stats
+    val totalDaysWithAny = completions.values.count { it > 0 }
+    val daysInMonth = selectedMonth.lengthOfMonth()
+    val completionRate = if (daysInMonth > 0) (totalDaysWithAny * 100 / daysInMonth) else 0
+    val totalXp = selectedDateLogs.sumOf { it.xpEarned }
 
     Scaffold(
         topBar = {
             TopAppBar(
-                title = { Text("Calendar", fontWeight = FontWeight.Bold) },
+                title = {
+                    Row(
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.spacedBy(10.dp),
+                    ) {
+                        ProfileAvatar(
+                            profilePhotoUri = profilePhotoUri,
+                            googlePhotoUrl = viewModel.googlePhotoUrl,
+                            size = 40.dp,
+                        )
+                        Text(
+                            "My Choreboo",
+                            style = MaterialTheme.typography.headlineMedium,
+                            fontWeight = FontWeight.Bold,
+                            color = MaterialTheme.colorScheme.primary,
+                        )
+                    }
+                },
+                actions = {
+                    Row(
+                        verticalAlignment = Alignment.CenterVertically,
+                        modifier = Modifier
+                            .padding(end = 16.dp)
+                            .clip(RoundedCornerShape(50.dp))
+                            .background(MaterialTheme.colorScheme.surfaceContainerHigh)
+                            .padding(horizontal = 10.dp, vertical = 6.dp),
+                    ) {
+                        Icon(
+                            Icons.Default.Stars,
+                            contentDescription = "Points",
+                            tint = MaterialTheme.colorScheme.secondary,
+                            modifier = Modifier.size(16.dp),
+                        )
+                        Spacer(modifier = Modifier.width(4.dp))
+                        Text(
+                            "$totalPoints",
+                            fontWeight = FontWeight.Bold,
+                            style = MaterialTheme.typography.labelMedium,
+                        )
+                    }
+                },
                 colors = TopAppBarDefaults.topAppBarColors(containerColor = MaterialTheme.colorScheme.surface),
             )
         },
@@ -69,208 +127,382 @@ fun CalendarScreen(
                 .fillMaxSize()
                 .padding(padding)
                 .padding(horizontal = 16.dp),
+            verticalArrangement = Arrangement.spacedBy(16.dp),
         ) {
-            // Month navigation
+            // Calendar card
             item {
-                Row(
+                Spacer(modifier = Modifier.height(4.dp))
+                Card(
                     modifier = Modifier.fillMaxWidth(),
-                    horizontalArrangement = Arrangement.SpaceBetween,
-                    verticalAlignment = Alignment.CenterVertically,
+                    shape = RoundedCornerShape(16.dp),
+                    colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceContainerLow),
                 ) {
-                    IconButton(onClick = { viewModel.previousMonth() }) {
-                        Icon(Icons.AutoMirrored.Filled.KeyboardArrowLeft, contentDescription = "Previous month")
-                    }
-                    Text(
-                        text = "${selectedMonth.month.getDisplayName(TextStyle.FULL, Locale.getDefault())} ${selectedMonth.year}",
-                        style = MaterialTheme.typography.titleLarge,
-                        fontWeight = FontWeight.SemiBold,
-                    )
-                    IconButton(onClick = { viewModel.nextMonth() }) {
-                        Icon(Icons.AutoMirrored.Filled.KeyboardArrowRight, contentDescription = "Next month")
+                    Column(modifier = Modifier.padding(20.dp)) {
+                        // Month navigation
+                        Row(
+                            modifier = Modifier.fillMaxWidth(),
+                            horizontalArrangement = Arrangement.SpaceBetween,
+                            verticalAlignment = Alignment.CenterVertically,
+                        ) {
+                            IconButton(
+                                onClick = { viewModel.previousMonth() },
+                                modifier = Modifier
+                                    .clip(CircleShape)
+                                    .background(MaterialTheme.colorScheme.surfaceContainerHighest),
+                            ) {
+                                Icon(Icons.AutoMirrored.Filled.KeyboardArrowLeft, contentDescription = "Previous month")
+                            }
+                            Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                                Text(
+                                    text = "${selectedMonth.month.getDisplayName(TextStyle.FULL, Locale.getDefault())} ${selectedMonth.year}",
+                                    style = MaterialTheme.typography.headlineSmall,
+                                    fontWeight = FontWeight.ExtraBold,
+                                )
+                                Text(
+                                    text = "$totalDaysWithAny/$daysInMonth Days Complete",
+                                    style = MaterialTheme.typography.labelMedium,
+                                    fontWeight = FontWeight.Bold,
+                                    color = MaterialTheme.colorScheme.primary,
+                                )
+                            }
+                            IconButton(
+                                onClick = { viewModel.nextMonth() },
+                                modifier = Modifier
+                                    .clip(CircleShape)
+                                    .background(MaterialTheme.colorScheme.surfaceContainerHighest),
+                            ) {
+                                Icon(Icons.AutoMirrored.Filled.KeyboardArrowRight, contentDescription = "Next month")
+                            }
+                        }
+
+                        Spacer(modifier = Modifier.height(20.dp))
+
+                        // Day of week headers
+                        Row(modifier = Modifier.fillMaxWidth()) {
+                            DayOfWeek.entries.forEach { dow ->
+                                Box(
+                                    modifier = Modifier.weight(1f),
+                                    contentAlignment = Alignment.Center,
+                                ) {
+                                    Text(
+                                        text = dow.getDisplayName(TextStyle.NARROW, Locale.getDefault()),
+                                        style = MaterialTheme.typography.labelSmall,
+                                        fontWeight = FontWeight.Bold,
+                                        color = MaterialTheme.colorScheme.outline,
+                                    )
+                                }
+                            }
+                        }
+
+                        Spacer(modifier = Modifier.height(8.dp))
+
+                        // Calendar grid
+                        val firstDayOfMonth = selectedMonth.atDay(1)
+                        val startOffset = firstDayOfMonth.dayOfWeek.value - 1
+                        val totalCells = startOffset + daysInMonth
+                        val rows = (totalCells + 6) / 7
+
+                        Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
+                            repeat(rows) { row ->
+                                Row(modifier = Modifier.fillMaxWidth()) {
+                                    for (col in 0..6) {
+                                        val cellIndex = row * 7 + col
+                                        val dayNum = cellIndex - startOffset + 1
+                                        Box(
+                                            modifier = Modifier
+                                                .weight(1f)
+                                                .aspectRatio(1f)
+                                                .padding(2.dp),
+                                            contentAlignment = Alignment.Center,
+                                        ) {
+                                            if (dayNum in 1..daysInMonth) {
+                                                val date = selectedMonth.atDay(dayNum)
+                                                val isToday = date == LocalDate.now()
+                                                val isSelected = date == selectedDate
+                                                val count = completions[date] ?: 0
+
+                                                val bgColor = when {
+                                                    isSelected -> MaterialTheme.colorScheme.primary
+                                                    count > 3 -> HeatmapHigh.copy(alpha = 0.3f)
+                                                    count > 0 -> HeatmapLow.copy(alpha = 0.3f)
+                                                    else -> Color.Transparent
+                                                }
+
+                                                Box(
+                                                    modifier = Modifier
+                                                        .fillMaxSize()
+                                                        .clip(RoundedCornerShape(10.dp))
+                                                        .background(bgColor)
+                                                        .then(
+                                                            if (isToday && !isSelected)
+                                                                Modifier.border(
+                                                                    3.dp,
+                                                                    MaterialTheme.colorScheme.primary,
+                                                                    RoundedCornerShape(10.dp),
+                                                                )
+                                                            else Modifier
+                                                        )
+                                                        .then(
+                                                            if (isSelected)
+                                                                Modifier.shadow(
+                                                                    4.dp,
+                                                                    RoundedCornerShape(10.dp),
+                                                                    ambientColor = MaterialTheme.colorScheme.primary.copy(alpha = 0.3f),
+                                                                )
+                                                            else Modifier
+                                                        )
+                                                        .clickable { viewModel.selectDate(date) },
+                                                    contentAlignment = Alignment.Center,
+                                                ) {
+                                                    Text(
+                                                        text = "$dayNum",
+                                                        style = MaterialTheme.typography.labelMedium,
+                                                        fontWeight = if (isToday || isSelected) FontWeight.Bold else FontWeight.Normal,
+                                                        color = when {
+                                                            isSelected -> MaterialTheme.colorScheme.onPrimary
+                                                            count == 0 && !isToday -> MaterialTheme.colorScheme.outlineVariant
+                                                            else -> MaterialTheme.colorScheme.onSurface
+                                                        },
+                                                    )
+                                                }
+                                            }
+                                        }
+                                    }
+                                }
+                            }
+                        }
+
+                        Spacer(modifier = Modifier.height(16.dp))
+
+                        // Legend
+                        Row(
+                            modifier = Modifier.fillMaxWidth(),
+                            horizontalArrangement = Arrangement.Center,
+                            verticalAlignment = Alignment.CenterVertically,
+                        ) {
+                            LegendDot(color = HeatmapHigh)
+                            Spacer(modifier = Modifier.width(4.dp))
+                            Text("4+ Tasks", style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                            Spacer(modifier = Modifier.width(16.dp))
+                            LegendDot(color = HeatmapLow)
+                            Spacer(modifier = Modifier.width(4.dp))
+                            Text("1-3 Tasks", style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                            Spacer(modifier = Modifier.width(16.dp))
+                            Box(
+                                modifier = Modifier
+                                    .size(12.dp)
+                                    .clip(CircleShape)
+                                    .border(1.dp, MaterialTheme.colorScheme.outlineVariant, CircleShape),
+                            )
+                            Spacer(modifier = Modifier.width(4.dp))
+                            Text("None", style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                        }
                     }
                 }
-                Spacer(modifier = Modifier.height(8.dp))
             }
 
-            // Day of week headers
-            item {
-                Row(modifier = Modifier.fillMaxWidth()) {
-                    DayOfWeek.entries.forEach { dow ->
+            // Selected date details
+            if (selectedDate != null) {
+                item {
+                    Row(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(horizontal = 4.dp),
+                        horizontalArrangement = Arrangement.SpaceBetween,
+                        verticalAlignment = Alignment.CenterVertically,
+                    ) {
+                        Text(
+                            text = selectedDate!!.let {
+                                "${it.dayOfWeek.getDisplayName(TextStyle.FULL, Locale.getDefault())}, " +
+                                "${it.month.getDisplayName(TextStyle.SHORT, Locale.getDefault())} ${it.dayOfMonth}"
+                            },
+                            style = MaterialTheme.typography.titleMedium,
+                            fontWeight = FontWeight.Bold,
+                        )
+                        if (totalXp > 0) {
+                            Text(
+                                text = "+$totalXp XP Total",
+                                style = MaterialTheme.typography.titleSmall,
+                                fontWeight = FontWeight.Bold,
+                                color = XpPurple,
+                            )
+                        }
+                    }
+                }
+
+                if (selectedDateLogs.isEmpty()) {
+                    item {
                         Box(
-                            modifier = Modifier.weight(1f),
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .clip(RoundedCornerShape(16.dp))
+                                .background(MaterialTheme.colorScheme.surfaceContainerLow)
+                                .padding(32.dp),
                             contentAlignment = Alignment.Center,
                         ) {
                             Text(
-                                text = dow.getDisplayName(TextStyle.SHORT, Locale.getDefault()),
+                                "No completions on this day",
+                                style = MaterialTheme.typography.bodyMedium,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                            )
+                        }
+                    }
+                } else {
+                    items(selectedDateLogs) { log ->
+                        Card(
+                            modifier = Modifier.fillMaxWidth(),
+                            shape = RoundedCornerShape(12.dp),
+                            colors = CardDefaults.cardColors(
+                                containerColor = MaterialTheme.colorScheme.surfaceContainerLowest,
+                            ),
+                            elevation = CardDefaults.cardElevation(defaultElevation = 1.dp),
+                        ) {
+                            Row(
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .padding(16.dp),
+                                horizontalArrangement = Arrangement.SpaceBetween,
+                                verticalAlignment = Alignment.CenterVertically,
+                            ) {
+                                Row(
+                                    verticalAlignment = Alignment.CenterVertically,
+                                    horizontalArrangement = Arrangement.spacedBy(12.dp),
+                                    modifier = Modifier.weight(1f),
+                                ) {
+                                    Text("📋", fontSize = 28.sp)
+                                    Column {
+                                        Text(
+                                            text = log.habitTitle,
+                                            style = MaterialTheme.typography.titleSmall,
+                                            fontWeight = FontWeight.Bold,
+                                        )
+                                        if (log.streakAtCompletion > 1) {
+                                            Text(
+                                                text = "🔥 ${log.streakAtCompletion} Day Streak",
+                                                style = MaterialTheme.typography.labelSmall,
+                                                fontWeight = FontWeight.Bold,
+                                                color = MaterialTheme.colorScheme.secondary,
+                                            )
+                                        }
+                                    }
+                                }
+                                // XP badge in tertiaryContainer/20
+                                Box(
+                                    modifier = Modifier
+                                        .clip(CircleShape)
+                                        .background(XpPurple.copy(alpha = 0.15f))
+                                        .padding(horizontal = 10.dp, vertical = 4.dp),
+                                ) {
+                                    Text(
+                                        text = "+${log.xpEarned} XP",
+                                        style = MaterialTheme.typography.labelMedium,
+                                        fontWeight = FontWeight.Bold,
+                                        color = XpPurple,
+                                    )
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+
+            // Monthly Mastery bento + milestone card
+            item {
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.spacedBy(12.dp),
+                ) {
+                    // Monthly Mastery — gradient from primary to primaryContainer (2/3 width)
+                    Box(
+                        modifier = Modifier
+                            .weight(2f)
+                            .height(140.dp)
+                            .clip(RoundedCornerShape(16.dp))
+                            .background(
+                                Brush.linearGradient(
+                                    colors = listOf(
+                                        MaterialTheme.colorScheme.primary,
+                                        MaterialTheme.colorScheme.primaryContainer,
+                                    ),
+                                ),
+                            )
+                            .padding(20.dp),
+                    ) {
+                        Column(
+                            modifier = Modifier.fillMaxSize(),
+                            verticalArrangement = Arrangement.SpaceBetween,
+                        ) {
+                            Text(
+                                text = "MONTHLY MASTERY",
                                 style = MaterialTheme.typography.labelSmall,
                                 fontWeight = FontWeight.Bold,
+                                color = MaterialTheme.colorScheme.onPrimary.copy(alpha = 0.8f),
+                                letterSpacing = 1.sp,
+                            )
+                            Column {
+                                Text(
+                                    text = "$completionRate%",
+                                    style = MaterialTheme.typography.displaySmall,
+                                    fontWeight = FontWeight.ExtraBold,
+                                    color = MaterialTheme.colorScheme.onPrimary,
+                                )
+                                Text(
+                                    text = "Completion rate this month",
+                                    style = MaterialTheme.typography.bodySmall,
+                                    color = MaterialTheme.colorScheme.onPrimary.copy(alpha = 0.9f),
+                                )
+                            }
+                        }
+                    }
+
+                    // Milestone card — surfaceContainerHigh
+                    Card(
+                        modifier = Modifier
+                            .weight(1f)
+                            .height(140.dp),
+                        shape = RoundedCornerShape(16.dp),
+                        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceContainerHigh),
+                    ) {
+                        Column(
+                            modifier = Modifier
+                                .fillMaxSize()
+                                .padding(16.dp),
+                            verticalArrangement = Arrangement.Center,
+                            horizontalAlignment = Alignment.CenterHorizontally,
+                        ) {
+                            Icon(
+                                Icons.Default.EmojiEvents,
+                                contentDescription = null,
+                                tint = MaterialTheme.colorScheme.secondary,
+                                modifier = Modifier.size(36.dp),
+                            )
+                            Spacer(modifier = Modifier.height(4.dp))
+                            Text(
+                                text = "${completions.values.count { it >= 4 }}",
+                                style = MaterialTheme.typography.headlineMedium,
+                                fontWeight = FontWeight.Bold,
+                            )
+                            Text(
+                                text = "Milestones",
+                                style = MaterialTheme.typography.labelSmall,
                                 color = MaterialTheme.colorScheme.onSurfaceVariant,
                             )
                         }
                     }
                 }
-                Spacer(modifier = Modifier.height(8.dp))
             }
 
-            // Calendar grid rows
-            val firstDayOfMonth = selectedMonth.atDay(1)
-            val startOffset = firstDayOfMonth.dayOfWeek.value - 1
-            val daysInMonth = selectedMonth.lengthOfMonth()
-            val totalCells = startOffset + daysInMonth
-            val rows = (totalCells + 6) / 7
-
-            items(rows) { row ->
-                Row(modifier = Modifier.fillMaxWidth()) {
-                    for (col in 0..6) {
-                        val cellIndex = row * 7 + col
-                        val dayNum = cellIndex - startOffset + 1
-                        Box(
-                            modifier = Modifier
-                                .weight(1f)
-                                .aspectRatio(1f)
-                                .padding(2.dp),
-                            contentAlignment = Alignment.Center,
-                        ) {
-                            if (dayNum in 1..daysInMonth) {
-                                val date = selectedMonth.atDay(dayNum)
-                                val isToday = date == LocalDate.now()
-                                val isSelected = date == selectedDate
-                                val count = completions[date] ?: 0
-                                val bgColor = when {
-                                    isSelected -> MaterialTheme.colorScheme.primary
-                                    count > 3 -> Color(0xFF4CAF50).copy(alpha = 0.3f)
-                                    count > 0 -> Color(0xFFFFC107).copy(alpha = 0.3f)
-                                    else -> Color.Transparent
-                                }
-                                Box(
-                                    modifier = Modifier
-                                        .size(38.dp)
-                                        .clip(CircleShape)
-                                        .background(bgColor)
-                                        .then(
-                                            if (isToday && !isSelected)
-                                                Modifier.border(2.dp, MaterialTheme.colorScheme.primary, CircleShape)
-                                            else Modifier
-                                        )
-                                        .clickable { viewModel.selectDate(date) },
-                                    contentAlignment = Alignment.Center,
-                                ) {
-                                    Text(
-                                        text = "$dayNum",
-                                        style = MaterialTheme.typography.bodySmall,
-                                        fontWeight = if (isToday || isSelected) FontWeight.Bold else FontWeight.Normal,
-                                        color = if (isSelected) MaterialTheme.colorScheme.onPrimary
-                                        else MaterialTheme.colorScheme.onSurface,
-                                    )
-                                }
-                            }
-                        }
-                    }
-                }
-            }
-
-            // Heatmap legend
-            item {
-                Spacer(modifier = Modifier.height(12.dp))
-                Row(
-                    modifier = Modifier.fillMaxWidth(),
-                    horizontalArrangement = Arrangement.Center,
-                    verticalAlignment = Alignment.CenterVertically,
-                ) {
-                    Box(
-                        modifier = Modifier
-                            .size(12.dp)
-                            .clip(CircleShape)
-                            .background(Color(0xFF4CAF50).copy(alpha = 0.3f)),
-                    )
-                    Text(
-                        text = " 4+  ",
-                        style = MaterialTheme.typography.labelSmall,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant,
-                    )
-                    Box(
-                        modifier = Modifier
-                            .size(12.dp)
-                            .clip(CircleShape)
-                            .background(Color(0xFFFFC107).copy(alpha = 0.3f)),
-                    )
-                    Text(
-                        text = " 1–3  ",
-                        style = MaterialTheme.typography.labelSmall,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant,
-                    )
-                    Box(
-                        modifier = Modifier
-                            .size(12.dp)
-                            .clip(CircleShape)
-                            .border(2.dp, MaterialTheme.colorScheme.primary, CircleShape),
-                    )
-                    Text(
-                        text = " Today",
-                        style = MaterialTheme.typography.labelSmall,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant,
-                    )
-                }
-                Spacer(modifier = Modifier.height(16.dp))
-            }
-
-            // Selected day details
-            if (selectedDate != null) {
-                item {
-                    Text(
-                        text = if (selectedDateLogs.isEmpty()) "No completions on this day"
-                        else "${selectedDateLogs.size} completion(s)",
-                        style = MaterialTheme.typography.titleSmall,
-                        fontWeight = FontWeight.SemiBold,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant,
-                    )
-                    Spacer(modifier = Modifier.height(8.dp))
-                }
-
-                items(selectedDateLogs) { log ->
-                    Card(
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .padding(vertical = 4.dp),
-                        shape = RoundedCornerShape(12.dp),
-                        colors = CardDefaults.cardColors(
-                            containerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.6f),
-                        ),
-                    ) {
-                        Row(
-                            modifier = Modifier
-                                .fillMaxWidth()
-                                .padding(12.dp),
-                            horizontalArrangement = Arrangement.SpaceBetween,
-                            verticalAlignment = Alignment.CenterVertically,
-                        ) {
-                            Column(modifier = Modifier.weight(1f)) {
-                                Text(
-                                    text = log.habitTitle,
-                                    style = MaterialTheme.typography.bodyMedium,
-                                    fontWeight = FontWeight.Medium,
-                                )
-                                if (log.streakAtCompletion > 1) {
-                                    Text(
-                                        text = "🔥 ${log.streakAtCompletion}-day streak",
-                                        style = MaterialTheme.typography.labelSmall,
-                                        color = MaterialTheme.colorScheme.onSurfaceVariant,
-                                    )
-                                }
-                            }
-                            Text(
-                                text = "+${log.xpEarned} XP",
-                                style = MaterialTheme.typography.labelMedium,
-                                fontWeight = FontWeight.Bold,
-                                color = MaterialTheme.colorScheme.primary,
-                            )
-                        }
-                    }
-                }
-            }
-
-            // Bottom padding
             item { Spacer(modifier = Modifier.height(16.dp)) }
         }
     }
+}
+
+@Composable
+private fun LegendDot(color: Color) {
+    Box(
+        modifier = Modifier
+            .size(12.dp)
+            .clip(CircleShape)
+            .background(color),
+    )
 }

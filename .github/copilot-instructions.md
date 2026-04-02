@@ -3,6 +3,20 @@
 ## Project Overview
 A Tamagotchi-style habit tracker Android app where users complete daily habits to earn XP, points, and food items for their digital pet called a "Choreboo." Choreboos have stats (hunger, happiness, energy), evolve through stages (Egg → Baby → Child → Teen → Adult → Legendary), and can be customized with accessories.
 
+## Build Environment (WSL + Windows Android SDK)
+
+> **IMPORTANT**: This project runs in WSL but Android Studio and the Android SDK are installed on Windows. All builds **must** go through `powershell.exe` calling `gradlew.bat`. Running `./gradlew` directly from WSL will fail because the SDK's build-tools contain Windows `.exe` binaries (`aapt2.exe`, etc.) that Linux cannot execute.
+>
+> Use `build.ps1` (project root) as a clean wrapper. `JAVA_HOME` is set persistently as a Windows User environment variable pointing to Android Studio's bundled JBR (`C:\Program Files\Android\Android Studio\jbr`); the script also auto-detects it as a fallback.
+
+| Task | Command (run from WSL or any terminal) |
+|------|----------------------------------------|
+| Debug build | `powershell.exe -File build.ps1 assembleDebug` |
+| Release build | `powershell.exe -File build.ps1 assembleRelease` |
+| All unit tests | `powershell.exe -File build.ps1 testDebugUnitTest` |
+| Instrumented tests | `powershell.exe -File build.ps1 connectedDebugAndroidTest` (requires device/emulator) |
+| Lint | `powershell.exe -File build.ps1 lint` |
+
 ## Tech Stack
 - **Language:** Kotlin
 - **UI:** Jetpack Compose + Material3

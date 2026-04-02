@@ -1,6 +1,5 @@
 package com.example.choreboo_habittrackerfriend.ui.pet.components
 
-import androidx.compose.animation.animateColorAsState
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
@@ -12,11 +11,9 @@ import androidx.compose.material3.LinearProgressIndicator
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
-import androidx.compose.runtime.getValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
-import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 
@@ -26,51 +23,57 @@ fun StatBar(
     value: Int,
     maxValue: Int = 100,
     emoji: String = "",
+    statType: String = "",
     modifier: Modifier = Modifier,
 ) {
     val fraction = (value.toFloat() / maxValue).coerceIn(0f, 1f)
-    val barColor by animateColorAsState(
-        targetValue = when {
-            fraction > 0.6f -> Color(0xFF4CAF50) // Green
-            fraction > 0.3f -> Color(0xFFFFC107) // Yellow
-            else -> Color(0xFFF44336) // Red
-        },
-        label = "statBarColor",
-    )
 
-    Column(modifier = modifier) {
-        Row(
-            verticalAlignment = Alignment.CenterVertically,
-            modifier = Modifier.fillMaxWidth(),
-        ) {
-            if (emoji.isNotEmpty()) {
-                Text(text = emoji, style = MaterialTheme.typography.bodyMedium)
-                Spacer(modifier = Modifier.width(6.dp))
+    // Stat-type color: design spec says bar color based on stat type, not value
+    val barColor = when (statType.lowercase()) {
+        "hunger" -> MaterialTheme.colorScheme.primary
+        "happiness" -> MaterialTheme.colorScheme.primaryContainer
+        "energy" -> MaterialTheme.colorScheme.secondaryContainer
+        else -> MaterialTheme.colorScheme.primary
+    }
+
+    Row(
+        verticalAlignment = Alignment.CenterVertically,
+        modifier = modifier.fillMaxWidth(),
+    ) {
+        if (emoji.isNotEmpty()) {
+            Text(text = emoji, style = MaterialTheme.typography.titleMedium)
+            Spacer(modifier = Modifier.width(8.dp))
+        }
+        Column(modifier = Modifier.weight(1f)) {
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                verticalAlignment = Alignment.CenterVertically,
+            ) {
+                Text(
+                    text = label.uppercase(),
+                    style = MaterialTheme.typography.labelSmall,
+                    fontWeight = FontWeight.Bold,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    modifier = Modifier.weight(1f),
+                )
+                Text(
+                    text = "$value/$maxValue",
+                    style = MaterialTheme.typography.labelSmall,
+                    fontWeight = FontWeight.Bold,
+                    color = MaterialTheme.colorScheme.onSurface,
+                )
             }
-            Text(
-                text = label,
-                style = MaterialTheme.typography.labelMedium,
-                fontWeight = FontWeight.Medium,
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
-            )
-            Spacer(modifier = Modifier.weight(1f))
-            Text(
-                text = "$value/$maxValue",
-                style = MaterialTheme.typography.labelSmall,
-                fontWeight = FontWeight.Bold,
+            Spacer(modifier = Modifier.height(4.dp))
+            LinearProgressIndicator(
+                progress = { fraction },
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .height(6.dp)
+                    .clip(RoundedCornerShape(4.dp)),
                 color = barColor,
+                // No surfaceVariant — use surfaceContainerHighest per design spec
+                trackColor = MaterialTheme.colorScheme.surfaceContainerHighest,
             )
         }
-        Spacer(modifier = Modifier.height(4.dp))
-        LinearProgressIndicator(
-            progress = { fraction },
-            modifier = Modifier
-                .fillMaxWidth()
-                .height(8.dp)
-                .clip(RoundedCornerShape(4.dp)),
-            color = barColor,
-            trackColor = MaterialTheme.colorScheme.surfaceVariant,
-        )
     }
 }
-

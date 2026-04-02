@@ -2,37 +2,130 @@ package com.example.choreboo_habittrackerfriend.ui.theme
 
 import androidx.compose.ui.graphics.Color
 
-// ── Light theme ──
-val ChorebooGreen = Color(0xFF2E7D32)
-val ChorebooTeal = Color(0xFF00897B)
-val ChorebooOrange = Color(0xFFF57C00)
-val ChorebooSurface = Color(0xFFF6FFF6)
-val ChorebooBackground = Color(0xFFFCFDF6)
-val ChorebooOnPrimary = Color(0xFFFFFFFF)
-val ChorebooOnSurface = Color(0xFF1B1C18)
-val ChorebooSurfaceVariant = Color(0xFFDDE5DB)
-val ChorebooOnSurfaceVariant = Color(0xFF424940)
-val ChorebooError = Color(0xFFBA1A1A)
-val ChorebooOnError = Color(0xFFFFFFFF)
+// ── Stitch Design System – Light Theme ──────────────────────────────────────
+// Primary: deep growth green
+val StitchPrimary            = Color(0xFF006E1C)
+val StitchOnPrimary          = Color(0xFFFFFFFF)
+val StitchPrimaryContainer   = Color(0xFF4CAF50)
+val StitchOnPrimaryContainer = Color(0xFF003C0B)
+val StitchPrimaryFixed       = Color(0xFF94F990)
+val StitchPrimaryFixedDim    = Color(0xFF78DC77)
+val StitchOnPrimaryFixed     = Color(0xFF002204)
+val StitchOnPrimaryFixedVariant = Color(0xFF005313)
 
-// ── Dark theme ──
-val ChorebooGreenDark = Color(0xFF81C784)
-val ChorebooTealDark = Color(0xFF4DB6AC)
-val ChorebooOrangeDark = Color(0xFFFFB74D)
-val ChorebooDarkSurface = Color(0xFF1A1C19)
-val ChorebooDarkBackground = Color(0xFF121410)
-val ChorebooDarkOnPrimary = Color(0xFF003910)
-val ChorebooDarkOnSurface = Color(0xFFE2E3DC)
-val ChorebooDarkSurfaceVariant = Color(0xFF424940)
-val ChorebooDarkOnSurfaceVariant = Color(0xFFC2C9BD)
-val ChorebooDarkError = Color(0xFFFFB4AB)
-val ChorebooDarkOnError = Color(0xFF690005)
+// Secondary: achievement / points (orange axis)
+val StitchSecondary               = Color(0xFF8B5000)
+val StitchOnSecondary             = Color(0xFFFFFFFF)
+val StitchSecondaryContainer      = Color(0xFFFF9800)
+val StitchOnSecondaryContainer    = Color(0xFF653900)
+val StitchSecondaryFixed          = Color(0xFFFFDCBE)
+val StitchSecondaryFixedDim       = Color(0xFFFFB870)
+val StitchOnSecondaryFixed        = Color(0xFF2C1600)
+val StitchOnSecondaryFixedVariant = Color(0xFF693C00)
 
-// ── Accent / Pet mood colors ──
-val PetHappyGreen = Color(0xFFE8F5E9)
-val PetHungryOrange = Color(0xFFFFF3E0)
-val PetTiredBlue = Color(0xFFE3F2FD)
-val PetSadGrey = Color(0xFFECEFF1)
-val GoldGlow = Color(0xFFFFD54F)
-val XpPurple = Color(0xFF7C4DFF)
-val StreakFlame = Color(0xFFFF6D00)
+// Tertiary: XP / leveling / lore (deep purple)
+val StitchTertiary               = Color(0xFF6833EA)
+val StitchOnTertiary             = Color(0xFFFFFFFF)
+val StitchTertiaryContainer      = Color(0xFFA488FF)
+val StitchOnTertiaryContainer    = Color(0xFF39009C)
+val StitchTertiaryFixed          = Color(0xFFE8DEFF)
+val StitchTertiaryFixedDim       = Color(0xFFCDBDFF)
+val StitchOnTertiaryFixed        = Color(0xFF20005F)
+val StitchOnTertiaryFixedVariant = Color(0xFF4F00D0)
+
+// Surface hierarchy (depth-first tonal layering)
+val StitchBackground              = Color(0xFFF6FAFE)
+val StitchOnBackground            = Color(0xFF171C1F)
+val StitchSurface                 = Color(0xFFF6FAFE)
+val StitchOnSurface               = Color(0xFF171C1F)
+val StitchSurfaceBright           = Color(0xFFF6FAFE)
+val StitchSurfaceDim              = Color(0xFFD6DADE)
+val StitchSurfaceVariant          = Color(0xFFDFE3E7)
+val StitchOnSurfaceVariant        = Color(0xFF3F4A3C)
+val StitchSurfaceContainerLowest  = Color(0xFFFFFFFF)
+val StitchSurfaceContainerLow     = Color(0xFFF0F4F8)
+val StitchSurfaceContainer        = Color(0xFFEAEEF2)
+val StitchSurfaceContainerHigh    = Color(0xFFE4E9ED)
+val StitchSurfaceContainerHighest = Color(0xFFDFE3E7)
+val StitchInverseSurface          = Color(0xFF2C3134)
+val StitchInverseOnSurface        = Color(0xFFEDF1F5)
+val StitchInversePrimary          = Color(0xFF78DC77)
+
+// Outline & borders
+val StitchOutline        = Color(0xFF6F7A6B)
+val StitchOutlineVariant = Color(0xFFBECAB9)
+val StitchSurfaceTint    = Color(0xFF006E1C)
+
+// Error
+val StitchError            = Color(0xFFBA1A1A)
+val StitchOnError          = Color(0xFFFFFFFF)
+val StitchErrorContainer   = Color(0xFFFFDAD6)
+val StitchOnErrorContainer = Color(0xFF93000A)
+
+// ── Stitch Design System – Dark Theme ────────────────────────────────────────
+val StitchDarkPrimary            = Color(0xFF78DC77)
+val StitchDarkOnPrimary          = Color(0xFF003910)
+val StitchDarkPrimaryContainer   = Color(0xFF005313)
+val StitchDarkOnPrimaryContainer = Color(0xFF94F990)
+
+val StitchDarkSecondary               = Color(0xFFFFB870)
+val StitchDarkOnSecondary             = Color(0xFF4A2800)
+val StitchDarkSecondaryContainer      = Color(0xFF693C00)
+val StitchDarkOnSecondaryContainer    = Color(0xFFFFDCBE)
+
+val StitchDarkTertiary               = Color(0xFFCDBDFF)
+val StitchDarkOnTertiary             = Color(0xFF380096)
+val StitchDarkTertiaryContainer      = Color(0xFF5018CE)
+val StitchDarkOnTertiaryContainer    = Color(0xFFE8DEFF)
+
+val StitchDarkBackground              = Color(0xFF0F1416)
+val StitchDarkOnBackground            = Color(0xFFE1E3E6)
+val StitchDarkSurface                 = Color(0xFF0F1416)
+val StitchDarkOnSurface               = Color(0xFFE1E3E6)
+val StitchDarkSurfaceDim              = Color(0xFF0F1416)
+val StitchDarkSurfaceVariant          = Color(0xFF3A4640)
+val StitchDarkOnSurfaceVariant        = Color(0xFFBBC8BB)
+val StitchDarkSurfaceContainerLowest  = Color(0xFF0A0F11)
+val StitchDarkSurfaceContainerLow     = Color(0xFF171C1F)
+val StitchDarkSurfaceContainer        = Color(0xFF1B2023)
+val StitchDarkSurfaceContainerHigh    = Color(0xFF252B2E)
+val StitchDarkSurfaceContainerHighest = Color(0xFF303639)
+val StitchDarkInverseSurface          = Color(0xFFE1E3E6)
+val StitchDarkInverseOnSurface        = Color(0xFF2C3134)
+val StitchDarkInversePrimary          = Color(0xFF006E1C)
+
+val StitchDarkOutline        = Color(0xFF8A9389)
+val StitchDarkOutlineVariant = Color(0xFF3A4640)
+
+val StitchDarkError            = Color(0xFFFFB4AB)
+val StitchDarkOnError          = Color(0xFF690005)
+val StitchDarkErrorContainer   = Color(0xFF93000A)
+val StitchDarkOnErrorContainer = Color(0xFFFFDAD6)
+
+// ── Pet mood gradient colors ──────────────────────────────────────────────────
+val PetMoodHappyStart   = Color(0xFFFFF9C4)  // yellow radial center
+val PetMoodHappyEnd     = Color(0xFF4CAF50)  // primaryContainer green edge
+val PetMoodHungryStart  = Color(0xFFFFF3E0)
+val PetMoodHungryEnd    = Color(0xFFFF9800)
+val PetMoodTiredStart   = Color(0xFFE3F2FD)
+val PetMoodTiredEnd     = Color(0xFF90CAF9)
+val PetMoodSadStart     = Color(0xFFECEFF1)
+val PetMoodSadEnd       = Color(0xFFB0BEC5)
+val PetMoodContentStart = Color(0xFFE8F5E9)
+val PetMoodContentEnd   = Color(0xFF66BB6A)
+
+// ── Semantic accent colors ────────────────────────────────────────────────────
+val StreakFlame = Color(0xFFFF6D00)  // streak fire icon / text
+val GoldGlow    = Color(0xFFFFD54F) // legendary item highlight
+
+// ── Heatmap colors (calendar) ──────────────────────────────────────────────────
+val HeatmapHigh = StitchPrimaryContainer   // 4+ tasks: primary green at 30% alpha
+val HeatmapLow  = Color(0xFFFFC107)        // 1-3 tasks: amber yellow at 30% alpha
+val HeatmapNone = StitchSurfaceVariant     // No tasks: surface variant
+
+// ── Legacy aliases (kept for backward-compat with PetScreen imports) ─────────
+val XpPurple       = StitchTertiary
+val PetHappyGreen  = StitchPrimaryContainer
+val PetHungryOrange = StitchSecondaryContainer
+val PetTiredBlue   = Color(0xFF90CAF9)
+val PetSadGrey     = Color(0xFFB0BEC5)

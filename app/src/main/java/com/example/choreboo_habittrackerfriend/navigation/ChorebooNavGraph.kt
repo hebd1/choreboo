@@ -7,16 +7,16 @@ import androidx.navigation.NavType
 import androidx.navigation.compose.NavHost
 import androidx.navigation.compose.composable
 import androidx.navigation.navArgument
+import com.example.choreboo_habittrackerfriend.ui.auth.AuthScreen
 import com.example.choreboo_habittrackerfriend.ui.habits.HabitListScreen
 import com.example.choreboo_habittrackerfriend.ui.habits.AddEditHabitScreen
 import com.example.choreboo_habittrackerfriend.ui.pet.PetScreen
-import com.example.choreboo_habittrackerfriend.ui.shop.ShopScreen
 import com.example.choreboo_habittrackerfriend.ui.calendar.CalendarScreen
-import com.example.choreboo_habittrackerfriend.ui.inventory.InventoryScreen
 import com.example.choreboo_habittrackerfriend.ui.onboarding.OnboardingScreen
 import com.example.choreboo_habittrackerfriend.ui.settings.SettingsScreen
 
 sealed class Screen(val route: String) {
+    data object Auth : Screen("auth")
     data object Onboarding : Screen("onboarding")
     data object HabitList : Screen("habits_list")
     data object AddEditHabit : Screen("add_edit_habit?habitId={habitId}") {
@@ -25,9 +25,7 @@ sealed class Screen(val route: String) {
         }
     }
     data object Pet : Screen("pet")
-    data object Shop : Screen("shop")
     data object Calendar : Screen("calendar")
-    data object Inventory : Screen("inventory")
     data object Settings : Screen("settings")
 }
 
@@ -42,6 +40,16 @@ fun ChorebooNavGraph(
         startDestination = startDestination,
         modifier = modifier,
     ) {
+        composable(Screen.Auth.route) {
+            AuthScreen(
+                onAuthSuccess = {
+                    navController.navigate(Screen.Onboarding.route) {
+                        popUpTo(Screen.Auth.route) { inclusive = true }
+                    }
+                }
+            )
+        }
+
         composable(Screen.Onboarding.route) {
             OnboardingScreen(
                 onComplete = {
@@ -56,7 +64,6 @@ fun ChorebooNavGraph(
             HabitListScreen(
                 onAddHabit = { navController.navigate(Screen.AddEditHabit.createRoute()) },
                 onEditHabit = { id -> navController.navigate(Screen.AddEditHabit.createRoute(id)) },
-                onNavigateToSettings = { navController.navigate(Screen.Settings.route) },
             )
         }
 
@@ -75,30 +82,22 @@ fun ChorebooNavGraph(
         }
 
         composable(Screen.Pet.route) {
-            PetScreen(
-                onNavigateToInventory = { navController.navigate(Screen.Inventory.route) },
-            )
-        }
-
-        composable(Screen.Shop.route) {
-            ShopScreen()
+            PetScreen()
         }
 
         composable(Screen.Calendar.route) {
             CalendarScreen()
         }
 
-        composable(Screen.Inventory.route) {
-            InventoryScreen(
-                onNavigateBack = { navController.popBackStack() },
-            )
-        }
-
         composable(Screen.Settings.route) {
             SettingsScreen(
                 onNavigateBack = { navController.popBackStack() },
+                onSignOut = {
+                    navController.navigate(Screen.Auth.route) {
+                        popUpTo(0) { inclusive = true }
+                    }
+                },
             )
         }
     }
 }
-

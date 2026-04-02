@@ -20,28 +20,22 @@ class UserPreferences @Inject constructor(
     private val dataStore: DataStore<Preferences>
 ) {
     companion object {
-        val TOTAL_POINTS = intPreferencesKey("total_points")
-        val REMINDER_ENABLED = booleanPreferencesKey("reminder_enabled")
-        val REMINDER_HOUR = intPreferencesKey("reminder_hour")
-        val REMINDER_MINUTE = intPreferencesKey("reminder_minute")
-        val THEME_MODE = stringPreferencesKey("theme_mode") // "system", "light", "dark"
-        val ONBOARDING_COMPLETE = booleanPreferencesKey("onboarding_complete")
-        val SOUND_ENABLED = booleanPreferencesKey("sound_enabled")
-    }
+         val TOTAL_POINTS = intPreferencesKey("total_points")
+         val THEME_MODE = stringPreferencesKey("theme_mode") // "system", "light", "dark"
+         val ONBOARDING_COMPLETE = booleanPreferencesKey("onboarding_complete")
+         val SOUND_ENABLED = booleanPreferencesKey("sound_enabled")
+         val PROFILE_PHOTO_URI = stringPreferencesKey("profile_photo_uri") // Custom profile photo path, null = use Google photo
+     }
 
-    val totalPoints: Flow<Int> = dataStore.data.map { it[TOTAL_POINTS] ?: 0 }
+     val totalPoints: Flow<Int> = dataStore.data.map { it[TOTAL_POINTS] ?: 0 }
 
-    val reminderEnabled: Flow<Boolean> = dataStore.data.map { it[REMINDER_ENABLED] ?: false }
-
-    val reminderHour: Flow<Int> = dataStore.data.map { it[REMINDER_HOUR] ?: 9 }
-
-    val reminderMinute: Flow<Int> = dataStore.data.map { it[REMINDER_MINUTE] ?: 0 }
-
-    val themeMode: Flow<String> = dataStore.data.map { it[THEME_MODE] ?: "system" }
+     val themeMode: Flow<String> = dataStore.data.map { it[THEME_MODE] ?: "system" }
 
     val onboardingComplete: Flow<Boolean> = dataStore.data.map { it[ONBOARDING_COMPLETE] ?: false }
 
     val soundEnabled: Flow<Boolean> = dataStore.data.map { it[SOUND_ENABLED] ?: true }
+
+    val profilePhotoUri: Flow<String?> = dataStore.data.map { it[PROFILE_PHOTO_URI] }
 
     suspend fun addPoints(amount: Int) {
         dataStore.edit { prefs ->
@@ -50,30 +44,19 @@ class UserPreferences @Inject constructor(
         }
     }
 
-    suspend fun deductPoints(amount: Int): Boolean {
-        var success = false
-        dataStore.edit { prefs ->
-            val current = prefs[TOTAL_POINTS] ?: 0
-            if (current >= amount) {
-                prefs[TOTAL_POINTS] = current - amount
-                success = true
-            }
-        }
-        return success
-    }
+     suspend fun deductPoints(amount: Int): Boolean {
+         var success = false
+         dataStore.edit { prefs ->
+             val current = prefs[TOTAL_POINTS] ?: 0
+             if (current >= amount) {
+                 prefs[TOTAL_POINTS] = current - amount
+                 success = true
+             }
+         }
+         return success
+     }
 
-    suspend fun setReminderEnabled(enabled: Boolean) {
-        dataStore.edit { it[REMINDER_ENABLED] = enabled }
-    }
-
-    suspend fun setReminderTime(hour: Int, minute: Int) {
-        dataStore.edit {
-            it[REMINDER_HOUR] = hour
-            it[REMINDER_MINUTE] = minute
-        }
-    }
-
-    suspend fun setThemeMode(mode: String) {
+     suspend fun setThemeMode(mode: String) {
         dataStore.edit { it[THEME_MODE] = mode }
     }
 
@@ -83,6 +66,16 @@ class UserPreferences @Inject constructor(
 
     suspend fun setSoundEnabled(enabled: Boolean) {
         dataStore.edit { it[SOUND_ENABLED] = enabled }
+    }
+
+    suspend fun setProfilePhotoUri(uri: String?) {
+        dataStore.edit { prefs ->
+            if (uri == null) {
+                prefs.remove(PROFILE_PHOTO_URI)
+            } else {
+                prefs[PROFILE_PHOTO_URI] = uri
+            }
+        }
     }
 }
 
