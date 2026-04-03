@@ -1,0 +1,77 @@
+# ============================================================
+# Choreboo Habit Tracker - Firebase Data Connect Schema
+# ============================================================
+# Tables: User, Household, Choreboo, Habit, HabitLog
+# ============================================================
+
+# ---- User ----
+# Keyed by Firebase Auth UID (String PK, not auto UUID).
+# Created on first sign-in.
+type User @table {
+  id: String! @col(name: "uid")
+  displayName: String!
+  email: String
+  photoUrl: String
+  household: Household @ref
+  createdAt: Timestamp! @default(expr: "request.time")
+}
+
+# ---- Household ----
+# A shared group. Members join via 6-char invite code.
+type Household @table {
+  id: UUID! @default(expr: "uuidV4()")
+  name: String!
+  inviteCode: String! @unique
+  createdBy: User! @ref
+  createdAt: Timestamp! @default(expr: "request.time")
+}
+
+# ---- Choreboo (Pet) ----
+# One per user. Owner tracked by ownerUid FK to User.
+type Choreboo @table {
+  id: UUID! @default(expr: "uuidV4()")
+  owner: User! @ref @unique
+  name: String!
+  stage: String!
+  level: Int!
+  xp: Int!
+  hunger: Int!
+  happiness: Int!
+  energy: Int!
+  petType: String!
+  lastInteractionAt: Timestamp!
+  createdAt: Timestamp! @default(expr: "request.time")
+  sleepUntil: Timestamp
+}
+
+# ---- Habit ----
+# Supports both personal and household habits.
+# ownerUid = creator's UID. householdId populated for shared habits.
+type Habit @table {
+  id: UUID! @default(expr: "uuidV4()")
+  owner: User! @ref
+  household: Household @ref
+  title: String!
+  description: String
+  iconName: String!
+  customDays: String!
+  difficulty: Int!
+  baseXp: Int!
+  reminderEnabled: Boolean!
+  reminderTime: String
+  isHouseholdHabit: Boolean!
+  isArchived: Boolean!
+  createdAt: Timestamp! @default(expr: "request.time")
+}
+
+# ---- HabitLog ----
+# One row per completion. Links to Habit and the completing User.
+type HabitLog @table {
+  id: UUID! @default(expr: "uuidV4()")
+  habit: Habit! @ref
+  completedBy: User! @ref
+  completedAt: Timestamp! @default(expr: "request.time")
+  date: String!
+  xpEarned: Int!
+  streakAtCompletion: Int!
+}

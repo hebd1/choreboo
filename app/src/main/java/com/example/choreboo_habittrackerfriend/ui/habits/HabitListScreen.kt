@@ -12,6 +12,7 @@ import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.aspectRatio
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
@@ -24,7 +25,9 @@ import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Add
-import androidx.compose.material.icons.filled.AutoAwesome
+import androidx.compose.material.icons.filled.Check
+import androidx.compose.material.icons.filled.EmojiEvents
+import androidx.compose.material.icons.filled.LocalFireDepartment
 import androidx.compose.material.icons.filled.Settings
 import androidx.compose.material.icons.filled.Stars
 import androidx.compose.material3.AlertDialog
@@ -37,7 +40,6 @@ import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.FloatingActionButton
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
-import androidx.compose.material3.LinearProgressIndicator
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.SnackbarDuration
@@ -58,7 +60,7 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
-import androidx.compose.ui.graphics.Brush
+import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
@@ -68,13 +70,15 @@ import com.airbnb.lottie.compose.LottieAnimation
 import com.airbnb.lottie.compose.LottieCompositionSpec
 import com.airbnb.lottie.compose.rememberLottieAnimatable
 import com.airbnb.lottie.compose.rememberLottieComposition
+import com.example.choreboo_habittrackerfriend.domain.model.ChorebooMood
 import com.example.choreboo_habittrackerfriend.domain.model.Habit
 import com.example.choreboo_habittrackerfriend.ui.habits.components.HabitCard
-import com.example.choreboo_habittrackerfriend.ui.theme.GradientUtils
+import com.example.choreboo_habittrackerfriend.ui.theme.XpPurple
 import com.example.choreboo_habittrackerfriend.ui.components.ProfileAvatar
 import com.example.choreboo_habittrackerfriend.ui.components.StitchSnackbar
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
+import java.time.DayOfWeek
 
 private const val COMPLETION_ANIMATION_COOLDOWN_MS = 30_000L
 
@@ -91,7 +95,13 @@ fun HabitListScreen(
     val profilePhotoUri by viewModel.profilePhotoUri.collectAsState()
     val todayCompletions by viewModel.todayCompletions.collectAsState()
     val streaks by viewModel.streaks.collectAsState()
+    val maxStreak by viewModel.maxStreak.collectAsState()
+    val todayXp by viewModel.todayXp.collectAsState()
     val petType by viewModel.petType.collectAsState()
+    val chorebooStats by viewModel.chorebooStats.collectAsState()
+    val earnedBadgeCount by viewModel.earnedBadgeCount.collectAsState()
+    val totalLifetimeXp by viewModel.totalLifetimeXp.collectAsState()
+    val weeklyCompletionDays by viewModel.weeklyCompletionDays.collectAsState()
     val snackbarHostState = remember { SnackbarHostState() }
     var habitToDelete by remember { mutableStateOf<Habit?>(null) }
     var showLevelUpDialog by remember { mutableStateOf<HabitListEvent.HabitCompleted?>(null) }
@@ -155,19 +165,17 @@ fun HabitListScreen(
         }
     }
 
-    // Compute "Weekly Narrative" hero stats
+    // Compute daily quest stats
     val scheduledToday = habits.filter { it.isScheduledForToday() }
     val completedToday = scheduledToday.count { (todayCompletions[it.id] ?: 0) >= 1 }
     val completionFraction = if (scheduledToday.isEmpty()) 0f
     else (completedToday.toFloat() / scheduledToday.size).coerceIn(0f, 1f)
-    val completionPct = (completionFraction * 100).toInt()
 
     Scaffold(
         topBar = {
             TopAppBar(
                 title = {
                     Row(verticalAlignment = Alignment.CenterVertically) {
-                        // Profile avatar circle
                         ProfileAvatar(
                             profilePhotoUri = profilePhotoUri,
                             googlePhotoUrl = viewModel.googlePhotoUrl,
@@ -183,28 +191,29 @@ fun HabitListScreen(
                     }
                 },
                 actions = {
-                    // Points pill — secondaryFixed orange background
+                    // Badge count pill
                     Row(
                         verticalAlignment = Alignment.CenterVertically,
                         modifier = Modifier
                             .clip(RoundedCornerShape(50.dp))
-                            .background(MaterialTheme.colorScheme.secondaryContainer.copy(alpha = 0.25f))
-                            .padding(horizontal = 10.dp, vertical = 4.dp),
+                            .background(MaterialTheme.colorScheme.secondaryContainer)
+                            .padding(horizontal = 12.dp, vertical = 6.dp),
                     ) {
                         Icon(
-                            imageVector = Icons.Default.Stars,
-                            contentDescription = "Points",
-                            tint = MaterialTheme.colorScheme.secondary,
+                            imageVector = Icons.Default.EmojiEvents,
+                            contentDescription = "Badges",
+                            tint = MaterialTheme.colorScheme.onSecondaryContainer,
                             modifier = Modifier.size(18.dp),
                         )
                         Spacer(modifier = Modifier.width(4.dp))
                         Text(
-                            text = "$totalPoints",
+                            text = "$earnedBadgeCount",
                             style = MaterialTheme.typography.labelLarge,
                             fontWeight = FontWeight.Bold,
-                            color = MaterialTheme.colorScheme.onSurface,
+                            color = MaterialTheme.colorScheme.onSecondaryContainer,
                         )
                     }
+                    Spacer(modifier = Modifier.width(8.dp))
                 },
                 colors = TopAppBarDefaults.topAppBarColors(
                     containerColor = androidx.compose.ui.graphics.Color.Transparent,
@@ -269,12 +278,64 @@ fun HabitListScreen(
                 ) {
                     item { Spacer(modifier = Modifier.height(8.dp)) }
 
-                    // "Weekly Narrative" hero card
+                    // "My Habits" hero text
                     item {
-                        WeeklyNarrativeCard(
-                            completionPct = completionPct,
+                        Column {
+                            Text(
+                                text = "My Habits",
+                                style = MaterialTheme.typography.displaySmall,
+                                fontWeight = FontWeight.Black,
+                                color = MaterialTheme.colorScheme.onSurface,
+                                letterSpacing = (-0.5).sp,
+                            )
+                            Text(
+                                text = "Keep your pet happy and growing!",
+                                style = MaterialTheme.typography.bodyMedium,
+                                fontWeight = FontWeight.Medium,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                            )
+                        }
+                    }
+
+                    // Weekly Streak card
+                    item {
+                        WeeklyStreakCard(
+                            maxStreak = maxStreak,
+                            weeklyCompletionDays = weeklyCompletionDays,
                             completionFraction = completionFraction,
                         )
+                    }
+
+                    // Streak / XP bento grid
+                    item {
+                        StreakXpBentoGrid(
+                            weeklyCompletionDays = weeklyCompletionDays,
+                            maxStreak = maxStreak,
+                            todayXp = todayXp,
+                            starPoints = totalLifetimeXp / 100,
+                        )
+                    }
+
+                    // "Daily Quest" section header
+                    item {
+                        Row(
+                            modifier = Modifier.fillMaxWidth(),
+                            horizontalArrangement = Arrangement.SpaceBetween,
+                            verticalAlignment = Alignment.CenterVertically,
+                        ) {
+                            Text(
+                                text = "Daily Quest",
+                                style = MaterialTheme.typography.titleMedium,
+                                fontWeight = FontWeight.Bold,
+                                color = MaterialTheme.colorScheme.onSurface,
+                            )
+                            Text(
+                                text = "$completedToday of ${scheduledToday.size} Completed",
+                                style = MaterialTheme.typography.labelMedium,
+                                fontWeight = FontWeight.Medium,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                            )
+                        }
                     }
 
                     items(habits, key = { it.id }) { habit ->
@@ -288,6 +349,17 @@ fun HabitListScreen(
                             onDelete = { habitToDelete = habit },
                         )
                     }
+
+                    // Pet Mood + Level/XP bento grid
+                    item {
+                        PetStatusBentoGrid(
+                            mood = chorebooStats?.mood ?: ChorebooMood.IDLE,
+                            level = chorebooStats?.level ?: 1,
+                            xp = chorebooStats?.xp ?: 0,
+                            xpToNextLevel = chorebooStats?.xpToNextLevel ?: 50,
+                        )
+                    }
+
                     item { Spacer(modifier = Modifier.height(80.dp)) }
                 }
             }
@@ -319,12 +391,12 @@ fun HabitListScreen(
             )
         }
 
-        // Achievement snackbar pinned to the top of the view area
+        // Achievement snackbar pinned above the bottom nav bar
         Box(
             modifier = Modifier
                 .fillMaxSize()
-                .padding(top = padding.calculateTopPadding()),
-            contentAlignment = Alignment.TopCenter,
+                .padding(bottom = 90.dp),
+            contentAlignment = Alignment.BottomCenter,
         ) {
             SnackbarHost(snackbarHostState) { data ->
                 StitchSnackbar(data)
@@ -359,7 +431,7 @@ fun HabitListScreen(
             }
         }
 
-        // Level-up celebration dialog pinned to top with secondary color
+        // Level-up celebration dialog
         showLevelUpDialog?.let { event ->
             LevelUpDialog(
                 event = event,
@@ -369,79 +441,375 @@ fun HabitListScreen(
     }
 }
 
+// ---------------------------------------------------------------------------
+// Today's Streak card
+// ---------------------------------------------------------------------------
+
+// ---------------------------------------------------------------------------
+// Weekly Streak card (replaces TodaysStreakCard)
+// ---------------------------------------------------------------------------
+
+private val weekDays = listOf(
+    DayOfWeek.MONDAY,
+    DayOfWeek.TUESDAY,
+    DayOfWeek.WEDNESDAY,
+    DayOfWeek.THURSDAY,
+    DayOfWeek.FRIDAY,
+    DayOfWeek.SATURDAY,
+    DayOfWeek.SUNDAY,
+)
+
+private val dayLabels = listOf("M", "T", "W", "T", "F", "S", "S")
+
 @Composable
-private fun WeeklyNarrativeCard(
-    completionPct: Int,
+private fun WeeklyStreakCard(
+    maxStreak: Int,
+    weeklyCompletionDays: Set<DayOfWeek>,
     completionFraction: Float,
 ) {
     Box(
         modifier = Modifier
             .fillMaxWidth()
-            .clip(RoundedCornerShape(24.dp))
-            .background(GradientUtils.primaryGradient())
+            .clip(RoundedCornerShape(20.dp))
+            .background(MaterialTheme.colorScheme.surfaceContainerLow),
     ) {
-        // Decorative circle (bottom-right)
+        // Fire watermark — faint, overlapping top-right
         Box(
             modifier = Modifier
-                .size(100.dp)
-                .align(Alignment.BottomEnd)
-                .background(
-                    MaterialTheme.colorScheme.onPrimary.copy(alpha = 0.1f),
-                    shape = CircleShape
-                )
-        )
-        
-        Column(modifier = Modifier.padding(24.dp)) {
-            // Label
+                .size(120.dp)
+                .align(Alignment.TopEnd)
+                .padding(end = 4.dp),
+        ) {
             Text(
-                text = "THE VERDANT FOREST",
+                text = "🔥",
+                fontSize = 100.sp,
+                modifier = Modifier
+                    .align(Alignment.Center)
+                    .graphicsAlpha(0.15f),
+            )
+        }
+
+        Column(modifier = Modifier.padding(horizontal = 24.dp, vertical = 20.dp)) {
+            Text(
+                text = "WEEKLY STREAK",
                 style = MaterialTheme.typography.labelSmall,
                 fontWeight = FontWeight.Bold,
-                color = MaterialTheme.colorScheme.onPrimary.copy(alpha = 0.75f),
-                letterSpacing = 1.5.sp,
+                color = MaterialTheme.colorScheme.primary,
+                letterSpacing = 2.sp,
             )
-            Spacer(modifier = Modifier.height(8.dp))
-            
-            // Title
-            Text(
-                text = if (completionPct >= 80) "You're on Fire! 🔥"
-                else if (completionPct >= 50) "Keep Going! 💪"
-                else "Start Your Quest! ⚡",
-                style = MaterialTheme.typography.headlineSmall,
-                fontWeight = FontWeight.ExtraBold,
-                color = MaterialTheme.colorScheme.onPrimary,
-            )
-            Spacer(modifier = Modifier.height(12.dp))
-            
-            // Progress bar
-            Box(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .height(8.dp)
-                    .clip(RoundedCornerShape(4.dp))
-                    .background(MaterialTheme.colorScheme.onPrimary.copy(alpha = 0.25f)),
-            ) {
-                Box(
-                    modifier = Modifier
-                        .fillMaxWidth(completionFraction)
-                        .height(8.dp)
-                        .clip(RoundedCornerShape(4.dp))
-                        .background(MaterialTheme.colorScheme.onPrimary),
+            Spacer(modifier = Modifier.height(6.dp))
+            Row(verticalAlignment = Alignment.Bottom) {
+                Text(
+                    text = "$maxStreak",
+                    style = MaterialTheme.typography.displaySmall,
+                    fontWeight = FontWeight.Black,
+                    color = MaterialTheme.colorScheme.onSurface,
+                )
+                Spacer(modifier = Modifier.width(8.dp))
+                Text(
+                    text = "Total Days",
+                    style = MaterialTheme.typography.titleMedium,
+                    fontWeight = FontWeight.Bold,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    modifier = Modifier.padding(bottom = 4.dp),
                 )
             }
-            Spacer(modifier = Modifier.height(8.dp))
-            
-            // Progress text
-            Text(
-                text = "$completionPct% of your daily quests finished.",
-                style = MaterialTheme.typography.bodySmall,
-                fontWeight = FontWeight.Medium,
-                color = MaterialTheme.colorScheme.onPrimary,
-            )
+            Spacer(modifier = Modifier.height(16.dp))
+
+            // 7 day-of-week circles
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.SpaceEvenly,
+            ) {
+                weekDays.forEachIndexed { index, day ->
+                    val isCompleted = day in weeklyCompletionDays
+                    Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                        Box(
+                            modifier = Modifier
+                                .size(36.dp)
+                                .clip(CircleShape)
+                                .background(
+                                    if (isCompleted) MaterialTheme.colorScheme.primary
+                                    else MaterialTheme.colorScheme.surfaceContainerHighest,
+                                ),
+                            contentAlignment = Alignment.Center,
+                        ) {
+                            if (isCompleted) {
+                                Icon(
+                                    imageVector = Icons.Default.Check,
+                                    contentDescription = "Completed",
+                                    tint = MaterialTheme.colorScheme.onPrimary,
+                                    modifier = Modifier.size(18.dp),
+                                )
+                            }
+                        }
+                        Spacer(modifier = Modifier.height(4.dp))
+                        Text(
+                            text = dayLabels[index],
+                            style = MaterialTheme.typography.labelSmall,
+                            fontWeight = if (isCompleted) FontWeight.Bold else FontWeight.Normal,
+                            color = if (isCompleted) MaterialTheme.colorScheme.primary
+                            else MaterialTheme.colorScheme.onSurfaceVariant,
+                        )
+                    }
+                }
+            }
         }
     }
 }
 
+// Helper modifier extension for alpha without wrapping in another Box
+private fun androidx.compose.ui.Modifier.graphicsAlpha(alphaValue: Float) =
+    this.alpha(alphaValue)
+
+// ---------------------------------------------------------------------------
+// Streak / XP bento grid
+// ---------------------------------------------------------------------------
+
+@Composable
+private fun StreakXpBentoGrid(
+    weeklyCompletionDays: Set<DayOfWeek>,
+    maxStreak: Int,
+    todayXp: Int,
+    starPoints: Int,
+) {
+    Row(
+        modifier = Modifier.fillMaxWidth(),
+        horizontalArrangement = Arrangement.spacedBy(12.dp),
+    ) {
+        // Left — weekly streak circles + total streak count (square)
+        Box(
+            modifier = Modifier
+                .weight(1f)
+                .aspectRatio(1f)
+                .clip(RoundedCornerShape(16.dp))
+                .background(MaterialTheme.colorScheme.surfaceContainerLow),
+            contentAlignment = Alignment.Center,
+        ) {
+            Column(
+                horizontalAlignment = Alignment.CenterHorizontally,
+                verticalArrangement = Arrangement.Center,
+                modifier = Modifier.padding(12.dp),
+            ) {
+                // Compact 7-circle row
+                Row(horizontalArrangement = Arrangement.spacedBy(4.dp)) {
+                    weekDays.forEach { day ->
+                        val isCompleted = day in weeklyCompletionDays
+                        Box(
+                            modifier = Modifier
+                                .size(16.dp)
+                                .clip(CircleShape)
+                                .background(
+                                    if (isCompleted) MaterialTheme.colorScheme.primary
+                                    else MaterialTheme.colorScheme.surfaceContainerHighest,
+                                ),
+                            contentAlignment = Alignment.Center,
+                        ) {
+                            if (isCompleted) {
+                                Icon(
+                                    imageVector = Icons.Default.Check,
+                                    contentDescription = null,
+                                    tint = MaterialTheme.colorScheme.onPrimary,
+                                    modifier = Modifier.size(10.dp),
+                                )
+                            }
+                        }
+                    }
+                }
+                Spacer(modifier = Modifier.height(8.dp))
+                Text(
+                    text = "$maxStreak",
+                    style = MaterialTheme.typography.displaySmall,
+                    fontWeight = FontWeight.Black,
+                    color = MaterialTheme.colorScheme.onSurface,
+                )
+                Text(
+                    text = "DAY STREAK",
+                    style = MaterialTheme.typography.labelSmall,
+                    fontWeight = FontWeight.Bold,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    letterSpacing = 1.sp,
+                )
+            }
+        }
+
+        // Right — two stacked pills
+        Column(
+            modifier = Modifier
+                .weight(1f)
+                .aspectRatio(1f),
+            verticalArrangement = Arrangement.spacedBy(10.dp),
+        ) {
+            // XP Today — purple tint
+            Box(
+                modifier = Modifier
+                    .weight(1f)
+                    .fillMaxWidth()
+                    .clip(RoundedCornerShape(16.dp))
+                    .background(XpPurple.copy(alpha = 0.12f)),
+                contentAlignment = Alignment.Center,
+            ) {
+                Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                    Row(verticalAlignment = Alignment.CenterVertically) {
+                        Text(text = "✨", fontSize = 16.sp)
+                        Spacer(modifier = Modifier.width(4.dp))
+                        Text(
+                            text = "+$todayXp",
+                            style = MaterialTheme.typography.titleLarge,
+                            fontWeight = FontWeight.Black,
+                            color = XpPurple,
+                        )
+                    }
+                    Text(
+                        text = "XP TODAY",
+                        style = MaterialTheme.typography.labelSmall,
+                        fontWeight = FontWeight.Bold,
+                        color = XpPurple.copy(alpha = 0.7f),
+                        letterSpacing = 1.sp,
+                    )
+                }
+            }
+
+            // Star Points — derived from lifetime XP (cosmetic)
+            Box(
+                modifier = Modifier
+                    .weight(1f)
+                    .fillMaxWidth()
+                    .clip(RoundedCornerShape(16.dp))
+                    .background(MaterialTheme.colorScheme.secondaryContainer.copy(alpha = 0.20f)),
+                contentAlignment = Alignment.Center,
+            ) {
+                Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                    Row(verticalAlignment = Alignment.CenterVertically) {
+                        Text(text = "⭐", fontSize = 16.sp)
+                        Spacer(modifier = Modifier.width(4.dp))
+                        Text(
+                            text = "$starPoints",
+                            style = MaterialTheme.typography.titleLarge,
+                            fontWeight = FontWeight.Black,
+                            color = MaterialTheme.colorScheme.secondary,
+                        )
+                    }
+                    Text(
+                        text = "STAR POINTS",
+                        style = MaterialTheme.typography.labelSmall,
+                        fontWeight = FontWeight.Bold,
+                        color = MaterialTheme.colorScheme.secondary.copy(alpha = 0.7f),
+                        letterSpacing = 1.sp,
+                    )
+                }
+            }
+        }
+    }
+}
+
+// ---------------------------------------------------------------------------
+// Pet Status bento grid (Pet Mood + Level/XP)
+// ---------------------------------------------------------------------------
+
+@Composable
+private fun PetStatusBentoGrid(
+    mood: ChorebooMood,
+    level: Int,
+    xp: Int,
+    xpToNextLevel: Int,
+) {
+    val moodEmoji = when (mood) {
+        ChorebooMood.HAPPY -> "🥰"
+        ChorebooMood.CONTENT -> "😊"
+        ChorebooMood.HUNGRY -> "😩"
+        ChorebooMood.TIRED -> "😴"
+        ChorebooMood.SAD -> "😢"
+        ChorebooMood.IDLE -> "😐"
+    }
+    val moodLabel = when (mood) {
+        ChorebooMood.HAPPY -> "Feeling Loved"
+        ChorebooMood.CONTENT -> "Feeling Good"
+        ChorebooMood.HUNGRY -> "Feeling Hungry"
+        ChorebooMood.TIRED -> "Feeling Tired"
+        ChorebooMood.SAD -> "Feeling Sad"
+        ChorebooMood.IDLE -> "Feeling Idle"
+    }
+
+    Row(
+        modifier = Modifier.fillMaxWidth(),
+        horizontalArrangement = Arrangement.spacedBy(12.dp),
+    ) {
+        // Pet Mood card — tertiaryFixed-like lavender
+        Box(
+            modifier = Modifier
+                .weight(1f)
+                .aspectRatio(1f)
+                .clip(RoundedCornerShape(20.dp))
+                .background(MaterialTheme.colorScheme.tertiaryContainer.copy(alpha = 0.30f)),
+        ) {
+            Column(
+                modifier = Modifier
+                    .fillMaxSize()
+                    .padding(16.dp),
+                verticalArrangement = Arrangement.SpaceBetween,
+            ) {
+                Text(
+                    text = "PET MOOD",
+                    style = MaterialTheme.typography.labelSmall,
+                    fontWeight = FontWeight.Bold,
+                    color = MaterialTheme.colorScheme.onTertiaryContainer,
+                    letterSpacing = 1.sp,
+                )
+                Text(
+                    text = moodEmoji,
+                    fontSize = 44.sp,
+                    modifier = Modifier.align(Alignment.CenterHorizontally),
+                )
+                Text(
+                    text = moodLabel,
+                    style = MaterialTheme.typography.titleSmall,
+                    fontWeight = FontWeight.Bold,
+                    color = MaterialTheme.colorScheme.onTertiaryContainer,
+                )
+            }
+        }
+
+        // Level / XP card — primaryFixed-like light green
+        Box(
+            modifier = Modifier
+                .weight(1f)
+                .aspectRatio(1f)
+                .clip(RoundedCornerShape(20.dp))
+                .background(MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.35f)),
+        ) {
+            Column(
+                modifier = Modifier
+                    .fillMaxSize()
+                    .padding(16.dp),
+                verticalArrangement = Arrangement.SpaceBetween,
+            ) {
+                Text(
+                    text = "LEVEL $level",
+                    style = MaterialTheme.typography.labelSmall,
+                    fontWeight = FontWeight.Bold,
+                    color = MaterialTheme.colorScheme.onPrimaryContainer,
+                    letterSpacing = 1.sp,
+                )
+                Text(
+                    text = "🍗",
+                    fontSize = 44.sp,
+                    modifier = Modifier.align(Alignment.CenterHorizontally),
+                )
+                Text(
+                    text = "$xp / $xpToNextLevel XP",
+                    style = MaterialTheme.typography.titleSmall,
+                    fontWeight = FontWeight.Bold,
+                    color = MaterialTheme.colorScheme.onPrimaryContainer,
+                )
+            }
+        }
+    }
+}
+
+// ---------------------------------------------------------------------------
+// Level-up celebration dialog
+// ---------------------------------------------------------------------------
 
 @Composable
 private fun LevelUpDialog(
@@ -455,9 +823,9 @@ private fun LevelUpDialog(
         Box(
             modifier = Modifier
                 .fillMaxSize()
-                .padding(top = 80.dp)
+                .padding(bottom = 100.dp)
                 .padding(horizontal = 24.dp),
-            contentAlignment = Alignment.TopCenter,
+            contentAlignment = Alignment.BottomCenter,
         ) {
             Card(
                 shape = RoundedCornerShape(24.dp),

@@ -21,13 +21,17 @@ class UserPreferences @Inject constructor(
 ) {
     companion object {
          val TOTAL_POINTS = intPreferencesKey("total_points")
+         val TOTAL_LIFETIME_XP = intPreferencesKey("total_lifetime_xp")
          val THEME_MODE = stringPreferencesKey("theme_mode") // "system", "light", "dark"
          val ONBOARDING_COMPLETE = booleanPreferencesKey("onboarding_complete")
          val SOUND_ENABLED = booleanPreferencesKey("sound_enabled")
          val PROFILE_PHOTO_URI = stringPreferencesKey("profile_photo_uri") // Custom profile photo path, null = use Google photo
+         val HOUSEHOLD_NOTIFICATIONS = booleanPreferencesKey("household_notifications_enabled")
      }
 
      val totalPoints: Flow<Int> = dataStore.data.map { it[TOTAL_POINTS] ?: 0 }
+
+     val totalLifetimeXp: Flow<Int> = dataStore.data.map { it[TOTAL_LIFETIME_XP] ?: 0 }
 
      val themeMode: Flow<String> = dataStore.data.map { it[THEME_MODE] ?: "system" }
 
@@ -37,10 +41,19 @@ class UserPreferences @Inject constructor(
 
     val profilePhotoUri: Flow<String?> = dataStore.data.map { it[PROFILE_PHOTO_URI] }
 
+    val householdNotificationsEnabled: Flow<Boolean> = dataStore.data.map { it[HOUSEHOLD_NOTIFICATIONS] ?: true }
+
     suspend fun addPoints(amount: Int) {
         dataStore.edit { prefs ->
             val current = prefs[TOTAL_POINTS] ?: 0
             prefs[TOTAL_POINTS] = current + amount
+        }
+    }
+
+    suspend fun addLifetimeXp(amount: Int) {
+        dataStore.edit { prefs ->
+            val current = prefs[TOTAL_LIFETIME_XP] ?: 0
+            prefs[TOTAL_LIFETIME_XP] = current + amount
         }
     }
 
@@ -76,6 +89,10 @@ class UserPreferences @Inject constructor(
                 prefs[PROFILE_PHOTO_URI] = uri
             }
         }
+    }
+
+    suspend fun setHouseholdNotificationsEnabled(enabled: Boolean) {
+        dataStore.edit { it[HOUSEHOLD_NOTIFICATIONS] = enabled }
     }
 }
 

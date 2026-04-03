@@ -24,6 +24,7 @@ import androidx.compose.material.icons.filled.DirectionsRun
 import androidx.compose.material.icons.filled.Edit
 import androidx.compose.material.icons.filled.Favorite
 import androidx.compose.material.icons.filled.FitnessCenter
+import androidx.compose.material.icons.filled.Home
 import androidx.compose.material.icons.filled.LocalFireDepartment
 import androidx.compose.material.icons.filled.Lock
 import androidx.compose.material.icons.filled.MenuBook
@@ -42,8 +43,10 @@ import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.draw.shadow
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextDecoration
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.example.choreboo_habittrackerfriend.domain.model.Habit
@@ -68,7 +71,7 @@ fun HabitCard(
         shape = RoundedCornerShape(16.dp),
         colors = CardDefaults.cardColors(
             containerColor = if (isComplete)
-                MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.20f)
+                MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.18f)
             else
                 MaterialTheme.colorScheme.surfaceContainerLow,
         ),
@@ -122,7 +125,11 @@ fun HabitCard(
                             text = habit.title,
                             style = MaterialTheme.typography.titleMedium,
                             fontWeight = FontWeight.Bold,
-                            color = MaterialTheme.colorScheme.onSurface,
+                            color = if (isComplete)
+                                MaterialTheme.colorScheme.onSurface.copy(alpha = 0.5f)
+                            else
+                                MaterialTheme.colorScheme.onSurface,
+                            textDecoration = if (isComplete) TextDecoration.LineThrough else TextDecoration.None,
                         )
                         // XP badge — tertiaryContainer pill
                         Box(
@@ -139,58 +146,91 @@ fun HabitCard(
                                 fontSize = 10.sp,
                             )
                         }
+                        // Household badge
+                        if (habit.isHouseholdHabit) {
+                            Box(
+                                modifier = Modifier
+                                    .clip(RoundedCornerShape(50.dp))
+                                    .background(MaterialTheme.colorScheme.secondaryContainer)
+                                    .padding(horizontal = 6.dp, vertical = 2.dp),
+                            ) {
+                                Row(
+                                    verticalAlignment = Alignment.CenterVertically,
+                                    horizontalArrangement = Arrangement.spacedBy(2.dp),
+                                ) {
+                                    Icon(
+                                        imageVector = Icons.Default.Home,
+                                        contentDescription = "Household habit",
+                                        tint = MaterialTheme.colorScheme.onSecondaryContainer,
+                                        modifier = Modifier.size(8.dp),
+                                    )
+                                    Text(
+                                        text = "HOUSEHOLD",
+                                        style = MaterialTheme.typography.labelSmall,
+                                        fontWeight = FontWeight.Bold,
+                                        color = MaterialTheme.colorScheme.onSecondaryContainer,
+                                        fontSize = 8.sp,
+                                    )
+                                }
+                            }
+                        }
                     }
                     Spacer(modifier = Modifier.height(4.dp))
-                    Row(
-                        verticalAlignment = Alignment.CenterVertically,
-                        horizontalArrangement = Arrangement.spacedBy(8.dp),
-                    ) {
-                        // Frequency label
+                    if (isComplete) {
                         Text(
-                            text = run {
-                                val days = habit.customDays
-                                
-                                // Check for monthly pattern (days starting with "D")
-                                val monthlyDays = days.filter { it.startsWith("D") }
-                                if (monthlyDays.isNotEmpty()) {
-                                    "Monthly"
-                                } else {
-                                    // Handle weekly pattern
-                                    val allDays = setOf("MON", "TUE", "WED", "THU", "FRI", "SAT", "SUN")
-                                    val weekdays = setOf("MON", "TUE", "WED", "THU", "FRI")
-                                    val weekends = setOf("SAT", "SUN")
-                                    val daysUpper = days.map { it.uppercase() }.toSet()
-                                    when {
-                                        daysUpper == allDays -> "Daily"
-                                        daysUpper == weekdays -> "Weekdays"
-                                        daysUpper == weekends -> "Weekends"
-                                        !isScheduledToday -> "Not today"
-                                        else -> "Custom"
-                                    }
-                                }
-                            },
+                            text = "✓ Completed",
                             style = MaterialTheme.typography.labelSmall,
-                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                            fontWeight = FontWeight.Bold,
+                            color = MaterialTheme.colorScheme.primary,
                         )
-                        // Streak (fire icon + count in secondary color)
-                        if (currentStreak > 0) {
-                            Row(verticalAlignment = Alignment.CenterVertically) {
-                                Icon(
-                                    imageVector = Icons.Default.LocalFireDepartment,
-                                    contentDescription = "Streak",
-                                    tint = if (currentStreak > 0)
-                                        MaterialTheme.colorScheme.secondary
-                                    else MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.4f),
-                                    modifier = Modifier.size(13.dp),
-                                )
-                                Spacer(modifier = Modifier.width(2.dp))
-                                Text(
-                                    text = "$currentStreak day streak",
-                                    style = MaterialTheme.typography.labelSmall,
-                                    color = if (currentStreak > 0)
-                                        MaterialTheme.colorScheme.secondary
-                                    else MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.4f),
-                                )
+                    } else {
+                        Row(
+                            verticalAlignment = Alignment.CenterVertically,
+                            horizontalArrangement = Arrangement.spacedBy(8.dp),
+                        ) {
+                            // Frequency label
+                            Text(
+                                text = run {
+                                    val days = habit.customDays
+
+                                    // Check for monthly pattern (days starting with "D")
+                                    val monthlyDays = days.filter { it.startsWith("D") }
+                                    if (monthlyDays.isNotEmpty()) {
+                                        "Monthly"
+                                    } else {
+                                        // Handle weekly pattern
+                                        val allDays = setOf("MON", "TUE", "WED", "THU", "FRI", "SAT", "SUN")
+                                        val weekdays = setOf("MON", "TUE", "WED", "THU", "FRI")
+                                        val weekends = setOf("SAT", "SUN")
+                                        val daysUpper = days.map { it.uppercase() }.toSet()
+                                        when {
+                                            daysUpper == allDays -> "Daily"
+                                            daysUpper == weekdays -> "Weekdays"
+                                            daysUpper == weekends -> "Weekends"
+                                            !isScheduledToday -> "Not today"
+                                            else -> "Custom"
+                                        }
+                                    }
+                                },
+                                style = MaterialTheme.typography.labelSmall,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                            )
+                            // Streak (fire icon + count in secondary color)
+                            if (currentStreak > 0) {
+                                Row(verticalAlignment = Alignment.CenterVertically) {
+                                    Icon(
+                                        imageVector = Icons.Default.LocalFireDepartment,
+                                        contentDescription = "Streak",
+                                        tint = MaterialTheme.colorScheme.secondary,
+                                        modifier = Modifier.size(13.dp),
+                                    )
+                                    Spacer(modifier = Modifier.width(2.dp))
+                                    Text(
+                                        text = "$currentStreak day streak",
+                                        style = MaterialTheme.typography.labelSmall,
+                                        color = MaterialTheme.colorScheme.secondary,
+                                    )
+                                }
                             }
                         }
                     }
@@ -228,6 +268,14 @@ fun HabitCard(
                         // Completion circle button
                         Box(
                             modifier = Modifier
+                                .then(
+                                    if (isComplete) Modifier.shadow(
+                                        elevation = 6.dp,
+                                        shape = CircleShape,
+                                        ambientColor = MaterialTheme.colorScheme.primary.copy(alpha = 0.4f),
+                                        spotColor = MaterialTheme.colorScheme.primary.copy(alpha = 0.4f),
+                                    ) else Modifier
+                                )
                                 .size(40.dp)
                                 .clip(CircleShape)
                                 .background(

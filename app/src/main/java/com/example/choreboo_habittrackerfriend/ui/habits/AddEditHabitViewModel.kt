@@ -39,6 +39,7 @@ data class HabitFormState(
     val frequencyMode: FrequencyMode = FrequencyMode.WEEKLY,
     val suggestedXp: Int? = null,
     val isEditing: Boolean = false,
+    val isHouseholdHabit: Boolean = false,
 )
 
 enum class FrequencyMode {
@@ -83,6 +84,7 @@ class AddEditHabitViewModel @Inject constructor(
                             reminderEnabled = habit.reminderEnabled,
                             reminderTime = habit.reminderTime ?: LocalTime.of(9, 0),
                             isEditing = true,
+                            isHouseholdHabit = habit.isHouseholdHabit,
                         )
                     }
                 }
@@ -112,6 +114,10 @@ class AddEditHabitViewModel @Inject constructor(
 
     fun updateIconName(iconName: String) {
         _formState.update { it.copy(iconName = iconName) }
+    }
+
+    fun updateIsHouseholdHabit(isHousehold: Boolean) {
+        _formState.update { it.copy(isHouseholdHabit = isHousehold) }
     }
 
     fun toggleCustomDay(day: String) {
@@ -215,6 +221,7 @@ class AddEditHabitViewModel @Inject constructor(
                 baseXp = state.baseXp,
                 reminderEnabled = state.reminderEnabled,
                 reminderTime = if (state.reminderEnabled) state.reminderTime else null,
+                isHouseholdHabit = state.isHouseholdHabit,
             )
             val savedHabitId = habitRepository.upsertHabit(habit)
 

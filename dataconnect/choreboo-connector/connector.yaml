@@ -1,0 +1,6 @@
+connectorId: choreboo
+authMode: PUBLIC
+generate:
+  kotlinSdk:
+    package: com.example.choreboo_habittrackerfriend.dataconnect
+    outputDir: ../../app/build/generated/sources

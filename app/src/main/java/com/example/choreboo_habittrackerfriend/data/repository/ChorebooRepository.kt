@@ -1,17 +1,26 @@
 package com.example.choreboo_habittrackerfriend.data.repository
 
+import android.util.Log
 import com.example.choreboo_habittrackerfriend.data.datastore.UserPreferences
 import com.example.choreboo_habittrackerfriend.data.local.dao.ChorebooDao
 import com.example.choreboo_habittrackerfriend.data.local.entity.ChorebooEntity
+import com.example.choreboo_habittrackerfriend.dataconnect.ChorebooConnector
+import com.example.choreboo_habittrackerfriend.dataconnect.execute
+import com.example.choreboo_habittrackerfriend.dataconnect.instance
 import com.example.choreboo_habittrackerfriend.domain.model.ChorebooStage
 import com.example.choreboo_habittrackerfriend.domain.model.ChorebooStats
 import com.example.choreboo_habittrackerfriend.domain.model.PetType
+import com.google.firebase.Timestamp
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.map
+import java.util.Date
+import java.util.UUID
 import javax.inject.Inject
 import javax.inject.Singleton
 import kotlin.math.max
+
+private const val TAG = "ChorebooRepository"
 
 data class XpResult(
     val levelsGained: Int = 0,
@@ -24,6 +33,8 @@ data class XpResult(
 class ChorebooRepository @Inject constructor(
     private val chorebooDao: ChorebooDao,
 ) {
+    private val connector by lazy { ChorebooConnector.instance }
+
     fun getChoreboo(): Flow<ChorebooStats?> = chorebooDao.getChoreboo().map { it?.toDomain() }
 
     suspend fun getChorebooSync(): ChorebooStats? = chorebooDao.getChorebooSync()?.toDomain()
@@ -41,7 +52,29 @@ class ChorebooRepository @Inject constructor(
             petType = petType.name,
         )
         val id = chorebooDao.insertChoreboo(newChoreboo)
-        return newChoreboo.copy(id = id)
+        val created = newChoreboo.copy(id = id)
+
+        // Write-through: insert into Data Connect
+        try {
+            val result = connector.insertChoreboo.execute(
+                name = name,
+                stage = ChorebooStage.EGG.name,
+                level = 1,
+                xp = 0,
+                hunger = 80,
+                happiness = 80,
+                energy = 80,
+                petType = petType.name,
+                lastInteractionAt = Timestamp(Date(created.lastInteractionAt)),
+            )
+            val remoteId = result.data.choreboo_insert.id.toString()
+            chorebooDao.updateChoreboo(created.copy(remoteId = remoteId))
+            Log.d(TAG, "Created choreboo in cloud: $remoteId")
+        } catch (e: Exception) {
+            Log.e(TAG, "Failed to sync new choreboo to cloud", e)
+        }
+
+        return created
     }
 
     suspend fun applyStatDecay() {
@@ -81,6 +114,9 @@ class ChorebooRepository @Inject constructor(
             sleepUntil = 0, // Clear sleep when it expires
         )
         chorebooDao.updateChoreboo(updated)
+
+        // Write-through: update stats in Data Connect
+        syncStatsToCloud(updated)
     }
 
     suspend fun addXp(amount: Int): XpResult {
@@ -110,6 +146,21 @@ class ChorebooRepository @Inject constructor(
         )
         chorebooDao.updateChoreboo(updated)
 
+        // Write-through: update XP in Data Connect
+        updated.remoteId?.let { remoteId ->
+            try {
+                connector.updateChorebooXp.execute(
+                    chorebooId = UUID.fromString(remoteId),
+                    level = newLevel,
+                    xp = newXp,
+                    stage = newStage.name,
+                )
+                Log.d(TAG, "Synced XP to cloud: level=$newLevel, xp=$newXp")
+            } catch (e: Exception) {
+                Log.e(TAG, "Failed to sync XP to cloud", e)
+            }
+        }
+
         return XpResult(
             levelsGained = newLevel - oldLevel,
             newLevel = newLevel,
@@ -126,9 +177,12 @@ class ChorebooRepository @Inject constructor(
             lastInteractionAt = System.currentTimeMillis(),
         )
         chorebooDao.updateChoreboo(updated)
+
+        // Write-through: update stats in Data Connect
+        syncStatsToCloud(updated)
     }
 
-    /** Put pet to sleep for 24 hours — freezes all stat decay during sleep. */
+    /** Put pet to sleep for 24 hours -- freezes all stat decay during sleep. */
     suspend fun putToSleep() {
         val choreboo = chorebooDao.getChorebooSync() ?: return
         val now = System.currentTimeMillis()
@@ -138,12 +192,26 @@ class ChorebooRepository @Inject constructor(
             lastInteractionAt = now,
         )
         chorebooDao.updateChoreboo(updated)
+
+        // Write-through: update sleep in Data Connect
+        updated.remoteId?.let { remoteId ->
+            try {
+                connector.updateChorebooSleep.execute(
+                    chorebooId = UUID.fromString(remoteId),
+                ) {
+                    sleepUntil = Timestamp(Date(sleepUntilTime))
+                }
+                Log.d(TAG, "Synced sleep to cloud")
+            } catch (e: Exception) {
+                Log.e(TAG, "Failed to sync sleep to cloud", e)
+            }
+        }
     }
 
     /**
      * Auto-feed: called silently after habit completion.
      * If hunger < 30 AND user has >= 10 points, deduct 10 points and add +20 hunger.
-     * No animation triggered — purely background operation.
+     * No animation triggered -- purely background operation.
      */
     suspend fun autoFeedIfNeeded(userPreferences: UserPreferences) {
         val choreboo = chorebooDao.getChorebooSync() ?: return
@@ -156,12 +224,108 @@ class ChorebooRepository @Inject constructor(
                 hunger = (choreboo.hunger + 20).coerceAtMost(100),
             )
             chorebooDao.updateChoreboo(updated)
+
+            // Write-through
+            syncStatsToCloud(updated)
         }
     }
 
     suspend fun updateName(name: String) {
         val choreboo = chorebooDao.getChorebooSync() ?: return
-        chorebooDao.updateChoreboo(choreboo.copy(name = name))
+        val updated = choreboo.copy(name = name)
+        chorebooDao.updateChoreboo(updated)
+
+        // Write-through: full update to Data Connect
+        updated.remoteId?.let { remoteId ->
+            try {
+                connector.updateChorebooFull.execute(
+                    chorebooId = UUID.fromString(remoteId),
+                    name = name,
+                    stage = updated.stage,
+                    level = updated.level,
+                    xp = updated.xp,
+                    hunger = updated.hunger,
+                    happiness = updated.happiness,
+                    energy = updated.energy,
+                    petType = updated.petType,
+                    lastInteractionAt = Timestamp(Date(updated.lastInteractionAt)),
+                ) {
+                    sleepUntil = if (updated.sleepUntil > 0) Timestamp(Date(updated.sleepUntil)) else null
+                }
+                Log.d(TAG, "Synced name update to cloud")
+            } catch (e: Exception) {
+                Log.e(TAG, "Failed to sync name update to cloud", e)
+            }
+        }
+    }
+
+    /**
+     * Sync stats (hunger, happiness, energy, lastInteractionAt) to Data Connect.
+     */
+    private suspend fun syncStatsToCloud(entity: ChorebooEntity) {
+        entity.remoteId?.let { remoteId ->
+            try {
+                connector.updateChorebooStats.execute(
+                    chorebooId = UUID.fromString(remoteId),
+                    hunger = entity.hunger,
+                    happiness = entity.happiness,
+                    energy = entity.energy,
+                    lastInteractionAt = Timestamp(Date(entity.lastInteractionAt)),
+                )
+            } catch (e: Exception) {
+                Log.e(TAG, "Failed to sync stats to cloud", e)
+            }
+        }
+    }
+
+    /**
+     * Pull choreboo from Data Connect and merge into Room (cloud wins).
+     * Called once after successful authentication.
+     */
+    suspend fun syncFromCloud() {
+        try {
+            val result = connector.getMyChoreboo.execute()
+            val cloudPet = result.data.choreboos.firstOrNull()
+            if (cloudPet == null) {
+                Log.d(TAG, "No choreboo found in cloud — skipping sync")
+                return
+            }
+
+            val remoteId = cloudPet.id.toString()
+            val existing = chorebooDao.getChorebooByRemoteId(remoteId)
+                ?: chorebooDao.getChorebooSync()
+
+            val lastInteractionMs = cloudPet.lastInteractionAt.toDate().time
+            val createdAtMs = cloudPet.createdAt.toDate().time
+            val sleepUntilMs = cloudPet.sleepUntil?.toDate()?.time ?: 0L
+
+            val entity = ChorebooEntity(
+                id = existing?.id ?: 0,
+                name = cloudPet.name,
+                stage = cloudPet.stage,
+                level = cloudPet.level,
+                xp = cloudPet.xp,
+                hunger = cloudPet.hunger,
+                happiness = cloudPet.happiness,
+                energy = cloudPet.energy,
+                petType = cloudPet.petType,
+                lastInteractionAt = lastInteractionMs,
+                createdAt = createdAtMs,
+                sleepUntil = sleepUntilMs,
+                ownerUid = cloudPet.owner.id,
+                remoteId = remoteId,
+            )
+
+            if (existing != null) {
+                chorebooDao.updateChoreboo(entity)
+            } else {
+                chorebooDao.insertChoreboo(entity)
+            }
+            Log.d(TAG, "Synced choreboo from cloud: $remoteId (level=${cloudPet.level})")
+        } catch (e: Exception) {
+            Log.e(TAG, "Failed to sync choreboo from cloud", e)
+            throw e
+        }
     }
 }
 

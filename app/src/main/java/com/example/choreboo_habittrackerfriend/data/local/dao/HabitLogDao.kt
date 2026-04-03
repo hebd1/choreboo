@@ -1,6 +1,7 @@
 package com.example.choreboo_habittrackerfriend.data.local.dao
 import androidx.room.Dao
 import androidx.room.Insert
+import androidx.room.OnConflictStrategy
 import androidx.room.Query
 import com.example.choreboo_habittrackerfriend.data.local.entity.HabitLogEntity
 import kotlinx.coroutines.flow.Flow
@@ -8,6 +9,12 @@ import kotlinx.coroutines.flow.Flow
 interface HabitLogDao {
     @Insert
     suspend fun insertLog(log: HabitLogEntity): Long
+
+    @Insert(onConflict = OnConflictStrategy.IGNORE)
+    suspend fun insertLogs(logs: List<HabitLogEntity>)
+
+    @Query("SELECT * FROM habit_logs WHERE remoteId = :remoteId LIMIT 1")
+    suspend fun getLogByRemoteId(remoteId: String): HabitLogEntity?
     @Query("SELECT * FROM habit_logs WHERE habitId = :habitId ORDER BY completedAt DESC")
     fun getLogsForHabit(habitId: Long): Flow<List<HabitLogEntity>>
     @Query("SELECT * FROM habit_logs WHERE date = :date ORDER BY completedAt DESC")
@@ -44,6 +51,18 @@ interface HabitLogDao {
         GROUP BY habitId
     """)
     fun getStreaksForDate(date: String): Flow<List<HabitStreak>>
+
+    /** Total number of habit completions ever — used for badge computation. */
+    @Query("SELECT COUNT(*) FROM habit_logs")
+    fun getTotalCompletionCount(): Flow<Int>
+
+    /** Highest streak ever recorded across all habit logs — used for badge computation. */
+    @Query("SELECT COALESCE(MAX(streakAtCompletion), 0) FROM habit_logs")
+    fun getMaxStreakEver(): Flow<Int>
+
+    /** Distinct dates with completions in a date range — used for weekly streak circles. */
+    @Query("SELECT DISTINCT date FROM habit_logs WHERE date >= :startDate AND date <= :endDate")
+    fun getCompletionDatesInRange(startDate: String, endDate: String): Flow<List<String>>
 }
 
 data class HabitStreak(

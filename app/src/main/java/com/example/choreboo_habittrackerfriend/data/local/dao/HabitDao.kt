@@ -16,6 +16,13 @@ interface HabitDao {
 
     @Query("SELECT * FROM habits WHERE id = :id")
     suspend fun getHabitByIdSync(id: Long): HabitEntity?
+
+    @Query("SELECT * FROM habits WHERE remoteId = :remoteId LIMIT 1")
+    suspend fun getHabitByRemoteId(remoteId: String): HabitEntity?
+
+    @Query("SELECT * FROM habits")
+    suspend fun getAllHabitsSync(): List<HabitEntity>
+
     @Insert(onConflict = OnConflictStrategy.REPLACE)
     suspend fun upsertHabit(habit: HabitEntity): Long
     @Update
@@ -26,4 +33,8 @@ interface HabitDao {
     suspend fun archiveHabit(id: Long)
     @Query("DELETE FROM habits WHERE id = :id")
     suspend fun deleteHabitById(id: Long)
+
+    /** Total count of all habits (including archived) — used for badge computation. */
+    @Query("SELECT COUNT(*) FROM habits")
+    fun getTotalHabitCount(): Flow<Int>
 }

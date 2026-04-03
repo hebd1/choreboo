@@ -6,6 +6,10 @@ import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.example.choreboo_habittrackerfriend.data.datastore.UserPreferences
 import com.example.choreboo_habittrackerfriend.data.repository.AuthRepository
+import com.example.choreboo_habittrackerfriend.data.repository.HouseholdRepository
+import com.example.choreboo_habittrackerfriend.data.repository.HouseholdResult
+import com.example.choreboo_habittrackerfriend.domain.model.Household
+import com.example.choreboo_habittrackerfriend.domain.model.HouseholdMember
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.flow.MutableSharedFlow
 import kotlinx.coroutines.flow.SharingStarted
@@ -21,6 +25,7 @@ class SettingsViewModel @Inject constructor(
     private val application: Application,
     private val userPreferences: UserPreferences,
     private val authRepository: AuthRepository,
+    private val householdRepository: HouseholdRepository,
 ) : ViewModel() {
     val themeMode: StateFlow<String> = userPreferences.themeMode
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), "system")
@@ -37,6 +42,17 @@ class SettingsViewModel @Inject constructor(
     val googlePhotoUrl: String?
         get() = authRepository.currentFirebaseUser?.photoUrl?.toString()
 
+    // Household state
+    val currentHousehold: StateFlow<Household?> = householdRepository.currentHousehold
+        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), null)
+
+    val householdMembers: StateFlow<List<HouseholdMember>> = householdRepository.householdMembers
+        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), emptyList())
+
+    private val _householdNotificationsEnabled = userPreferences.householdNotificationsEnabled
+    val householdNotificationsEnabled: StateFlow<Boolean> = _householdNotificationsEnabled
+        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), true)
+
     private val _events = MutableSharedFlow<SettingsEvent>()
     val events: SharedFlow<SettingsEvent> = _events.asSharedFlow()
 
@@ -46,6 +62,49 @@ class SettingsViewModel @Inject constructor(
      fun setSoundEnabled(enabled: Boolean) {
          viewModelScope.launch { userPreferences.setSoundEnabled(enabled) }
      }
+
+    fun setHouseholdNotificationsEnabled(enabled: Boolean) {
+        viewModelScope.launch { userPreferences.setHouseholdNotificationsEnabled(enabled) }
+    }
+
+    fun createHousehold(name: String) {
+        viewModelScope.launch {
+            when (val result = householdRepository.createHousehold(name)) {
+                is HouseholdResult.Success -> {
+                    _events.emit(SettingsEvent.ShowSuccess("Household \"${result.household.name}\" created!"))
+                }
+                is HouseholdResult.Error -> {
+                    _events.emit(SettingsEvent.ShowError(result.message))
+                }
+            }
+        }
+    }
+
+    fun joinHousehold(inviteCode: String) {
+        viewModelScope.launch {
+            when (val result = householdRepository.joinHousehold(inviteCode)) {
+                is HouseholdResult.Success -> {
+                    _events.emit(SettingsEvent.ShowSuccess("Joined \"${result.household.name}\"!"))
+                }
+                is HouseholdResult.Error -> {
+                    _events.emit(SettingsEvent.ShowError(result.message))
+                }
+            }
+        }
+    }
+
+    fun leaveHousehold() {
+        viewModelScope.launch {
+            when (val result = householdRepository.leaveHousehold()) {
+                is HouseholdResult.Success -> {
+                    _events.emit(SettingsEvent.ShowSuccess("Left household."))
+                }
+                is HouseholdResult.Error -> {
+                    _events.emit(SettingsEvent.ShowError(result.message))
+                }
+            }
+        }
+    }
 
      fun signOut() {
         authRepository.signOut()
@@ -86,4 +145,5 @@ class SettingsViewModel @Inject constructor(
 sealed class SettingsEvent {
     data object SignedOut : SettingsEvent()
     data class ShowError(val message: String) : SettingsEvent()
+    data class ShowSuccess(val message: String) : SettingsEvent()
 }

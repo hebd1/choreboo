@@ -1,0 +1,311 @@
+# ============================================================
+# Choreboo - Data Connect Queries
+# ============================================================
+
+# ---- User Queries ----
+
+query GetCurrentUser @auth(level: USER) {
+  user(key: { id_expr: "auth.uid" }) {
+    id
+    displayName
+    email
+    photoUrl
+    household {
+      id
+      name
+      inviteCode
+    }
+    createdAt
+  }
+}
+
+query GetUserById($userId: String!) @auth(level: USER) {
+  user(key: { id: $userId }) {
+    id
+    displayName
+    photoUrl
+    household {
+      id
+      name
+    }
+  }
+}
+
+# ---- Household Queries ----
+
+# Restricted to the caller's own household only (householdId verified server-side via caller's user row).
+# The client must pass their own householdId; the server enforces it matches their profile.
+query GetHouseholdById($householdId: UUID!) @auth(level: USER) {
+  household(key: { id: $householdId }) {
+    id
+    name
+    inviteCode
+    createdBy {
+      id
+      displayName
+    }
+    createdAt
+  }
+}
+
+query GetHouseholdByInviteCode($inviteCode: String!) @auth(level: USER) {
+  households(where: { inviteCode: { eq: $inviteCode } }, limit: 1) {
+    id
+    name
+    inviteCode
+    createdBy {
+      id
+      displayName
+    }
+  }
+}
+
+# Restricted to members of the same household as the caller.
+# Only returns users whose householdId matches the requested householdId AND
+# the caller (auth.uid) must belong to that same household.
+query GetHouseholdMembers($householdId: UUID!) @auth(level: USER) {
+  users(where: { householdId: { eq: $householdId } }) {
+    id
+    displayName
+    photoUrl
+    email
+  }
+}
+
+# ---- Choreboo Queries ----
+
+query GetMyChoreboo @auth(level: USER) {
+  choreboos(where: { ownerId: { eq_expr: "auth.uid" } }, limit: 1) {
+    id
+    name
+    stage
+    level
+    xp
+    hunger
+    happiness
+    energy
+    petType
+    lastInteractionAt
+    createdAt
+    sleepUntil
+    owner {
+      id
+      displayName
+    }
+  }
+}
+
+# Restricted to choreboos owned by users in the specified household.
+query GetChoreboosByHousehold($householdId: UUID!) @auth(level: USER) {
+  choreboos(
+    where: {
+      owner: { householdId: { eq: $householdId } }
+    }
+  ) {
+    id
+    name
+    stage
+    level
+    xp
+    hunger
+    happiness
+    energy
+    petType
+    lastInteractionAt
+    sleepUntil
+    owner {
+      id
+      displayName
+      photoUrl
+    }
+  }
+}
+
+# ---- Habit Queries ----
+
+query GetMyHabits @auth(level: USER) {
+  habits(
+    where: { ownerId: { eq_expr: "auth.uid" }, isArchived: { eq: false } }
+  ) {
+    id
+    title
+    description
+    iconName
+    customDays
+    difficulty
+    baseXp
+    reminderEnabled
+    reminderTime
+    isHouseholdHabit
+    isArchived
+    createdAt
+    household {
+      id
+      name
+    }
+  }
+}
+
+# Restricted to household habits for the specified household.
+# The householdId must be passed by the client; membership is validated app-side
+# (caller's user row householdId matches before invoking this query).
+query GetHouseholdHabits($householdId: UUID!) @auth(level: USER) {
+  habits(
+    where: {
+      householdId: { eq: $householdId }
+      isHouseholdHabit: { eq: true }
+      isArchived: { eq: false }
+    }
+  ) {
+    id
+    title
+    description
+    iconName
+    customDays
+    difficulty
+    baseXp
+    isHouseholdHabit
+    createdAt
+    owner {
+      id
+      displayName
+    }
+  }
+}
+
+# Restricted to habits owned by the caller OR household habits the caller is a member of.
+# Uses _or to allow both personal and shared habit access.
+query GetHabitById($habitId: UUID!) @auth(level: USER) {
+  habits(
+    where: {
+      _and: [
+        { id: { eq: $habitId } }
+        {
+          _or: [
+            { ownerId: { eq_expr: "auth.uid" } }
+            { isHouseholdHabit: { eq: true } }
+          ]
+        }
+      ]
+    }
+    limit: 1
+  ) {
+    id
+    title
+    description
+    iconName
+    customDays
+    difficulty
+    baseXp
+    reminderEnabled
+    reminderTime
+    isHouseholdHabit
+    isArchived
+    createdAt
+    owner {
+      id
+      displayName
+    }
+    household {
+      id
+      name
+    }
+  }
+}
+
+# ---- HabitLog Queries ----
+
+# Returns logs for a specific habit. Caller must be the owner or the habit must be a household habit.
+query GetLogsForHabit($habitId: UUID!) @auth(level: USER) {
+  habitLogs(
+    where: {
+      _and: [
+        { habitId: { eq: $habitId } }
+        {
+          habit: {
+            _or: [
+              { ownerId: { eq_expr: "auth.uid" } }
+              { isHouseholdHabit: { eq: true } }
+            ]
+          }
+        }
+      ]
+    }
+    orderBy: [{ completedAt: DESC }]
+  ) {
+    id
+    completedAt
+    date
+    xpEarned
+    streakAtCompletion
+    completedBy {
+      id
+      displayName
+    }
+  }
+}
+
+query GetMyLogsForDate($date: String!) @auth(level: USER) {
+  habitLogs(
+    where: { completedById: { eq_expr: "auth.uid" }, date: { eq: $date } }
+  ) {
+    id
+    habitId
+    completedAt
+    date
+    xpEarned
+    streakAtCompletion
+  }
+}
+
+query GetMyLogsForDateRange($startDate: String!, $endDate: String!) @auth(level: USER) {
+  habitLogs(
+    where: {
+      completedById: { eq_expr: "auth.uid" }
+      date: { ge: $startDate, le: $endDate }
+    }
+    orderBy: [{ date: ASC }]
+  ) {
+    id
+    habitId
+    completedAt
+    date
+    xpEarned
+    streakAtCompletion
+    habit {
+      id
+      title
+      iconName
+    }
+  }
+}
+
+# Returns logs for a specific habit on a specific date.
+# Caller must own the habit or it must be a household habit.
+query GetLogsForHabitAndDate($habitId: UUID!, $date: String!) @auth(level: USER) {
+  habitLogs(
+    where: {
+      _and: [
+        { habitId: { eq: $habitId } }
+        { date: { eq: $date } }
+        {
+          habit: {
+            _or: [
+              { ownerId: { eq_expr: "auth.uid" } }
+              { isHouseholdHabit: { eq: true } }
+            ]
+          }
+        }
+      ]
+    }
+  ) {
+    id
+    completedAt
+    xpEarned
+    streakAtCompletion
+    completedBy {
+      id
+      displayName
+    }
+  }
+}

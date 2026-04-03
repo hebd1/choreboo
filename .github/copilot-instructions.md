@@ -1,7 +1,7 @@
 # Choreboo Habit Tracker Friend - Copilot Instructions
 
 ## Project Overview
-A Tamagotchi-style habit tracker Android app where users complete daily habits to earn XP, points, and food items for their digital pet called a "Choreboo." Choreboos have stats (hunger, happiness, energy), evolve through stages (Egg → Baby → Child → Teen → Adult → Legendary), and can be customized with accessories.
+A Tamagotchi-style habit tracker Android app where users complete daily habits to earn XP for their digital pet called a "Choreboo." Choreboos have stats (hunger, happiness, energy) and evolve through stages (Egg → Baby → Child → Teen → Adult → Legendary). Supports **households** — shared groups where members can see each other's pets and habits. Firebase Auth for identity; Firebase Data Connect (PostgreSQL) as cloud backend.
 
 ## Build Environment (WSL + Windows Android SDK)
 
@@ -21,7 +21,8 @@ A Tamagotchi-style habit tracker Android app where users complete daily habits t
 - **Language:** Kotlin
 - **UI:** Jetpack Compose + Material3
 - **DI:** Hilt (`@HiltAndroidApp`, `@AndroidEntryPoint`, `@HiltViewModel`)
-- **Database:** Room (local, offline-first, no backend)
+- **Database:** Room (local cache) + Firebase Data Connect (PostgreSQL cloud backend)
+- **Auth:** Firebase Auth (email/password + Google sign-in)
 - **Preferences:** DataStore
 - **Animations:** Lottie Compose (placeholder emoji for now, swappable to Lottie later)
 - **Images:** Coil
@@ -33,46 +34,59 @@ A Tamagotchi-style habit tracker Android app where users complete daily habits t
 - **Min SDK:** 24 | **Target SDK:** 36 | **Compile SDK:** 36
 
 ## Architecture
-- **Pattern:** MVVM (Screen → ViewModel → Repository → DAO → Room)
+- **Pattern:** MVVM (Screen → ViewModel → Repository → DAO → Room), with write-through to Firebase Data Connect
 - **Package structure:**
   ```
   com.example.choreboo_habittrackerfriend/
-  ├── MainActivity.kt              # @AndroidEntryPoint, hosts NavGraph + BottomNavBar, injects UserPreferences + ChorebooRepository
-  ├── ChorebooApplication.kt         # @HiltAndroidApp, notification channels
-  ├── navigation/                  # ChorebooNavGraph.kt, Screen sealed class
+  ├── MainActivity.kt                  # @AndroidEntryPoint, dynamic startDestination (Auth/Onboarding/HabitList)
+  ├── ChorebooApplication.kt           # @HiltAndroidApp, notification channels
+  ├── navigation/                      # ChorebooNavGraph.kt, Screen sealed class (8 routes)
   ├── data/
-  │   ├── local/                   # ChorebooDatabase, entities, DAOs, TypeConverters
-  │   ├── datastore/               # UserPreferences (points, theme, reminders, onboarding, sound)
-  │   └── repository/              # HabitRepository, ChorebooRepository (XpResult), ShopRepository (PurchaseResult), InventoryRepository
-  ├── di/                          # AppModule (Hilt @Module providing DB, DAOs, DataStore)
-  ├── domain/model/                # Habit (isScheduledForToday), ChorebooStats (mood, xpProgress), Item, enums
+  │   ├── local/
+  │   │   ├── ChorebooDatabase.kt      # Room DB v7, 3 entities, fallbackToDestructiveMigration
+  │   │   ├── Converters.kt            # Gson TypeConverter for List<String>
+  │   │   ├── entity/                  # HabitEntity, HabitLogEntity, ChorebooEntity
+  │   │   └── dao/                     # HabitDao, HabitLogDao, ChorebooDao
+  │   ├── datastore/                   # UserPreferences (theme, reminders, onboarding, sound)
+  │   └── repository/                  # HabitRepository, ChorebooRepository, AuthRepository, HouseholdRepository, UserRepository
+  ├── di/                              # AppModule (DB, DAOs, DataStore, UserPreferences, FirebaseAuth)
+  ├── domain/model/                    # Habit, ChorebooStats, ChorebooMood, ChorebooStage, PetType, Household, AppUser, Badge
   ├── ui/
-  │   ├── theme/                   # Color.kt (Choreboo palette), Theme.kt (themeMode param), Type.kt
-  │   ├── components/              # BottomNavBar (petMood dynamic icon)
-  │   ├── habits/                  # HabitListScreen (delete confirm, level-up dialog), AddEditHabitScreen, components/ (HabitCard, StreakBadge)
-  │   ├── pet/                     # PetScreen (equipped accessories display, feed bottom sheet), PetViewModel (EquippedItemInfo), components/StatBar
-  │   ├── shop/                    # ShopScreen (item descriptions), ShopItemCard
-  │   ├── inventory/               # InventoryScreen (equip/unequip), InventoryItemCard (equipped state)
-  │   ├── calendar/                # CalendarScreen (single LazyColumn, heatmap legend), CalendarViewModel
-  │   ├── onboarding/              # OnboardingScreen (name your Choreboo, hatch egg)
-  │   └── settings/                # SettingsScreen (theme, sound, reminders with permission request)
-  └── worker/                      # ReminderWorker (daily notifications with random messages)
+  │   ├── theme/                       # Color.kt (Choreboo palette), Theme.kt (themeMode param), Type.kt
+  │   ├── components/                  # BottomNavBar (5 tabs with dynamic pet mood icon)
+  │   ├── auth/                        # AuthScreen, AuthViewModel (login/register/sync orchestration)
+  │   ├── habits/                      # HabitListScreen (delete confirm, level-up dialog), AddEditHabitScreen, components/ (HabitCard, StreakBadge)
+  │   ├── pet/                         # PetScreen (feed bottom sheet), PetViewModel, components/StatBar
+  │   ├── household/                   # HouseholdScreen, HouseholdViewModel, components/HouseholdPetCard
+  │   ├── calendar/                    # CalendarScreen (single LazyColumn, heatmap legend), CalendarViewModel
+  │   ├── onboarding/                  # OnboardingScreen (name your Choreboo, hatch egg)
+  │   └── settings/                    # SettingsScreen (theme, sound, reminders with permission request), SettingsViewModel
+  └── worker/                          # ReminderWorker (daily notifications with random messages)
   ```
 
-## Room Database Schema (v1, 6 entities)
-- **habits** – id, title, description, iconName, frequency, customDays, targetCount, baseXp, createdAt, isArchived
-- **habit_logs** – id, habitId (FK→habits CASCADE), completedAt, date (ISO string), xpEarned, streakAtCompletion
-- **choreboos** – id, name, stage, level, xp, hunger, happiness, energy, lastInteractionAt, createdAt
-- **items** – id, name, description, type (FOOD/HAT/CLOTHES/BACKGROUND), rarity, price, effectValue, effectStat, animationAsset (pre-seeded on DB create)
-- **inventory_items** – id, itemId (FK→items), quantity, acquiredAt
-- **equipped_items** – id, chorebooId (FK→choreboos), itemId (FK→items), slot
+## Room Database Schema (v7, 3 entities)
+- **habits** – id, title, description, iconName, customDays, difficulty, baseXp, reminderEnabled, reminderTime, createdAt, isArchived, isHouseholdHabit, ownerUid, householdId, remoteId
+- **habit_logs** – id, habitId (FK→habits CASCADE), completedAt, date (ISO string), xpEarned, streakAtCompletion, completedByUid, remoteId
+- **choreboos** – id, name, stage, level, xp, hunger, happiness, energy, petType, lastInteractionAt, createdAt, sleepUntil, ownerUid, remoteId
 
-Using `fallbackToDestructiveMigration()` during development.
+- `remoteId` maps to Data Connect UUIDs for cloud sync.
+- `ownerUid` / `completedByUid` / `householdId` map to Firebase Auth UIDs and household references.
+- Uses `fallbackToDestructiveMigration()` during development.
+
+## Cloud Backend (Firebase Data Connect)
+
+5 cloud tables in `dataconnect/schema/schema.gql`: User, Household, Choreboo, Habit, HabitLog.
+
+- **Write-through**: All Room mutations also fire the corresponding Data Connect mutation. Failures are silent.
+- **Cloud-to-local sync**: Triggered after auth only. Order: habits → choreboo → habit logs (last 30 days). Cloud wins on conflict.
+- **Security**: 14 queries + 15 mutations, all with `@auth(level: USER)` and auth-scoped filters.
+- **SDK regen**: `npx firebase-tools@latest dataconnect:sdk:generate`
 
 ## Navigation
-- 4 bottom tabs: Habits (`habits_list`), Choreboo (`pet`), Shop (`shop`), Calendar (`calendar`)
-- Additional routes: `add_edit_habit?habitId={id}`, `inventory`, `settings`, `onboarding`
-- Bottom bar hidden on: onboarding, add/edit habit, inventory, settings
+- 5 bottom tabs: Habits (`habits_list`), Choreboo (`pet`), House (`household`), Calendar (`calendar`), Settings (`settings`)
+- Additional routes: `auth`, `onboarding`, `add_edit_habit?habitId={id}`
+- Bottom bar hidden on: auth, onboarding, add/edit habit
+- Start destination is dynamic: Auth → Onboarding → HabitList
 - BottomNavBar shows dynamic pet mood icon for the Choreboo tab
 
 ## Key Conventions
@@ -83,17 +97,19 @@ Using `fallbackToDestructiveMigration()` during development.
 - Domain models are separate from Room entities; mapping via extension functions (`toDomain()` / `toEntity()`)
 - Enums stored as Strings in Room (no TypeConverter needed for enums)
 - Dates stored as ISO-8601 strings ("2026-03-24") for easy Room queries
-- Points/currency managed via DataStore, not Room
 - Stat decay calculated on app open based on `lastInteractionAt` timestamp
 - Core library desugaring enabled for `java.time` API support on minSdk 24
+- Write-through: any Room mutation should also call the corresponding Data Connect mutation
 
 ## Implemented Features
-- **Habit completion** — XP earned (base + streak bonus), prevents over-completion via targetCount, 30% random food reward drop
+- **Firebase Auth** — Email/password + Google sign-in, syncing overlay on auth screen
+- **Households** — Create/join via invite code, view household members' pets and habits
+- **Cloud sync** — Write-through on all mutations, cloud-to-local sync on auth (habits → choreboo → logs)
+- **Habit completion** — XP earned (base + streak bonus), prevents over-completion via targetCount
 - **Streak tracking** — StreakBadge component, streaks displayed per habit from HabitLogDao
 - **Scheduling** — `Habit.isScheduledForToday()` disables completion button for CUSTOM habits on non-scheduled days
 - **Delete confirmation** — AlertDialog before deleting a habit
 - **Level-up celebration** — AlertDialog shown when XP causes level-up or stage evolution
-- **Equip system** — Accessories (HAT/CLOTHES/BACKGROUND) equippable from inventory, shown on PetScreen
 - **Theme wiring** — Settings theme picker (system/light/dark) propagated to Theme.kt via `themeMode` param
 - **ReminderWorker** — Daily WorkManager job with randomized notification messages, POST_NOTIFICATIONS permission handled
 - **Calendar heatmap** — Single LazyColumn with color-coded days + legend + detail logs with habit names
@@ -108,7 +124,7 @@ Using `fallbackToDestructiveMigration()` during development.
 ## Style Guidelines
 - Modern, rounded UI: `RoundedCornerShape(16.dp)` for cards, `RoundedCornerShape(12.dp)` for inputs
 - Use `MaterialTheme.typography.*` consistently (no hardcoded text styles)
-- Touch targets ≥ 48dp
+- Touch targets >= 48dp
 - All icons have `contentDescription` for accessibility
 - Empty states show emoji + friendly message + call to action
 - Use `AnimatedVisibility`, `animateColorAsState` for smooth transitions
@@ -118,7 +134,7 @@ Using `fallbackToDestructiveMigration()` during development.
 CheckCircle, FitnessCenter, MenuBook, WaterDrop, SelfImprovement, MusicNote, LocalFireDepartment, DirectionsRun, Bedtime, Code, Restaurant, CleaningServices, School, Brush, Favorite
 
 ## Pet Animation Strategy
-- Currently using placeholder emoji per stage (🥚🐣🐥🐤🐔🦅)
+- Currently using placeholder emoji per stage
 - Designed to be swapped with Lottie JSON files in `res/raw/` (choreboo_idle.json, choreboo_happy.json, etc.)
 - `PetAnimationView` composable selects animation based on `ChorebooMood`
 - Pet size scales by `ChorebooStage`
@@ -126,9 +142,9 @@ CheckCircle, FitnessCenter, MenuBook, WaterDrop, SelfImprovement, MusicNote, Loc
 ## Key Data Flow Patterns
 - **`ChorebooRepository.addXp()`** returns `XpResult(levelsGained, newLevel, evolved, newStage)` for celebration UI
 - **`HabitRepository.completeHabit()`** returns `CompletionResult(xpEarned, newStreak, alreadyComplete)` with targetCount enforcement
-- **`ShopRepository.getRandomFoodItem()`** uses weighted rarity (70% COMMON, 25% RARE, 5% LEGENDARY)
 - **`HabitRepository.getStreaksForToday()`** returns `Flow<Map<Long, Int>>` for StreakBadge display
-- **EquippedItemInfo** — PetViewModel resolves equipped entity item IDs to display names reactively
+- **Cloud-to-local sync**: `HabitRepository.syncHabitsFromCloud()`, `HabitRepository.syncHabitLogsFromCloud()`, `ChorebooRepository.syncFromCloud()`
+- **Auth orchestration**: `AuthViewModel.syncCloudDataToLocal()` runs sync after login/register
 
 ## When Generating Code
 - Always use the package `com.example.choreboo_habittrackerfriend`
@@ -141,10 +157,10 @@ CheckCircle, FitnessCenter, MenuBook, WaterDrop, SelfImprovement, MusicNote, Loc
 - Use `AlertDialog` for confirmations (delete, level-up); `ModalBottomSheet` for selection lists (feed)
 - For new features that need level-up detection, use the `XpResult` return from `ChorebooRepository.addXp()`
 - When adding new habit icons, update both `iconOptions` in AddEditHabitScreen and `getIconForName()` in HabitCard
+- Write-through: any Room mutation should also call the corresponding Data Connect mutation
 
 ## Not Yet Implemented (Future)
 - Glance widget (today's habits + pet mood)
 - Sound effects (play on completion, feeding, level-up)
 - Lottie animations (replace emoji placeholders)
-- Mystery eggs in shop
 - Multiple Choreboos

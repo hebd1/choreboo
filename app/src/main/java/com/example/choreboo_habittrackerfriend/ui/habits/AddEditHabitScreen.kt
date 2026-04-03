@@ -35,6 +35,7 @@ import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.Alarm
 import androidx.compose.material.icons.filled.AutoAwesome
 import androidx.compose.material.icons.filled.ChevronRight
+import androidx.compose.material.icons.filled.Groups
 import androidx.compose.material.icons.filled.NotificationsNone
 import androidx.compose.material.icons.filled.Schedule
 import androidx.compose.material.icons.filled.TaskAlt
@@ -423,6 +424,64 @@ fun AddEditHabitScreen(
 
                 Spacer(modifier = Modifier.height(28.dp))
 
+                // Household Habit toggle
+                Box(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .clip(RoundedCornerShape(16.dp))
+                        .background(MaterialTheme.colorScheme.surfaceContainerLow)
+                        .border(
+                            width = 0.dp,
+                            color = Color.Transparent,
+                            shape = RoundedCornerShape(16.dp),
+                        ),
+                ) {
+                    // Secondary-container left border accent
+                    Box(
+                        modifier = Modifier
+                            .align(Alignment.CenterStart)
+                            .width(4.dp)
+                            .height(56.dp)
+                            .background(
+                                MaterialTheme.colorScheme.secondaryContainer,
+                                RoundedCornerShape(topStart = 16.dp, bottomStart = 16.dp),
+                            ),
+                    )
+                    Row(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(start = 12.dp, end = 12.dp, top = 12.dp, bottom = 12.dp),
+                        verticalAlignment = Alignment.CenterVertically,
+                    ) {
+                        Icon(
+                            imageVector = Icons.Default.Groups,
+                            contentDescription = "Household Habit",
+                            tint = MaterialTheme.colorScheme.secondary,
+                            modifier = Modifier.size(24.dp),
+                        )
+                        Spacer(modifier = Modifier.width(12.dp))
+                        Column(modifier = Modifier.weight(1f)) {
+                            Text(
+                                text = "Household Habit",
+                                style = MaterialTheme.typography.labelMedium,
+                                fontWeight = FontWeight.Bold,
+                                color = MaterialTheme.colorScheme.onSurface,
+                            )
+                            Text(
+                                text = "Visible to all household members",
+                                style = MaterialTheme.typography.bodySmall,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                            )
+                        }
+                        Switch(
+                            checked = formState.isHouseholdHabit,
+                            onCheckedChange = viewModel::updateIsHouseholdHabit,
+                        )
+                    }
+                }
+
+                Spacer(modifier = Modifier.height(28.dp))
+
                 // CTA buttons
                 Box(
                     modifier = Modifier
@@ -480,12 +539,12 @@ fun AddEditHabitScreen(
             }
         }
 
-        // Snackbar pinned to the top of the view area
+        // Snackbar pinned to the bottom of the view area
         Box(
             modifier = Modifier
                 .fillMaxSize()
-                .padding(top = padding.calculateTopPadding()),
-            contentAlignment = Alignment.TopCenter,
+                .padding(bottom = 16.dp),
+            contentAlignment = Alignment.BottomCenter,
         ) {
             SnackbarHost(snackbarHostState) { data ->
                 StitchSnackbar(data)

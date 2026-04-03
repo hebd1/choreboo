@@ -12,6 +12,7 @@ import com.example.choreboo_habittrackerfriend.ui.habits.HabitListScreen
 import com.example.choreboo_habittrackerfriend.ui.habits.AddEditHabitScreen
 import com.example.choreboo_habittrackerfriend.ui.pet.PetScreen
 import com.example.choreboo_habittrackerfriend.ui.calendar.CalendarScreen
+import com.example.choreboo_habittrackerfriend.ui.household.HouseholdScreen
 import com.example.choreboo_habittrackerfriend.ui.onboarding.OnboardingScreen
 import com.example.choreboo_habittrackerfriend.ui.settings.SettingsScreen
 
@@ -25,6 +26,7 @@ sealed class Screen(val route: String) {
         }
     }
     data object Pet : Screen("pet")
+    data object Household : Screen("household")
     data object Calendar : Screen("calendar")
     data object Settings : Screen("settings")
 }
@@ -83,6 +85,14 @@ fun ChorebooNavGraph(
 
         composable(Screen.Pet.route) {
             PetScreen()
+        }
+
+        composable(Screen.Household.route) {
+            HouseholdScreen(
+                onNavigateToSettings = {
+                    navController.navigate(Screen.Settings.route)
+                },
+            )
         }
 
         composable(Screen.Calendar.route) {

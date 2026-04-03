@@ -22,4 +22,6 @@ data class HabitLogEntity(
     val date: String,
     val xpEarned: Int = 0,
     val streakAtCompletion: Int = 0,
+    val completedByUid: String? = null,
+    val remoteId: String? = null,
 )

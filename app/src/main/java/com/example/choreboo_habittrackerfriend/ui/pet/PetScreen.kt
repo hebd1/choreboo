@@ -18,17 +18,13 @@ import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
-import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.rememberScrollState
-import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.Restaurant
 import androidx.compose.material.icons.filled.Stars
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
-import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.ExperimentalMaterial3Api
@@ -64,12 +60,10 @@ import androidx.hilt.navigation.compose.hiltViewModel
 import com.airbnb.lottie.compose.LottieAnimation
 import com.airbnb.lottie.compose.LottieCompositionSpec
 import com.airbnb.lottie.compose.LottieConstants
-import com.airbnb.lottie.compose.animateLottieCompositionAsState
 import com.airbnb.lottie.compose.rememberLottieAnimatable
 import com.airbnb.lottie.compose.rememberLottieComposition
 import com.example.choreboo_habittrackerfriend.domain.model.ChorebooMood
 import com.example.choreboo_habittrackerfriend.domain.model.PetType
-import com.example.choreboo_habittrackerfriend.ui.pet.components.StatBar
 import com.example.choreboo_habittrackerfriend.ui.theme.GradientUtils
 import com.example.choreboo_habittrackerfriend.ui.theme.PetMoodContentEnd
 import com.example.choreboo_habittrackerfriend.ui.theme.PetMoodContentStart
@@ -202,328 +196,323 @@ fun PetScreen(
         }
 
         val stats = choreboo!!
-        Column(
-            modifier = Modifier
-                .fillMaxSize()
-                .padding(padding)
-                .verticalScroll(rememberScrollState()),
-            horizontalAlignment = Alignment.CenterHorizontally,
-        ) {
-            Spacer(modifier = Modifier.height(16.dp))
-            Box(
+
+        // Main scrollable content
+        Box(modifier = Modifier.fillMaxSize()) {
+            Column(
                 modifier = Modifier
-                    .fillMaxWidth()
-                    .padding(horizontal = 16.dp),
+                    .fillMaxSize()
+                    .padding(padding)
+                    // Reserve space at bottom for the fixed action row + nav bar
+                    .padding(bottom = 168.dp)
+                    .verticalScroll(rememberScrollState()),
+                horizontalAlignment = Alignment.CenterHorizontally,
             ) {
+                Spacer(modifier = Modifier.height(16.dp))
                 Box(
                     modifier = Modifier
                         .fillMaxWidth()
-                        .height(220.dp)
-                        .clip(RoundedCornerShape(16.dp))
-                        .background(
-                            Brush.radialGradient(
-                                colors = listOf(moodBgStart, moodBgColors),
-                                radius = 600f,
-                            ),
-                        )
-                        .border(
-                            width = 1.dp,
-                            color = MaterialTheme.colorScheme.outlineVariant,
-                            shape = RoundedCornerShape(16.dp),
-                        ),
-                    contentAlignment = Alignment.Center,
+                        .padding(horizontal = 16.dp),
                 ) {
-                    // Lottie animation — only fox has real animations for now
-                    PetAnimation(
-                        petType = stats.petType,
-                        mood = mood,
-                        isEating = isEating,
-                        isInteracting = isInteracting,
-                        isSleeping = isSleeping,
-                        showStartSleepAnimation = showStartSleepAnimation,
-                        onEatingComplete = { viewModel.onEatingAnimationComplete() },
-                        onInteractComplete = { isInteracting = false },
-                        onStartSleepComplete = { showStartSleepAnimation = false },
-                        onTap = { isInteracting = true },
-                        modifier = Modifier.size(160.dp),
-                    )
-
-                    // Mood pill at bottom
                     Box(
                         modifier = Modifier
-                            .align(Alignment.BottomCenter)
-                            .padding(bottom = 10.dp)
-                            .clip(RoundedCornerShape(50.dp))
-                            .background(MaterialTheme.colorScheme.surfaceContainerHighest.copy(alpha = 0.8f))
-                            .padding(horizontal = 14.dp, vertical = 6.dp),
+                            .fillMaxWidth()
+                            .height(220.dp)
+                            .clip(RoundedCornerShape(16.dp))
+                            .background(
+                                Brush.radialGradient(
+                                    colors = listOf(moodBgStart, moodBgColors),
+                                    radius = 600f,
+                                ),
+                            )
+                            .border(
+                                width = 1.dp,
+                                color = MaterialTheme.colorScheme.outlineVariant,
+                                shape = RoundedCornerShape(16.dp),
+                            ),
+                        contentAlignment = Alignment.Center,
                     ) {
-                        Text(
-                            text = if (isSleeping) "😴 SLEEPING" else "${mood.emoji} ${mood.displayName.uppercase()}",
-                            style = MaterialTheme.typography.labelMedium,
-                            fontWeight = FontWeight.Bold,
-                            color = MaterialTheme.colorScheme.onSurface,
+                        // Lottie animation — only fox has real animations for now
+                        PetAnimation(
+                            petType = stats.petType,
+                            mood = mood,
+                            isEating = isEating,
+                            isInteracting = isInteracting,
+                            isSleeping = isSleeping,
+                            showStartSleepAnimation = showStartSleepAnimation,
+                            onEatingComplete = { viewModel.onEatingAnimationComplete() },
+                            onInteractComplete = { isInteracting = false },
+                            onStartSleepComplete = { showStartSleepAnimation = false },
+                            onTap = { isInteracting = true },
+                            modifier = Modifier.size(160.dp),
+                        )
+
+                        // Mood pill at bottom
+                        Box(
+                            modifier = Modifier
+                                .align(Alignment.BottomCenter)
+                                .padding(bottom = 10.dp)
+                                .clip(RoundedCornerShape(50.dp))
+                                .background(MaterialTheme.colorScheme.surfaceContainerHighest.copy(alpha = 0.8f))
+                                .padding(horizontal = 14.dp, vertical = 6.dp),
+                        ) {
+                            Text(
+                                text = if (isSleeping) "😴 SLEEPING" else "${mood.emoji} ${mood.displayName.uppercase()}",
+                                style = MaterialTheme.typography.labelMedium,
+                                fontWeight = FontWeight.Bold,
+                                color = MaterialTheme.colorScheme.onSurface,
+                            )
+                        }
+                    }
+
+                    // Level badge — top-right
+                    Box(
+                        modifier = Modifier
+                            .align(Alignment.TopEnd)
+                            .offset(x = 6.dp, y = (-12).dp)
+                            .rotate(3f)
+                            .clip(RoundedCornerShape(10.dp))
+                            .background(MaterialTheme.colorScheme.secondaryContainer)
+                            .padding(horizontal = 12.dp, vertical = 8.dp),
+                    ) {
+                        Row(
+                            verticalAlignment = Alignment.CenterVertically,
+                            horizontalArrangement = Arrangement.spacedBy(4.dp),
+                        ) {
+                            Text("⭐", fontSize = 18.sp)
+                            Text(
+                                text = "Lv.${stats.level}",
+                                fontWeight = FontWeight.Black,
+                                style = MaterialTheme.typography.titleMedium,
+                                color = MaterialTheme.colorScheme.onSecondaryContainer,
+                            )
+                        }
+                    }
+                }
+
+                // Sleep confirmation dialog
+                if (showSleepDialog) {
+                    AlertDialog(
+                        onDismissRequest = { showSleepDialog = false },
+                        title = {
+                            Text("Put Choreboo to Sleep?", fontWeight = FontWeight.Bold)
+                        },
+                        text = {
+                            Text(
+                                "Your Choreboo will sleep for 24 hours. During this time, their stats will not decrease and they'll be fully rested! 😴\n\nAfter 24 hours, normal stat decay will resume.",
+                            )
+                        },
+                        confirmButton = {
+                            Button(
+                                onClick = {
+                                    showStartSleepAnimation = true
+                                    viewModel.sleepChoreboo()
+                                    showSleepDialog = false
+                                },
+                            ) {
+                                Text("Let Them Sleep")
+                            }
+                        },
+                        dismissButton = {
+                            TextButton(
+                                onClick = { showSleepDialog = false },
+                            ) {
+                                Text("Cancel")
+                            }
+                        },
+                    )
+                }
+
+                Spacer(modifier = Modifier.height(20.dp))
+
+                // Name & XP card
+                Card(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(horizontal = 16.dp),
+                    shape = RoundedCornerShape(16.dp),
+                    colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceContainerLowest.copy(alpha = 0.8f)),
+                    elevation = CardDefaults.cardElevation(defaultElevation = 0.dp),
+                    border = androidx.compose.foundation.BorderStroke(
+                        width = 1.dp,
+                        color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.4f),
+                    ),
+                ) {
+                    Column(modifier = Modifier.padding(16.dp)) {
+                        Row(
+                            modifier = Modifier.fillMaxWidth(),
+                            horizontalArrangement = Arrangement.SpaceBetween,
+                            verticalAlignment = Alignment.Bottom,
+                        ) {
+                            Column {
+                                Text(
+                                    text = stats.name,
+                                    style = MaterialTheme.typography.headlineSmall,
+                                    fontWeight = FontWeight.ExtraBold,
+                                )
+                                Text(
+                                    text = "${stats.stage.displayName} ${stats.petType.emoji}",
+                                    style = MaterialTheme.typography.bodyMedium,
+                                    fontWeight = FontWeight.Medium,
+                                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                )
+                            }
+                            Text(
+                                text = "Lv. ${stats.level}",
+                                style = MaterialTheme.typography.headlineMedium,
+                                fontWeight = FontWeight.Black,
+                                color = XpPurple,
+                            )
+                        }
+
+                        Spacer(modifier = Modifier.height(10.dp))
+
+                        Row(
+                            modifier = Modifier.fillMaxWidth(),
+                            horizontalArrangement = Arrangement.SpaceBetween,
+                        ) {
+                            Text(
+                                text = "XP PROGRESS",
+                                style = MaterialTheme.typography.labelSmall,
+                                fontWeight = FontWeight.Bold,
+                                color = XpPurple,
+                                letterSpacing = 1.sp,
+                            )
+                            Text(
+                                text = "${stats.xp} / ${stats.xpToNextLevel}",
+                                style = MaterialTheme.typography.labelSmall,
+                                fontWeight = FontWeight.Bold,
+                                color = XpPurple,
+                            )
+                        }
+                        Spacer(modifier = Modifier.height(6.dp))
+                        LinearProgressIndicator(
+                            progress = { stats.xpProgressFraction },
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .height(8.dp)
+                                .clip(RoundedCornerShape(5.dp)),
+                            color = XpPurple,
+                            trackColor = MaterialTheme.colorScheme.surfaceContainerHigh,
                         )
                     }
                 }
 
-                // Level badge — top-right
-                Box(
+                Spacer(modifier = Modifier.height(12.dp))
+
+                // Stats bento grid — 2-col top (Hunger + Joy) + full-width Energy
+                Column(
                     modifier = Modifier
-                        .align(Alignment.TopEnd)
-                        .offset(x = 6.dp, y = (-12).dp)
-                        .rotate(3f)
-                        .clip(RoundedCornerShape(10.dp))
-                        .background(MaterialTheme.colorScheme.secondaryContainer)
-                        .padding(horizontal = 12.dp, vertical = 8.dp),
+                        .fillMaxWidth()
+                        .padding(horizontal = 16.dp),
+                    verticalArrangement = Arrangement.spacedBy(10.dp),
                 ) {
                     Row(
-                        verticalAlignment = Alignment.CenterVertically,
-                        horizontalArrangement = Arrangement.spacedBy(4.dp),
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.spacedBy(10.dp),
                     ) {
-                        Text("⭐", fontSize = 18.sp)
-                        Text(
-                            text = "Lv.${stats.level}",
-                            fontWeight = FontWeight.Black,
-                            style = MaterialTheme.typography.titleMedium,
-                            color = MaterialTheme.colorScheme.onSecondaryContainer,
+                        // Hunger card
+                        StatBentoCard(
+                            modifier = Modifier.weight(1f),
+                            label = "HUNGER",
+                            emoji = "🍖",
+                            value = stats.hunger,
+                            statusText = when {
+                                stats.hunger >= 80 -> "Full"
+                                stats.hunger >= 50 -> "Peckish"
+                                stats.hunger >= 25 -> "Hungry"
+                                else -> "Starving!"
+                            },
+                            barColor = MaterialTheme.colorScheme.secondary,
+                        )
+                        // Joy / Happiness card
+                        StatBentoCard(
+                            modifier = Modifier.weight(1f),
+                            label = "JOY",
+                            emoji = "💕",
+                            value = stats.happiness,
+                            statusText = when {
+                                stats.happiness >= 80 -> "Happy"
+                                stats.happiness >= 50 -> "Content"
+                                stats.happiness >= 25 -> "Sad"
+                                else -> "Miserable!"
+                            },
+                            barColor = MaterialTheme.colorScheme.primary,
                         )
                     }
+                    // Energy — full width with status label on right
+                    EnergyBentoCard(
+                        value = stats.energy,
+                        statusText = when {
+                            stats.energy >= 70 -> "Energized"
+                            stats.energy >= 40 -> "Recharging"
+                            stats.energy >= 15 -> "Needs Nap Soon"
+                            else -> "Exhausted!"
+                        },
+                    )
                 }
+
+                Spacer(modifier = Modifier.height(16.dp))
             }
 
-            Spacer(modifier = Modifier.height(16.dp))
-
-            // Action row: Feed, Play, Sleep
-            LazyRow(
+            // Fixed bottom action row — Feed / Play / Sleep equidistant above nav bar
+            Box(
                 modifier = Modifier
+                    .align(Alignment.BottomCenter)
                     .fillMaxWidth()
-                    .padding(horizontal = 16.dp),
-                horizontalArrangement = Arrangement.spacedBy(12.dp),
+                    .background(
+                        Brush.verticalGradient(
+                            colors = listOf(
+                                MaterialTheme.colorScheme.surface.copy(alpha = 0f),
+                                MaterialTheme.colorScheme.surface.copy(alpha = 0.95f),
+                                MaterialTheme.colorScheme.surface,
+                            ),
+                        ),
+                    )
+                    .padding(horizontal = 16.dp)
+                    .padding(bottom = 88.dp, top = 8.dp),
             ) {
-                item {
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.SpaceEvenly,
+                ) {
                     ActionButton(
+                        modifier = Modifier.weight(1f),
                         label = "Feed",
                         emoji = "🍖",
                         onClick = { viewModel.feedChoreboo() },
                         enabled = totalPoints >= 10 && !isSleeping,
+                        isPrimary = true,
                     )
-                }
-                item {
                     ActionButton(
+                        modifier = Modifier.weight(1f),
                         label = "Play",
                         emoji = "🎮",
                         onClick = { isInteracting = true },
                         enabled = !isSleeping,
+                        isPrimary = false,
                     )
-                }
-                item {
                     ActionButton(
+                        modifier = Modifier.weight(1f),
                         label = "Sleep",
                         emoji = "😴",
                         onClick = { showSleepDialog = true },
                         enabled = !isSleeping,
+                        isPrimary = false,
                     )
                 }
             }
 
-            // Sleep confirmation dialog
-            if (showSleepDialog) {
-                AlertDialog(
-                    onDismissRequest = { showSleepDialog = false },
-                    title = {
-                        Text("Put Choreboo to Sleep?", fontWeight = FontWeight.Bold)
-                    },
-                    text = {
-                        Text(
-                            "Your Choreboo will sleep for 24 hours. During this time, their stats will not decrease and they'll be fully rested! 😴\n\nAfter 24 hours, normal stat decay will resume.",
-                        )
-                    },
-                    confirmButton = {
-                        Button(
-                            onClick = {
-                                showStartSleepAnimation = true
-                                viewModel.sleepChoreboo()
-                                showSleepDialog = false
-                            },
-                        ) {
-                            Text("Let Them Sleep")
-                        }
-                    },
-                    dismissButton = {
-                        TextButton(
-                            onClick = { showSleepDialog = false },
-                        ) {
-                            Text("Cancel")
-                        }
-                    },
-                )
-            }
-
-            Spacer(modifier = Modifier.height(20.dp))
-
-            // Name & XP card
-            Card(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .padding(horizontal = 16.dp),
-                shape = RoundedCornerShape(16.dp),
-                colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceContainerLowest.copy(alpha = 0.8f)),
-                elevation = CardDefaults.cardElevation(defaultElevation = 0.dp),
-                border = androidx.compose.foundation.BorderStroke(
-                    width = 1.dp,
-                    color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.4f),
-                ),
-            ) {
-                Column(modifier = Modifier.padding(16.dp)) {
-                    Row(
-                        modifier = Modifier.fillMaxWidth(),
-                        horizontalArrangement = Arrangement.SpaceBetween,
-                        verticalAlignment = Alignment.Bottom,
-                    ) {
-                        Column {
-                            Text(
-                                text = stats.name,
-                                style = MaterialTheme.typography.headlineSmall,
-                                fontWeight = FontWeight.ExtraBold,
-                            )
-                            Text(
-                                text = "${stats.stage.displayName} ${stats.petType.emoji}",
-                                style = MaterialTheme.typography.bodyMedium,
-                                fontWeight = FontWeight.Medium,
-                                color = MaterialTheme.colorScheme.onSurfaceVariant,
-                            )
-                        }
-                        Text(
-                            text = "Lv. ${stats.level}",
-                            style = MaterialTheme.typography.headlineMedium,
-                            fontWeight = FontWeight.Black,
-                            color = XpPurple,
-                        )
-                    }
-
-                    Spacer(modifier = Modifier.height(10.dp))
-
-                    Row(
-                        modifier = Modifier.fillMaxWidth(),
-                        horizontalArrangement = Arrangement.SpaceBetween,
-                    ) {
-                        Text(
-                            text = "XP PROGRESS",
-                            style = MaterialTheme.typography.labelSmall,
-                            fontWeight = FontWeight.Bold,
-                            color = XpPurple,
-                            letterSpacing = 1.sp,
-                        )
-                        Text(
-                            text = "${stats.xp} / ${stats.xpToNextLevel}",
-                            style = MaterialTheme.typography.labelSmall,
-                            fontWeight = FontWeight.Bold,
-                            color = XpPurple,
-                        )
-                    }
-                    Spacer(modifier = Modifier.height(6.dp))
-                    LinearProgressIndicator(
-                        progress = { stats.xpProgressFraction },
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .height(8.dp)
-                            .clip(RoundedCornerShape(5.dp)),
-                        color = XpPurple,
-                        trackColor = MaterialTheme.colorScheme.surfaceContainerHigh,
-                    )
-                }
-            }
-
-            Spacer(modifier = Modifier.height(12.dp))
-
-            // Stats bento card
-            Card(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .padding(horizontal = 16.dp),
-                shape = RoundedCornerShape(16.dp),
-                colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceContainerLow.copy(alpha = 0.8f)),
-                border = androidx.compose.foundation.BorderStroke(
-                    width = 1.dp,
-                    color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.4f),
-                ),
-            ) {
-                Column(
-                    modifier = Modifier.padding(16.dp),
-                    verticalArrangement = Arrangement.spacedBy(12.dp),
-                ) {
-                    StatBar(label = "Hunger", value = stats.hunger, emoji = "🍖", statType = "hunger")
-                    StatBar(label = "Happiness", value = stats.happiness, emoji = "💕", statType = "happiness")
-                    StatBar(label = "Energy", value = stats.energy, emoji = "⚡", statType = "energy")
-                }
-            }
-
-            Spacer(modifier = Modifier.height(16.dp))
-
-            // Feed button
+            // Snackbar pinned above the action row
             Box(
                 modifier = Modifier
-                    .fillMaxWidth()
-                    .padding(horizontal = 16.dp)
-                    .height(48.dp)
-                    .clip(CircleShape)
-                    .background(
-                        if (totalPoints >= 10 && !isSleeping) {
-                            Brush.linearGradient(
-                                colors = listOf(
-                                    MaterialTheme.colorScheme.primary,
-                                    MaterialTheme.colorScheme.primaryContainer,
-                                ),
-                            )
-                        } else {
-                            Brush.linearGradient(
-                                colors = listOf(
-                                    MaterialTheme.colorScheme.surfaceContainerHighest,
-                                    MaterialTheme.colorScheme.surfaceContainerHighest,
-                                ),
-                            )
-                        }
-                    ),
-                contentAlignment = Alignment.Center,
+                    .fillMaxSize()
+                    .padding(bottom = 104.dp),
+                contentAlignment = Alignment.BottomCenter,
             ) {
-                Button(
-                    onClick = { viewModel.feedChoreboo() },
-                    enabled = totalPoints >= 10 && !isSleeping,
-                    modifier = Modifier.fillMaxSize(),
-                    shape = CircleShape,
-                    colors = ButtonDefaults.buttonColors(
-                        containerColor = Color.Transparent,
-                        disabledContainerColor = Color.Transparent,
-                    ),
-                    elevation = null,
-                ) {
-                    Icon(
-                        Icons.Default.Restaurant,
-                        contentDescription = null,
-                        modifier = Modifier.size(20.dp),
-                        tint = if (totalPoints >= 10 && !isSleeping) MaterialTheme.colorScheme.onPrimary else MaterialTheme.colorScheme.onSurfaceVariant,
-                    )
-                    Spacer(modifier = Modifier.width(8.dp))
-                    Text(
-                        text = if (totalPoints >= 10 && !isSleeping) "Feed (10 pts)" else "Feed (need 10 pts)",
-                        fontWeight = FontWeight.Bold,
-                        color = if (totalPoints >= 10 && !isSleeping) MaterialTheme.colorScheme.onPrimary else MaterialTheme.colorScheme.onSurfaceVariant,
-                    )
+                SnackbarHost(snackbarHostState) { data ->
+                    StitchSnackbar(data)
                 }
-            }
-
-            Spacer(modifier = Modifier.height(80.dp))
-        }
-
-        // Snackbar pinned to the top of the view area
-        Box(
-            modifier = Modifier
-                .fillMaxSize()
-                .padding(top = padding.calculateTopPadding()),
-            contentAlignment = Alignment.TopCenter,
-        ) {
-            SnackbarHost(snackbarHostState) { data ->
-                StitchSnackbar(data)
             }
         }
     }
@@ -538,21 +527,29 @@ private fun ActionButton(
     emoji: String,
     onClick: () -> Unit,
     enabled: Boolean,
+    isPrimary: Boolean,
     modifier: Modifier = Modifier,
 ) {
     Box(
         modifier = modifier
-            .width(80.dp)
-            .height(80.dp)
-            .clip(RoundedCornerShape(16.dp))
+            .height(72.dp)
+            .clip(RoundedCornerShape(50.dp))
             .background(
-                if (enabled) GradientUtils.secondaryGradient() 
-                else Brush.linearGradient(
-                    colors = listOf(
-                        MaterialTheme.colorScheme.surfaceContainerHighest,
-                        MaterialTheme.colorScheme.surfaceContainerHighest,
-                    ),
-                ),
+                when {
+                    !enabled -> Brush.linearGradient(
+                        colors = listOf(
+                            MaterialTheme.colorScheme.surfaceContainerHighest,
+                            MaterialTheme.colorScheme.surfaceContainerHighest,
+                        ),
+                    )
+                    isPrimary -> GradientUtils.primaryGradient()
+                    else -> Brush.linearGradient(
+                        colors = listOf(
+                            MaterialTheme.colorScheme.surfaceContainerHigh,
+                            MaterialTheme.colorScheme.surfaceContainerHigh,
+                        ),
+                    )
+                },
             )
             .clickable(enabled = enabled) { onClick() },
         contentAlignment = Alignment.Center,
@@ -563,15 +560,180 @@ private fun ActionButton(
         ) {
             Text(
                 emoji,
-                fontSize = 26.sp,
+                fontSize = 24.sp,
             )
             Spacer(modifier = Modifier.height(4.dp))
             Text(
                 label,
                 style = MaterialTheme.typography.labelSmall,
                 fontWeight = FontWeight.Bold,
-                color = if (enabled) MaterialTheme.colorScheme.onSecondary else MaterialTheme.colorScheme.onSurfaceVariant,
+                color = when {
+                    !enabled -> MaterialTheme.colorScheme.onSurfaceVariant
+                    isPrimary -> MaterialTheme.colorScheme.onPrimary
+                    else -> MaterialTheme.colorScheme.onSurface
+                },
             )
+        }
+    }
+}
+
+/**
+ * Small bento stat card for Hunger / Joy.
+ */
+@Composable
+private fun StatBentoCard(
+    modifier: Modifier = Modifier,
+    label: String,
+    emoji: String,
+    value: Int,
+    statusText: String,
+    barColor: androidx.compose.ui.graphics.Color,
+) {
+    Box(
+        modifier = modifier
+            .height(110.dp)
+            .clip(RoundedCornerShape(16.dp))
+            .background(MaterialTheme.colorScheme.surfaceContainerLowest),
+    ) {
+        Column(
+            modifier = Modifier
+                .fillMaxSize()
+                .padding(14.dp),
+            verticalArrangement = Arrangement.SpaceBetween,
+        ) {
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.SpaceBetween,
+                verticalAlignment = Alignment.CenterVertically,
+            ) {
+                Text(emoji, fontSize = 20.sp)
+                Text(
+                    text = label,
+                    style = MaterialTheme.typography.labelSmall,
+                    fontWeight = FontWeight.Bold,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    letterSpacing = 1.sp,
+                )
+            }
+            Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.SpaceBetween,
+                    verticalAlignment = Alignment.Bottom,
+                ) {
+                    Text(
+                        text = "$value%",
+                        style = MaterialTheme.typography.titleMedium,
+                        fontWeight = FontWeight.Bold,
+                    )
+                    Text(
+                        text = statusText,
+                        style = MaterialTheme.typography.labelSmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    )
+                }
+                Box(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .height(6.dp)
+                        .clip(RoundedCornerShape(3.dp))
+                        .background(MaterialTheme.colorScheme.surfaceContainerHigh),
+                ) {
+                    Box(
+                        modifier = Modifier
+                            .fillMaxWidth((value / 100f).coerceIn(0f, 1f))
+                            .height(6.dp)
+                            .clip(RoundedCornerShape(3.dp))
+                            .background(barColor),
+                    )
+                }
+            }
+        }
+    }
+}
+
+/**
+ * Full-width energy bento card with gradient bar and status on right.
+ */
+@Composable
+private fun EnergyBentoCard(
+    value: Int,
+    statusText: String,
+    modifier: Modifier = Modifier,
+) {
+    Box(
+        modifier = modifier
+            .fillMaxWidth()
+            .height(100.dp)
+            .clip(RoundedCornerShape(16.dp))
+            .background(MaterialTheme.colorScheme.surfaceContainerLowest),
+    ) {
+        Column(
+            modifier = Modifier
+                .fillMaxSize()
+                .padding(14.dp),
+            verticalArrangement = Arrangement.SpaceBetween,
+        ) {
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.SpaceBetween,
+                verticalAlignment = Alignment.CenterVertically,
+            ) {
+                Row(
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.spacedBy(6.dp),
+                ) {
+                    Text("⚡", fontSize = 20.sp)
+                    Text(
+                        text = "ENERGY LEVELS",
+                        style = MaterialTheme.typography.labelSmall,
+                        fontWeight = FontWeight.Bold,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        letterSpacing = 1.sp,
+                    )
+                }
+                Text(
+                    text = statusText.uppercase(),
+                    style = MaterialTheme.typography.labelSmall,
+                    fontWeight = FontWeight.Bold,
+                    color = MaterialTheme.colorScheme.tertiary,
+                )
+            }
+            Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.SpaceBetween,
+                    verticalAlignment = Alignment.Bottom,
+                ) {
+                    Text(
+                        text = "$value%",
+                        style = MaterialTheme.typography.titleMedium,
+                        fontWeight = FontWeight.Bold,
+                    )
+                }
+                Box(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .height(8.dp)
+                        .clip(RoundedCornerShape(4.dp))
+                        .background(MaterialTheme.colorScheme.surfaceContainerHigh),
+                ) {
+                    Box(
+                        modifier = Modifier
+                            .fillMaxWidth((value / 100f).coerceIn(0f, 1f))
+                            .height(8.dp)
+                            .clip(RoundedCornerShape(4.dp))
+                            .background(
+                                Brush.horizontalGradient(
+                                    colors = listOf(
+                                        MaterialTheme.colorScheme.tertiary,
+                                        MaterialTheme.colorScheme.tertiaryContainer,
+                                    ),
+                                ),
+                            ),
+                    )
+                }
+            }
         }
     }
 }
@@ -753,7 +915,7 @@ private fun PetAnimation(
             )
         }
     } else {
-        // Placeholder emoji for bear/penguin/cat until their Lottie files are added
+        // Placeholder emoji for panda/capybara/axolotl until their Lottie files are added
         val sizeMultiplier = 64.sp
         Box(modifier = modifier, contentAlignment = Alignment.Center) {
             Text(

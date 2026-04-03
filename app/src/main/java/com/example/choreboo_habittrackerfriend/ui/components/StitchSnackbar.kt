@@ -26,7 +26,7 @@ import androidx.compose.ui.unit.sp
 fun StitchSnackbar(data: SnackbarData) {
     Row(
         modifier = Modifier
-            .padding(start = 16.dp, end = 16.dp, top = 8.dp)
+            .padding(start = 16.dp, end = 16.dp, bottom = 8.dp)
             .fillMaxWidth()
             .clip(RoundedCornerShape(50.dp))
             .background(

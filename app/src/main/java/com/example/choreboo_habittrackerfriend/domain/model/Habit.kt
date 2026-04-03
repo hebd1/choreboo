@@ -15,6 +15,10 @@ data class Habit(
     val reminderTime: LocalTime? = null,
     val createdAt: Long = System.currentTimeMillis(),
     val isArchived: Boolean = false,
+    val isHouseholdHabit: Boolean = false,
+    val ownerUid: String? = null,
+    val householdId: String? = null,
+    val remoteId: String? = null,
 ) {
     fun isScheduledForToday(): Boolean {
         // Check if any day is a weekly day-of-week selector (MON, TUE, etc.)

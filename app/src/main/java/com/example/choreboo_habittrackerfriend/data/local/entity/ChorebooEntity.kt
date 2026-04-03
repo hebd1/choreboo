@@ -15,4 +15,6 @@ data class ChorebooEntity(
     val lastInteractionAt: Long = System.currentTimeMillis(),
     val createdAt: Long = System.currentTimeMillis(),
     val sleepUntil: Long = 0,
+    val ownerUid: String? = null,
+    val remoteId: String? = null,
 )

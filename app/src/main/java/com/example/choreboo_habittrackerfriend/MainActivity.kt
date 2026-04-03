@@ -104,6 +104,7 @@ fun ChorebooApp(
     val bottomNavRoutes = listOf(
         Screen.HabitList.route,
         Screen.Pet.route,
+        Screen.Household.route,
         Screen.Calendar.route,
         Screen.Settings.route,
     )

@@ -51,6 +51,7 @@ import com.example.choreboo_habittrackerfriend.ui.theme.HeatmapHigh
 import com.example.choreboo_habittrackerfriend.ui.theme.HeatmapLow
 import com.example.choreboo_habittrackerfriend.ui.theme.XpPurple
 import com.example.choreboo_habittrackerfriend.ui.components.ProfileAvatar
+import com.example.choreboo_habittrackerfriend.ui.habits.components.getEmojiForIconName
 import java.time.DayOfWeek
 import java.time.LocalDate
 import java.time.format.TextStyle
@@ -67,6 +68,7 @@ fun CalendarScreen(
     val selectedDateLogs by viewModel.selectedDateLogs.collectAsState()
     val totalPoints by viewModel.totalPoints.collectAsState()
     val profilePhotoUri by viewModel.profilePhotoUri.collectAsState()
+    val earnedBadgeCount by viewModel.earnedBadgeCount.collectAsState()
 
     // Calculate monthly stats
     val totalDaysWithAny = completions.values.count { it > 0 }
@@ -301,6 +303,97 @@ fun CalendarScreen(
                 }
             }
 
+            // Monthly Mastery bento + badges card
+            item {
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.spacedBy(12.dp),
+                ) {
+                    // Monthly Mastery — gradient from primary to primaryContainer (2/3 width)
+                    Box(
+                        modifier = Modifier
+                            .weight(2f)
+                            .height(140.dp)
+                            .clip(RoundedCornerShape(16.dp))
+                            .background(
+                                Brush.linearGradient(
+                                    colors = listOf(
+                                        MaterialTheme.colorScheme.primary,
+                                        MaterialTheme.colorScheme.primaryContainer,
+                                    ),
+                                ),
+                            )
+                            .padding(20.dp),
+                    ) {
+                        Column(
+                            modifier = Modifier.fillMaxSize(),
+                            verticalArrangement = Arrangement.SpaceBetween,
+                        ) {
+                            Text(
+                                text = "MONTHLY MASTERY",
+                                style = MaterialTheme.typography.labelSmall,
+                                fontWeight = FontWeight.Bold,
+                                color = MaterialTheme.colorScheme.onPrimary.copy(alpha = 0.8f),
+                                letterSpacing = 1.sp,
+                            )
+                            Column {
+                                Text(
+                                    text = "$completionRate%",
+                                    style = MaterialTheme.typography.displaySmall,
+                                    fontWeight = FontWeight.ExtraBold,
+                                    color = MaterialTheme.colorScheme.onPrimary,
+                                )
+                                Text(
+                                    text = when {
+                                        completionRate >= 80 -> "You're a habit warrior!"
+                                        completionRate >= 50 -> "Great momentum, keep going!"
+                                        completionRate >= 20 -> "Every day counts — push forward!"
+                                        else -> "Your streak starts today!"
+                                    },
+                                    style = MaterialTheme.typography.bodySmall,
+                                    color = MaterialTheme.colorScheme.onPrimary.copy(alpha = 0.9f),
+                                )
+                            }
+                        }
+                    }
+
+                    // Badges card — surfaceContainerHigh
+                    Card(
+                        modifier = Modifier
+                            .weight(1f)
+                            .height(140.dp),
+                        shape = RoundedCornerShape(16.dp),
+                        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceContainerHigh),
+                    ) {
+                        Column(
+                            modifier = Modifier
+                                .fillMaxSize()
+                                .padding(16.dp),
+                            verticalArrangement = Arrangement.Center,
+                            horizontalAlignment = Alignment.CenterHorizontally,
+                        ) {
+                            Icon(
+                                Icons.Default.EmojiEvents,
+                                contentDescription = null,
+                                tint = MaterialTheme.colorScheme.secondary,
+                                modifier = Modifier.size(36.dp),
+                            )
+                            Spacer(modifier = Modifier.height(4.dp))
+                            Text(
+                                text = "$earnedBadgeCount",
+                                style = MaterialTheme.typography.headlineMedium,
+                                fontWeight = FontWeight.Bold,
+                            )
+                            Text(
+                                text = "Badges",
+                                style = MaterialTheme.typography.labelSmall,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                            )
+                        }
+                    }
+                }
+            }
+
             // Selected date details
             if (selectedDate != null) {
                 item {
@@ -369,7 +462,7 @@ fun CalendarScreen(
                                     horizontalArrangement = Arrangement.spacedBy(12.dp),
                                     modifier = Modifier.weight(1f),
                                 ) {
-                                    Text("📋", fontSize = 28.sp)
+                                    Text(getEmojiForIconName(log.habitIcon), fontSize = 28.sp)
                                     Column {
                                         Text(
                                             text = log.habitTitle,
@@ -401,92 +494,6 @@ fun CalendarScreen(
                                     )
                                 }
                             }
-                        }
-                    }
-                }
-            }
-
-            // Monthly Mastery bento + milestone card
-            item {
-                Row(
-                    modifier = Modifier.fillMaxWidth(),
-                    horizontalArrangement = Arrangement.spacedBy(12.dp),
-                ) {
-                    // Monthly Mastery — gradient from primary to primaryContainer (2/3 width)
-                    Box(
-                        modifier = Modifier
-                            .weight(2f)
-                            .height(140.dp)
-                            .clip(RoundedCornerShape(16.dp))
-                            .background(
-                                Brush.linearGradient(
-                                    colors = listOf(
-                                        MaterialTheme.colorScheme.primary,
-                                        MaterialTheme.colorScheme.primaryContainer,
-                                    ),
-                                ),
-                            )
-                            .padding(20.dp),
-                    ) {
-                        Column(
-                            modifier = Modifier.fillMaxSize(),
-                            verticalArrangement = Arrangement.SpaceBetween,
-                        ) {
-                            Text(
-                                text = "MONTHLY MASTERY",
-                                style = MaterialTheme.typography.labelSmall,
-                                fontWeight = FontWeight.Bold,
-                                color = MaterialTheme.colorScheme.onPrimary.copy(alpha = 0.8f),
-                                letterSpacing = 1.sp,
-                            )
-                            Column {
-                                Text(
-                                    text = "$completionRate%",
-                                    style = MaterialTheme.typography.displaySmall,
-                                    fontWeight = FontWeight.ExtraBold,
-                                    color = MaterialTheme.colorScheme.onPrimary,
-                                )
-                                Text(
-                                    text = "Completion rate this month",
-                                    style = MaterialTheme.typography.bodySmall,
-                                    color = MaterialTheme.colorScheme.onPrimary.copy(alpha = 0.9f),
-                                )
-                            }
-                        }
-                    }
-
-                    // Milestone card — surfaceContainerHigh
-                    Card(
-                        modifier = Modifier
-                            .weight(1f)
-                            .height(140.dp),
-                        shape = RoundedCornerShape(16.dp),
-                        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceContainerHigh),
-                    ) {
-                        Column(
-                            modifier = Modifier
-                                .fillMaxSize()
-                                .padding(16.dp),
-                            verticalArrangement = Arrangement.Center,
-                            horizontalAlignment = Alignment.CenterHorizontally,
-                        ) {
-                            Icon(
-                                Icons.Default.EmojiEvents,
-                                contentDescription = null,
-                                tint = MaterialTheme.colorScheme.secondary,
-                                modifier = Modifier.size(36.dp),
-                            )
-                            Spacer(modifier = Modifier.height(4.dp))
-                            Text(
-                                text = "${completions.values.count { it >= 4 }}",
-                                style = MaterialTheme.typography.headlineMedium,
-                                fontWeight = FontWeight.Bold,
-                            )
-                            Text(
-                                text = "Milestones",
-                                style = MaterialTheme.typography.labelSmall,
-                                color = MaterialTheme.colorScheme.onSurfaceVariant,
-                            )
                         }
                     }
                 }

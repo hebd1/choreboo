@@ -14,4 +14,8 @@ data class HabitEntity(
     val reminderTime: String? = null,
     val createdAt: Long = System.currentTimeMillis(),
     val isArchived: Boolean = false,
+    val isHouseholdHabit: Boolean = false,
+    val ownerUid: String? = null,
+    val householdId: String? = null,
+    val remoteId: String? = null,
 )

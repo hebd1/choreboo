@@ -459,14 +459,42 @@ fun AuthScreen(
 
                 Spacer(modifier = Modifier.height(40.dp))
             }
+
+            // Syncing overlay — shown after auth succeeds while cloud data is pulled
+            // Placed AFTER main content so it renders on top and blocks interaction
+            if (formState.isSyncing) {
+                Box(
+                    modifier = Modifier
+                        .fillMaxSize()
+                        .background(MaterialTheme.colorScheme.surface.copy(alpha = 0.92f)),
+                    contentAlignment = Alignment.Center,
+                ) {
+                    Column(
+                        horizontalAlignment = Alignment.CenterHorizontally,
+                        verticalArrangement = Arrangement.Center,
+                    ) {
+                        CircularProgressIndicator(
+                            modifier = Modifier.size(48.dp),
+                            strokeWidth = 3.dp,
+                            color = MaterialTheme.colorScheme.primary,
+                        )
+                        Spacer(modifier = Modifier.height(16.dp))
+                        Text(
+                            "Syncing your data...",
+                            style = MaterialTheme.typography.bodyLarge,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        )
+                    }
+                }
+            }
         }
 
-        // Snackbar pinned to the top of the view area
+        // Snackbar pinned to the bottom of the view area
         Box(
             modifier = Modifier
                 .fillMaxSize()
-                .padding(top = padding.calculateTopPadding()),
-            contentAlignment = Alignment.TopCenter,
+                .padding(bottom = 16.dp),
+            contentAlignment = Alignment.BottomCenter,
         ) {
             SnackbarHost(snackbarHostState) { data ->
                 StitchSnackbar(data)

@@ -12,6 +12,10 @@ interface ChorebooDao {
     fun getChoreboo(): Flow<ChorebooEntity?>
     @Query("SELECT * FROM choreboos LIMIT 1")
     suspend fun getChorebooSync(): ChorebooEntity?
+
+    @Query("SELECT * FROM choreboos WHERE remoteId = :remoteId LIMIT 1")
+    suspend fun getChorebooByRemoteId(remoteId: String): ChorebooEntity?
+
     @Insert(onConflict = OnConflictStrategy.REPLACE)
     suspend fun insertChoreboo(choreboo: ChorebooEntity): Long
     @Update

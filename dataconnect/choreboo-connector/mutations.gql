@@ -1,0 +1,259 @@
+# ============================================================
+# Choreboo - Data Connect Mutations
+# ============================================================
+
+# ---- User Mutations ----
+
+mutation UpsertUser($displayName: String!, $email: String, $photoUrl: String)
+@auth(level: USER) {
+  user_upsert(
+    data: {
+      id_expr: "auth.uid"
+      displayName: $displayName
+      email: $email
+      photoUrl: $photoUrl
+    }
+  )
+}
+
+mutation UpdateUserHousehold($householdId: UUID) @auth(level: USER) {
+  user_update(
+    key: { id_expr: "auth.uid" }
+    data: { householdId: $householdId }
+  )
+}
+
+# ---- Household Mutations ----
+
+mutation CreateHousehold($name: String!, $inviteCode: String!)
+@auth(level: USER) {
+  household_insert(
+    data: {
+      name: $name
+      inviteCode: $inviteCode
+      createdById_expr: "auth.uid"
+    }
+  )
+}
+
+# Only the creator can delete their household.
+mutation DeleteHousehold($householdId: UUID!) @auth(level: USER) {
+  household_deleteMany(
+    where: { id: { eq: $householdId }, createdById: { eq_expr: "auth.uid" } }
+  )
+}
+
+# ---- Choreboo Mutations ----
+
+mutation InsertChoreboo(
+  $name: String!,
+  $stage: String!,
+  $level: Int!,
+  $xp: Int!,
+  $hunger: Int!,
+  $happiness: Int!,
+  $energy: Int!,
+  $petType: String!,
+  $lastInteractionAt: Timestamp!,
+  $sleepUntil: Timestamp
+) @auth(level: USER) {
+  choreboo_insert(
+    data: {
+      ownerId_expr: "auth.uid"
+      name: $name
+      stage: $stage
+      level: $level
+      xp: $xp
+      hunger: $hunger
+      happiness: $happiness
+      energy: $energy
+      petType: $petType
+      lastInteractionAt: $lastInteractionAt
+      sleepUntil: $sleepUntil
+    }
+  )
+}
+
+# Only the owning user can update their choreboo (ownerId scoped to auth.uid).
+mutation UpdateChorebooFull(
+  $chorebooId: UUID!,
+  $name: String!,
+  $stage: String!,
+  $level: Int!,
+  $xp: Int!,
+  $hunger: Int!,
+  $happiness: Int!,
+  $energy: Int!,
+  $petType: String!,
+  $lastInteractionAt: Timestamp!,
+  $sleepUntil: Timestamp
+) @auth(level: USER) {
+  choreboo_updateMany(
+    where: { id: { eq: $chorebooId }, ownerId: { eq_expr: "auth.uid" } }
+    data: {
+      name: $name
+      stage: $stage
+      level: $level
+      xp: $xp
+      hunger: $hunger
+      happiness: $happiness
+      energy: $energy
+      petType: $petType
+      lastInteractionAt: $lastInteractionAt
+      sleepUntil: $sleepUntil
+    }
+  )
+}
+
+# Only the owning user can update their choreboo stats.
+mutation UpdateChorebooStats(
+  $chorebooId: UUID!,
+  $hunger: Int!,
+  $happiness: Int!,
+  $energy: Int!,
+  $lastInteractionAt: Timestamp!
+) @auth(level: USER) {
+  choreboo_updateMany(
+    where: { id: { eq: $chorebooId }, ownerId: { eq_expr: "auth.uid" } }
+    data: {
+      hunger: $hunger
+      happiness: $happiness
+      energy: $energy
+      lastInteractionAt: $lastInteractionAt
+    }
+  )
+}
+
+# Only the owning user can update their choreboo XP/level.
+mutation UpdateChorebooXp(
+  $chorebooId: UUID!,
+  $level: Int!,
+  $xp: Int!,
+  $stage: String!
+) @auth(level: USER) {
+  choreboo_updateMany(
+    where: { id: { eq: $chorebooId }, ownerId: { eq_expr: "auth.uid" } }
+    data: {
+      level: $level
+      xp: $xp
+      stage: $stage
+    }
+  )
+}
+
+# Only the owning user can update their choreboo sleep state.
+mutation UpdateChorebooSleep(
+  $chorebooId: UUID!,
+  $sleepUntil: Timestamp
+) @auth(level: USER) {
+  choreboo_updateMany(
+    where: { id: { eq: $chorebooId }, ownerId: { eq_expr: "auth.uid" } }
+    data: {
+      sleepUntil: $sleepUntil
+    }
+  )
+}
+
+# ---- Habit Mutations ----
+
+mutation CreateHabit(
+  $title: String!,
+  $description: String,
+  $iconName: String!,
+  $customDays: String!,
+  $difficulty: Int!,
+  $baseXp: Int!,
+  $reminderEnabled: Boolean!,
+  $reminderTime: String,
+  $isHouseholdHabit: Boolean!,
+  $householdId: UUID
+) @auth(level: USER) {
+  habit_insert(
+    data: {
+      ownerId_expr: "auth.uid"
+      title: $title
+      description: $description
+      iconName: $iconName
+      customDays: $customDays
+      difficulty: $difficulty
+      baseXp: $baseXp
+      reminderEnabled: $reminderEnabled
+      reminderTime: $reminderTime
+      isHouseholdHabit: $isHouseholdHabit
+      householdId: $householdId
+      isArchived: false
+    }
+  )
+}
+
+# Only the owner can update their habit.
+mutation UpdateHabit(
+  $habitId: UUID!,
+  $title: String!,
+  $description: String,
+  $iconName: String!,
+  $customDays: String!,
+  $difficulty: Int!,
+  $baseXp: Int!,
+  $reminderEnabled: Boolean!,
+  $reminderTime: String,
+  $isHouseholdHabit: Boolean!,
+  $householdId: UUID
+) @auth(level: USER) {
+  habit_updateMany(
+    where: { id: { eq: $habitId }, ownerId: { eq_expr: "auth.uid" } }
+    data: {
+      title: $title
+      description: $description
+      iconName: $iconName
+      customDays: $customDays
+      difficulty: $difficulty
+      baseXp: $baseXp
+      reminderEnabled: $reminderEnabled
+      reminderTime: $reminderTime
+      isHouseholdHabit: $isHouseholdHabit
+      householdId: $householdId
+    }
+  )
+}
+
+# Only the owner can archive their habit.
+mutation ArchiveHabit($habitId: UUID!) @auth(level: USER) {
+  habit_updateMany(
+    where: { id: { eq: $habitId }, ownerId: { eq_expr: "auth.uid" } }
+    data: { isArchived: true }
+  )
+}
+
+# Only the owner can delete their habit.
+mutation DeleteHabit($habitId: UUID!) @auth(level: USER) {
+  habit_deleteMany(
+    where: { id: { eq: $habitId }, ownerId: { eq_expr: "auth.uid" } }
+  )
+}
+
+# ---- HabitLog Mutations ----
+
+mutation CreateHabitLog(
+  $habitId: UUID!,
+  $date: String!,
+  $xpEarned: Int!,
+  $streakAtCompletion: Int!
+) @auth(level: USER) {
+  habitLog_insert(
+    data: {
+      habitId: $habitId
+      completedById_expr: "auth.uid"
+      date: $date
+      xpEarned: $xpEarned
+      streakAtCompletion: $streakAtCompletion
+    }
+  )
+}
+
+# Only the user who created the log can delete it.
+mutation DeleteHabitLog($logId: UUID!) @auth(level: USER) {
+  habitLog_deleteMany(
+    where: { id: { eq: $logId }, completedById: { eq_expr: "auth.uid" } }
+  )
+}
