@@ -46,7 +46,7 @@ class ChorebooRepository @Inject constructor(
         val newChoreboo = ChorebooEntity(
             name = name,
             stage = ChorebooStage.EGG.name,
-            hunger = 80,
+            hunger = 10,
             happiness = 80,
             energy = 80,
             petType = petType.name,
@@ -61,7 +61,7 @@ class ChorebooRepository @Inject constructor(
                 stage = ChorebooStage.EGG.name,
                 level = 1,
                 xp = 0,
-                hunger = 80,
+                hunger = 10,
                 happiness = 80,
                 energy = 80,
                 petType = petType.name,

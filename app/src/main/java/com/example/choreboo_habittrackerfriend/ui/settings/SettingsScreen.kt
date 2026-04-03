@@ -464,7 +464,7 @@ fun SettingsScreen(
                         Text(
                             "Settings",
                             style = MaterialTheme.typography.headlineMedium,
-                            fontWeight = FontWeight.Bold,
+                            fontWeight = FontWeight.ExtraBold,
                             color = MaterialTheme.colorScheme.primary,
                         )
                     }

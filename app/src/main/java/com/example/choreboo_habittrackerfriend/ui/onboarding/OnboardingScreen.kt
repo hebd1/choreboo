@@ -314,15 +314,6 @@ private fun PetSelectionCard(
                 fontWeight = FontWeight.Bold,
                 color = if (isSelected) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurface,
             )
-            if (petType == PetType.FOX) {
-                Spacer(modifier = Modifier.height(4.dp))
-                Text(
-                    text = "Animated ✨",
-                    style = MaterialTheme.typography.labelSmall,
-                    color = MaterialTheme.colorScheme.secondary,
-                    fontWeight = FontWeight.SemiBold,
-                )
-            }
         }
     }
 }

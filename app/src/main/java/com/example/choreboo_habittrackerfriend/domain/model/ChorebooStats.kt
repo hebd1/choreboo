@@ -5,7 +5,7 @@ data class ChorebooStats(
     val stage: ChorebooStage = ChorebooStage.EGG,
     val level: Int = 1,
     val xp: Int = 0,
-    val hunger: Int = 80,
+    val hunger: Int = 10,
     val happiness: Int = 80,
     val energy: Int = 80,
     val petType: PetType = PetType.FOX,

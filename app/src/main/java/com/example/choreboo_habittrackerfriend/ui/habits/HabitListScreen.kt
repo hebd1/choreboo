@@ -7,12 +7,15 @@ import androidx.compose.animation.fadeOut
 import androidx.compose.animation.slideInVertically
 import androidx.compose.animation.slideOutVertically
 import androidx.compose.foundation.background
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.IntrinsicSize
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.aspectRatio
+import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
@@ -26,9 +29,7 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.Check
-import androidx.compose.material.icons.filled.EmojiEvents
-import androidx.compose.material.icons.filled.LocalFireDepartment
-import androidx.compose.material.icons.filled.Settings
+import androidx.compose.material.icons.filled.Lock
 import androidx.compose.material.icons.filled.Stars
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Card
@@ -39,8 +40,8 @@ import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.FloatingActionButton
 import androidx.compose.material3.Icon
-import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.ModalBottomSheet
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.SnackbarDuration
 import androidx.compose.material3.SnackbarHost
@@ -49,6 +50,7 @@ import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.material3.TopAppBar
 import androidx.compose.material3.TopAppBarDefaults
+import androidx.compose.material3.rememberModalBottomSheetState
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
@@ -63,6 +65,7 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.hilt.navigation.compose.hiltViewModel
@@ -70,6 +73,7 @@ import com.airbnb.lottie.compose.LottieAnimation
 import com.airbnb.lottie.compose.LottieCompositionSpec
 import com.airbnb.lottie.compose.rememberLottieAnimatable
 import com.airbnb.lottie.compose.rememberLottieComposition
+import com.example.choreboo_habittrackerfriend.domain.model.Badge
 import com.example.choreboo_habittrackerfriend.domain.model.ChorebooMood
 import com.example.choreboo_habittrackerfriend.domain.model.Habit
 import com.example.choreboo_habittrackerfriend.ui.habits.components.HabitCard
@@ -102,9 +106,12 @@ fun HabitListScreen(
     val earnedBadgeCount by viewModel.earnedBadgeCount.collectAsState()
     val totalLifetimeXp by viewModel.totalLifetimeXp.collectAsState()
     val weeklyCompletionDays by viewModel.weeklyCompletionDays.collectAsState()
+    val recentBadges by viewModel.recentBadges.collectAsState()
+    val allBadges by viewModel.allBadges.collectAsState()
     val snackbarHostState = remember { SnackbarHostState() }
     var habitToDelete by remember { mutableStateOf<Habit?>(null) }
     var showLevelUpDialog by remember { mutableStateOf<HabitListEvent.HabitCompleted?>(null) }
+    var showBadgeSheet by remember { mutableStateOf(false) }
 
     // Overscreen completion animation state
     var showCompletionAnimation by remember { mutableStateOf(false) }
@@ -185,35 +192,34 @@ fun HabitListScreen(
                         Text(
                             text = "My Habits",
                             style = MaterialTheme.typography.headlineMedium,
-                            fontWeight = FontWeight.Bold,
+                            fontWeight = FontWeight.ExtraBold,
                             color = MaterialTheme.colorScheme.primary,
                         )
                     }
                 },
                 actions = {
-                    // Badge count pill
+                    // Star points chip — matches Pet/Calendar/Settings screens
                     Row(
                         verticalAlignment = Alignment.CenterVertically,
                         modifier = Modifier
+                            .padding(end = 16.dp)
                             .clip(RoundedCornerShape(50.dp))
-                            .background(MaterialTheme.colorScheme.secondaryContainer)
+                            .background(MaterialTheme.colorScheme.surfaceContainerHigh.copy(alpha = 0.85f))
                             .padding(horizontal = 12.dp, vertical = 6.dp),
                     ) {
                         Icon(
-                            imageVector = Icons.Default.EmojiEvents,
-                            contentDescription = "Badges",
-                            tint = MaterialTheme.colorScheme.onSecondaryContainer,
+                            imageVector = Icons.Default.Stars,
+                            contentDescription = "Points",
+                            tint = MaterialTheme.colorScheme.secondary,
                             modifier = Modifier.size(18.dp),
                         )
                         Spacer(modifier = Modifier.width(4.dp))
                         Text(
-                            text = "$earnedBadgeCount",
-                            style = MaterialTheme.typography.labelLarge,
+                            text = "$totalPoints",
                             fontWeight = FontWeight.Bold,
-                            color = MaterialTheme.colorScheme.onSecondaryContainer,
+                            style = MaterialTheme.typography.labelLarge,
                         )
                     }
-                    Spacer(modifier = Modifier.width(8.dp))
                 },
                 colors = TopAppBarDefaults.topAppBarColors(
                     containerColor = androidx.compose.ui.graphics.Color.Transparent,
@@ -309,10 +315,13 @@ fun HabitListScreen(
                     // Streak / XP bento grid
                     item {
                         StreakXpBentoGrid(
-                            weeklyCompletionDays = weeklyCompletionDays,
-                            maxStreak = maxStreak,
+                            previewBadges = allBadges.sortedWith(
+                                compareByDescending<Badge> { it.isUnlocked }
+                                    .thenByDescending { it.definition.threshold },
+                            ).take(4),
                             todayXp = todayXp,
-                            starPoints = totalLifetimeXp / 100,
+                            starPoints = totalPoints,
+                            onBadgesTapped = { showBadgeSheet = true },
                         )
                     }
 
@@ -436,6 +445,14 @@ fun HabitListScreen(
             LevelUpDialog(
                 event = event,
                 onDismiss = { showLevelUpDialog = null },
+            )
+        }
+
+        // Badge collection bottom sheet
+        if (showBadgeSheet) {
+            BadgeBottomSheet(
+                badges = allBadges,
+                onDismiss = { showBadgeSheet = false },
             )
         }
     }
@@ -568,68 +585,95 @@ private fun androidx.compose.ui.Modifier.graphicsAlpha(alphaValue: Float) =
 
 @Composable
 private fun StreakXpBentoGrid(
-    weeklyCompletionDays: Set<DayOfWeek>,
-    maxStreak: Int,
+    previewBadges: List<Badge>,
     todayXp: Int,
     starPoints: Int,
+    onBadgesTapped: () -> Unit,
 ) {
     Row(
-        modifier = Modifier.fillMaxWidth(),
+        modifier = Modifier
+            .fillMaxWidth()
+            .height(IntrinsicSize.Min),
         horizontalArrangement = Arrangement.spacedBy(12.dp),
     ) {
-        // Left — weekly streak circles + total streak count (square)
+        // Left — badge preview
         Box(
             modifier = Modifier
                 .weight(1f)
-                .aspectRatio(1f)
                 .clip(RoundedCornerShape(16.dp))
-                .background(MaterialTheme.colorScheme.surfaceContainerLow),
-            contentAlignment = Alignment.Center,
+                .background(MaterialTheme.colorScheme.surfaceContainerLow)
+                .clickable { onBadgesTapped() },
         ) {
             Column(
-                horizontalAlignment = Alignment.CenterHorizontally,
-                verticalArrangement = Arrangement.Center,
-                modifier = Modifier.padding(12.dp),
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(14.dp),
             ) {
-                // Compact 7-circle row
-                Row(horizontalArrangement = Arrangement.spacedBy(4.dp)) {
-                    weekDays.forEach { day ->
-                        val isCompleted = day in weeklyCompletionDays
-                        Box(
-                            modifier = Modifier
-                                .size(16.dp)
-                                .clip(CircleShape)
-                                .background(
-                                    if (isCompleted) MaterialTheme.colorScheme.primary
-                                    else MaterialTheme.colorScheme.surfaceContainerHighest,
-                                ),
-                            contentAlignment = Alignment.Center,
-                        ) {
-                            if (isCompleted) {
-                                Icon(
-                                    imageVector = Icons.Default.Check,
-                                    contentDescription = null,
-                                    tint = MaterialTheme.colorScheme.onPrimary,
-                                    modifier = Modifier.size(10.dp),
-                                )
-                            }
-                        }
-                    }
-                }
-                Spacer(modifier = Modifier.height(8.dp))
                 Text(
-                    text = "$maxStreak",
-                    style = MaterialTheme.typography.displaySmall,
-                    fontWeight = FontWeight.Black,
-                    color = MaterialTheme.colorScheme.onSurface,
-                )
-                Text(
-                    text = "DAY STREAK",
+                    text = "BADGES",
                     style = MaterialTheme.typography.labelSmall,
                     fontWeight = FontWeight.Bold,
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                     letterSpacing = 1.sp,
                 )
+                Spacer(modifier = Modifier.height(8.dp))
+                if (previewBadges.isEmpty()) {
+                    Column(
+                        modifier = Modifier.fillMaxSize(),
+                        horizontalAlignment = Alignment.CenterHorizontally,
+                        verticalArrangement = Arrangement.Center,
+                    ) {
+                        Text("\uD83C\uDFC5", fontSize = 32.sp)
+                        Spacer(modifier = Modifier.height(6.dp))
+                        Text(
+                            text = "Complete habits\nto earn badges!",
+                            style = MaterialTheme.typography.labelSmall,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                            textAlign = TextAlign.Center,
+                        )
+                    }
+                } else {
+                    Column(
+                        verticalArrangement = Arrangement.spacedBy(6.dp),
+                        modifier = Modifier.fillMaxWidth(),
+                    ) {
+                        previewBadges.forEach { badge ->
+                            val isUnlocked = badge.isUnlocked
+                            Row(
+                                verticalAlignment = Alignment.CenterVertically,
+                                horizontalArrangement = Arrangement.spacedBy(8.dp),
+                            ) {
+                                Box(
+                                    modifier = Modifier
+                                        .size(26.dp)
+                                        .clip(CircleShape)
+                                        .background(
+                                            if (isUnlocked) MaterialTheme.colorScheme.secondaryContainer
+                                            else MaterialTheme.colorScheme.surfaceContainerHigh,
+                                        ),
+                                    contentAlignment = Alignment.Center,
+                                ) {
+                                    Icon(
+                                        imageVector = badge.definition.icon,
+                                        contentDescription = badge.definition.displayName,
+                                        tint = if (isUnlocked) MaterialTheme.colorScheme.onSecondaryContainer
+                                        else MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.38f),
+                                        modifier = Modifier.size(16.dp),
+                                    )
+                                }
+                                Text(
+                                    text = badge.definition.displayName,
+                                    style = MaterialTheme.typography.labelSmall,
+                                    fontWeight = FontWeight.Bold,
+                                    color = if (isUnlocked) MaterialTheme.colorScheme.onSurface
+                                    else MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.38f),
+                                    maxLines = 1,
+                                    overflow = TextOverflow.Ellipsis,
+                                )
+                            }
+                        }
+                    }
+                }
             }
         }
 
@@ -637,7 +681,7 @@ private fun StreakXpBentoGrid(
         Column(
             modifier = Modifier
                 .weight(1f)
-                .aspectRatio(1f),
+                .fillMaxHeight(),
             verticalArrangement = Arrangement.spacedBy(10.dp),
         ) {
             // XP Today — purple tint
@@ -670,7 +714,7 @@ private fun StreakXpBentoGrid(
                 }
             }
 
-            // Star Points — derived from lifetime XP (cosmetic)
+            // Star Points
             Box(
                 modifier = Modifier
                     .weight(1f)
@@ -697,6 +741,130 @@ private fun StreakXpBentoGrid(
                         color = MaterialTheme.colorScheme.secondary.copy(alpha = 0.7f),
                         letterSpacing = 1.sp,
                     )
+                }
+            }
+        }
+    }
+}
+
+// ---------------------------------------------------------------------------
+// Badge collection bottom sheet
+// ---------------------------------------------------------------------------
+
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+private fun BadgeBottomSheet(
+    badges: List<Badge>,
+    onDismiss: () -> Unit,
+) {
+    val sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)
+
+    ModalBottomSheet(
+        onDismissRequest = onDismiss,
+        sheetState = sheetState,
+        shape = RoundedCornerShape(topStart = 24.dp, topEnd = 24.dp),
+        containerColor = MaterialTheme.colorScheme.surface,
+    ) {
+        Column(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(horizontal = 20.dp)
+                .padding(bottom = 32.dp),
+        ) {
+            // Header
+            Text(
+                text = "Badge Collection",
+                style = MaterialTheme.typography.titleLarge,
+                fontWeight = FontWeight.Bold,
+                color = MaterialTheme.colorScheme.onSurface,
+            )
+            Spacer(modifier = Modifier.height(4.dp))
+            Text(
+                text = "${badges.count { it.isUnlocked }} of ${badges.size} earned",
+                style = MaterialTheme.typography.labelMedium,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+            )
+            Spacer(modifier = Modifier.height(16.dp))
+
+            // Badge list
+            badges.forEach { badge ->
+                val isUnlocked = badge.isUnlocked
+                Row(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(vertical = 8.dp),
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.spacedBy(14.dp),
+                ) {
+                    // Icon circle
+                    Box(
+                        modifier = Modifier
+                            .size(44.dp)
+                            .clip(CircleShape)
+                            .background(
+                                if (isUnlocked) MaterialTheme.colorScheme.secondaryContainer
+                                else MaterialTheme.colorScheme.surfaceContainerHigh,
+                            ),
+                        contentAlignment = Alignment.Center,
+                    ) {
+                        Icon(
+                            imageVector = badge.definition.icon,
+                            contentDescription = badge.definition.displayName,
+                            tint = if (isUnlocked) MaterialTheme.colorScheme.onSecondaryContainer
+                            else MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.38f),
+                            modifier = Modifier.size(22.dp),
+                        )
+                    }
+
+                    // Name + description
+                    Column(modifier = Modifier.weight(1f)) {
+                        Text(
+                            text = badge.definition.displayName,
+                            style = MaterialTheme.typography.bodyMedium,
+                            fontWeight = FontWeight.Bold,
+                            color = if (isUnlocked) MaterialTheme.colorScheme.onSurface
+                            else MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.5f),
+                        )
+                        Text(
+                            text = badge.definition.description,
+                            style = MaterialTheme.typography.bodySmall,
+                            color = if (isUnlocked) MaterialTheme.colorScheme.onSurfaceVariant
+                            else MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.38f),
+                        )
+                    }
+
+                    // Status indicator
+                    if (isUnlocked) {
+                        Box(
+                            modifier = Modifier
+                                .size(24.dp)
+                                .clip(CircleShape)
+                                .background(MaterialTheme.colorScheme.primary),
+                            contentAlignment = Alignment.Center,
+                        ) {
+                            Icon(
+                                imageVector = Icons.Default.Check,
+                                contentDescription = "Earned",
+                                tint = MaterialTheme.colorScheme.onPrimary,
+                                modifier = Modifier.size(14.dp),
+                            )
+                        }
+                    } else {
+                        Box(
+                            modifier = Modifier
+                                .size(24.dp)
+                                .clip(CircleShape)
+                                .background(MaterialTheme.colorScheme.surfaceContainerHigh),
+                            contentAlignment = Alignment.Center,
+                        ) {
+                            Icon(
+                                imageVector = Icons.Default.Lock,
+                                contentDescription = "Locked",
+                                tint = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.38f),
+                                modifier = Modifier.size(14.dp),
+                            )
+                        }
+                    }
                 }
             }
         }

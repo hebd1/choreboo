@@ -90,9 +90,9 @@ fun CalendarScreen(
                             size = 40.dp,
                         )
                         Text(
-                            "My Choreboo",
+                            "Calendar",
                             style = MaterialTheme.typography.headlineMedium,
-                            fontWeight = FontWeight.Bold,
+                            fontWeight = FontWeight.ExtraBold,
                             color = MaterialTheme.colorScheme.primary,
                         )
                     }

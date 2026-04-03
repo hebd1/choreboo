@@ -7,6 +7,7 @@ import com.example.choreboo_habittrackerfriend.data.repository.BadgeRepository
 import com.example.choreboo_habittrackerfriend.data.repository.HabitRepository
 import com.example.choreboo_habittrackerfriend.data.repository.AuthRepository
 import com.example.choreboo_habittrackerfriend.data.repository.ChorebooRepository
+import com.example.choreboo_habittrackerfriend.domain.model.Badge
 import com.example.choreboo_habittrackerfriend.domain.model.ChorebooMood
 import com.example.choreboo_habittrackerfriend.domain.model.ChorebooStats
 import com.example.choreboo_habittrackerfriend.domain.model.Habit
@@ -55,6 +56,20 @@ class HabitListViewModel @Inject constructor(
     /** Number of badges the user has earned. */
     val earnedBadgeCount: StateFlow<Int> = badgeRepository.getEarnedBadgeCount()
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), 0)
+
+    /** All badges with their unlocked state — used by the badge bottom sheet. */
+    val allBadges: StateFlow<List<Badge>> = badgeRepository.getAllBadges()
+        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), emptyList())
+
+    /** Most recently unlocked badges (up to 3), ordered by threshold descending so the hardest-to-earn appear first. */
+    val recentBadges: StateFlow<List<Badge>> = allBadges
+        .map { badges ->
+            badges
+                .filter { it.isUnlocked }
+                .sortedByDescending { it.definition.threshold }
+                .take(3)
+        }
+        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), emptyList())
 
     val profilePhotoUri: StateFlow<String?> = userPreferences.profilePhotoUri
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), null)

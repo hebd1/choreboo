@@ -54,10 +54,10 @@ fun HouseholdScreen(
     ) {
         // Header
         Text(
-            text = household?.name ?: "Our Household",
+            text = household?.name ?: "Household",
             style = MaterialTheme.typography.headlineMedium,
-            fontWeight = FontWeight.Bold,
-            color = MaterialTheme.colorScheme.onSurface,
+            fontWeight = FontWeight.ExtraBold,
+            color = MaterialTheme.colorScheme.primary,
         )
 
         Spacer(modifier = Modifier.height(16.dp))

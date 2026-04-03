@@ -203,8 +203,6 @@ fun PetScreen(
                 modifier = Modifier
                     .fillMaxSize()
                     .padding(padding)
-                    // Reserve space at bottom for the fixed action row + nav bar
-                    .padding(bottom = 168.dp)
                     .verticalScroll(rememberScrollState()),
                 horizontalAlignment = Alignment.CenterHorizontally,
             ) {
@@ -453,28 +451,13 @@ fun PetScreen(
                 }
 
                 Spacer(modifier = Modifier.height(16.dp))
-            }
 
-            // Fixed bottom action row — Feed / Play / Sleep equidistant above nav bar
-            Box(
-                modifier = Modifier
-                    .align(Alignment.BottomCenter)
-                    .fillMaxWidth()
-                    .background(
-                        Brush.verticalGradient(
-                            colors = listOf(
-                                MaterialTheme.colorScheme.surface.copy(alpha = 0f),
-                                MaterialTheme.colorScheme.surface.copy(alpha = 0.95f),
-                                MaterialTheme.colorScheme.surface,
-                            ),
-                        ),
-                    )
-                    .padding(horizontal = 16.dp)
-                    .padding(bottom = 88.dp, top = 8.dp),
-            ) {
+                // Action row — Feed / Play / Sleep equidistant between stats and nav bar
                 Row(
-                    modifier = Modifier.fillMaxWidth(),
-                    horizontalArrangement = Arrangement.SpaceEvenly,
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(horizontal = 16.dp),
+                    horizontalArrangement = Arrangement.spacedBy(10.dp),
                 ) {
                     ActionButton(
                         modifier = Modifier.weight(1f),
@@ -501,13 +484,16 @@ fun PetScreen(
                         isPrimary = false,
                     )
                 }
+
+                // Bottom padding to clear the nav bar
+                Spacer(modifier = Modifier.height(96.dp))
             }
 
-            // Snackbar pinned above the action row
+            // Snackbar pinned above the nav bar
             Box(
                 modifier = Modifier
                     .fillMaxSize()
-                    .padding(bottom = 104.dp),
+                    .padding(bottom = 90.dp),
                 contentAlignment = Alignment.BottomCenter,
             ) {
                 SnackbarHost(snackbarHostState) { data ->
@@ -532,7 +518,7 @@ private fun ActionButton(
 ) {
     Box(
         modifier = modifier
-            .height(72.dp)
+            .height(64.dp)
             .clip(RoundedCornerShape(50.dp))
             .background(
                 when {

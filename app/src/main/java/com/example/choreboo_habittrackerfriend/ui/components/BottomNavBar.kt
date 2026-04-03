@@ -14,6 +14,7 @@ import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.CalendarMonth
@@ -135,7 +136,9 @@ private fun NavBarTab(
     Box(
         contentAlignment = Alignment.Center,
         modifier = Modifier
-            .clip(RoundedCornerShape(50.dp))
+            .offset(y = offsetY)
+            .size(48.dp)
+            .clip(CircleShape)
             .clickable(
                 interactionSource = remember { MutableInteractionSource() },
                 indication = null,
@@ -143,11 +146,10 @@ private fun NavBarTab(
             )
             .then(
                 if (selected)
-                    Modifier.background(MaterialTheme.colorScheme.primaryContainer, RoundedCornerShape(50.dp))
+                    Modifier.background(MaterialTheme.colorScheme.primaryContainer, CircleShape)
                 else
                     Modifier
-            )
-            .padding(horizontal = 14.dp, vertical = 10.dp),
+            ),
     ) {
         Icon(
             imageVector = item.icon,
@@ -157,8 +159,7 @@ private fun NavBarTab(
             else
                 MaterialTheme.colorScheme.onSurfaceVariant,
             modifier = Modifier
-                .size(24.dp)
-                .offset(y = offsetY),
+                .size(24.dp),
         )
     }
 }
