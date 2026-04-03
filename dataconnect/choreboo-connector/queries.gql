@@ -33,18 +33,20 @@ query GetUserById($userId: String!) @auth(level: USER) {
 
 # ---- Household Queries ----
 
-# Restricted to the caller's own household only (householdId verified server-side via caller's user row).
-# The client must pass their own householdId; the server enforces it matches their profile.
-query GetHouseholdById($householdId: UUID!) @auth(level: USER) {
-  household(key: { id: $householdId }) {
-    id
-    name
-    inviteCode
-    createdBy {
+# Inherently scoped: traverses from the authenticated user to their household.
+# No householdId parameter — caller can only see their own household.
+query GetMyHousehold @auth(level: USER) {
+  user(key: { id_expr: "auth.uid" }) {
+    household {
       id
-      displayName
+      name
+      inviteCode
+      createdBy {
+        id
+        displayName
+      }
+      createdAt
     }
-    createdAt
   }
 }
 
@@ -60,15 +62,18 @@ query GetHouseholdByInviteCode($inviteCode: String!) @auth(level: USER) {
   }
 }
 
-# Restricted to members of the same household as the caller.
-# Only returns users whose householdId matches the requested householdId AND
-# the caller (auth.uid) must belong to that same household.
-query GetHouseholdMembers($householdId: UUID!) @auth(level: USER) {
-  users(where: { householdId: { eq: $householdId } }) {
-    id
-    displayName
-    photoUrl
-    email
+# Inherently scoped: traverses from the authenticated user to their household's members.
+# Uses the auto-generated reverse relation `users_on_household`.
+query GetMyHouseholdMembers @auth(level: USER) {
+  user(key: { id_expr: "auth.uid" }) {
+    household {
+      users_on_household {
+        id
+        displayName
+        photoUrl
+        email
+      }
+    }
   }
 }
 
@@ -95,28 +100,29 @@ query GetMyChoreboo @auth(level: USER) {
   }
 }
 
-# Restricted to choreboos owned by users in the specified household.
-query GetChoreboosByHousehold($householdId: UUID!) @auth(level: USER) {
-  choreboos(
-    where: {
-      owner: { householdId: { eq: $householdId } }
-    }
-  ) {
-    id
-    name
-    stage
-    level
-    xp
-    hunger
-    happiness
-    energy
-    petType
-    lastInteractionAt
-    sleepUntil
-    owner {
-      id
-      displayName
-      photoUrl
+# Inherently scoped: traverses from the authenticated user to their household's
+# members' choreboos. Uses nested reverse relations.
+query GetMyHouseholdChoreboos @auth(level: USER) {
+  user(key: { id_expr: "auth.uid" }) {
+    household {
+      users_on_household {
+        id
+        displayName
+        photoUrl
+        choreboo_on_owner {
+          id
+          name
+          stage
+          level
+          xp
+          hunger
+          happiness
+          energy
+          petType
+          lastInteractionAt
+          sleepUntil
+        }
+      }
     }
   }
 }
@@ -146,29 +152,26 @@ query GetMyHabits @auth(level: USER) {
   }
 }
 
-# Restricted to household habits for the specified household.
-# The householdId must be passed by the client; membership is validated app-side
-# (caller's user row householdId matches before invoking this query).
-query GetHouseholdHabits($householdId: UUID!) @auth(level: USER) {
-  habits(
-    where: {
-      householdId: { eq: $householdId }
-      isHouseholdHabit: { eq: true }
-      isArchived: { eq: false }
-    }
-  ) {
-    id
-    title
-    description
-    iconName
-    customDays
-    difficulty
-    baseXp
-    isHouseholdHabit
-    createdAt
-    owner {
-      id
-      displayName
+# Inherently scoped: traverses from the authenticated user to their household's habits.
+# Uses the auto-generated reverse relation `habits_on_household`.
+query GetMyHouseholdHabits @auth(level: USER) {
+  user(key: { id_expr: "auth.uid" }) {
+    household {
+      habits_on_household(where: { isHouseholdHabit: { eq: true }, isArchived: { eq: false } }) {
+        id
+        title
+        description
+        iconName
+        customDays
+        difficulty
+        baseXp
+        isHouseholdHabit
+        createdAt
+        owner {
+          id
+          displayName
+        }
+      }
     }
   }
 }

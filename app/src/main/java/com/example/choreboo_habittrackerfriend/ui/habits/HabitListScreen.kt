@@ -210,7 +210,7 @@ fun HabitListScreen(
                         Icon(
                             imageVector = Icons.Default.Stars,
                             contentDescription = "Points",
-                            tint = MaterialTheme.colorScheme.secondary,
+                            tint = MaterialTheme.colorScheme.secondaryContainer,
                             modifier = Modifier.size(18.dp),
                         )
                         Spacer(modifier = Modifier.width(4.dp))
@@ -238,93 +238,75 @@ fun HabitListScreen(
             }
         },
     ) { padding ->
-        when {
-            isLoading -> {
-                Box(
-                    modifier = Modifier
-                        .fillMaxSize()
-                        .padding(padding),
-                    contentAlignment = Alignment.Center,
-                ) {
-                    CircularProgressIndicator()
-                }
+        if (isLoading) {
+            Box(
+                modifier = Modifier
+                    .fillMaxSize()
+                    .padding(padding),
+                contentAlignment = Alignment.Center,
+            ) {
+                CircularProgressIndicator()
             }
-            habits.isEmpty() -> {
-                Box(
-                    modifier = Modifier
-                        .fillMaxSize()
-                        .padding(padding),
-                    contentAlignment = Alignment.Center,
-                ) {
-                    Column(horizontalAlignment = Alignment.CenterHorizontally) {
-                        Text(text = "📋", style = MaterialTheme.typography.displayLarge)
-                        Spacer(modifier = Modifier.height(16.dp))
-                        Text(
-                            text = "No habits yet!",
-                            style = MaterialTheme.typography.titleLarge,
-                            fontWeight = FontWeight.SemiBold,
-                        )
-                        Spacer(modifier = Modifier.height(8.dp))
-                        Text(
-                            text = "Tap + to create your first habit\nand start earning rewards for your Choreboo!",
-                            style = MaterialTheme.typography.bodyMedium,
-                            color = MaterialTheme.colorScheme.onSurfaceVariant,
-                            textAlign = TextAlign.Center,
-                        )
-                    }
-                }
-            }
-            else -> {
-                LazyColumn(
-                    modifier = Modifier
-                        .fillMaxSize()
-                        .padding(padding)
-                        .padding(horizontal = 16.dp),
-                    verticalArrangement = Arrangement.spacedBy(12.dp),
-                ) {
-                    item { Spacer(modifier = Modifier.height(8.dp)) }
+        } else {
+            LazyColumn(
+                modifier = Modifier
+                    .fillMaxSize()
+                    .padding(padding)
+                    .padding(horizontal = 16.dp),
+                verticalArrangement = Arrangement.spacedBy(12.dp),
+            ) {
+                item { Spacer(modifier = Modifier.height(8.dp)) }
 
-                    // "My Habits" hero text
+                // Weekly Streak card
+                item {
+                    WeeklyStreakCard(
+                        maxStreak = maxStreak,
+                        weeklyCompletionDays = weeklyCompletionDays,
+                        completionFraction = completionFraction,
+                    )
+                }
+
+                // Streak / XP bento grid
+                item {
+                    StreakXpBentoGrid(
+                        previewBadges = allBadges.sortedWith(
+                            compareByDescending<Badge> { it.isUnlocked }
+                                .thenByDescending { it.definition.threshold },
+                        ).take(4),
+                        todayXp = todayXp,
+                        starPoints = totalPoints,
+                        onBadgesTapped = { showBadgeSheet = true },
+                    )
+                }
+
+                if (habits.isEmpty()) {
+                    // Empty state — no habits yet
                     item {
-                        Column {
-                            Text(
-                                text = "My Habits",
-                                style = MaterialTheme.typography.displaySmall,
-                                fontWeight = FontWeight.Black,
-                                color = MaterialTheme.colorScheme.onSurface,
-                                letterSpacing = (-0.5).sp,
-                            )
-                            Text(
-                                text = "Keep your pet happy and growing!",
-                                style = MaterialTheme.typography.bodyMedium,
-                                fontWeight = FontWeight.Medium,
-                                color = MaterialTheme.colorScheme.onSurfaceVariant,
-                            )
+                        Box(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .padding(vertical = 48.dp),
+                            contentAlignment = Alignment.Center,
+                        ) {
+                            Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                                Text(text = "📋", style = MaterialTheme.typography.displayLarge)
+                                Spacer(modifier = Modifier.height(16.dp))
+                                Text(
+                                    text = "No habits yet!",
+                                    style = MaterialTheme.typography.titleLarge,
+                                    fontWeight = FontWeight.SemiBold,
+                                )
+                                Spacer(modifier = Modifier.height(8.dp))
+                                Text(
+                                    text = "Tap + to create your first habit\nand start earning rewards for your Choreboo!",
+                                    style = MaterialTheme.typography.bodyMedium,
+                                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                    textAlign = TextAlign.Center,
+                                )
+                            }
                         }
                     }
-
-                    // Weekly Streak card
-                    item {
-                        WeeklyStreakCard(
-                            maxStreak = maxStreak,
-                            weeklyCompletionDays = weeklyCompletionDays,
-                            completionFraction = completionFraction,
-                        )
-                    }
-
-                    // Streak / XP bento grid
-                    item {
-                        StreakXpBentoGrid(
-                            previewBadges = allBadges.sortedWith(
-                                compareByDescending<Badge> { it.isUnlocked }
-                                    .thenByDescending { it.definition.threshold },
-                            ).take(4),
-                            todayXp = todayXp,
-                            starPoints = totalPoints,
-                            onBadgesTapped = { showBadgeSheet = true },
-                        )
-                    }
-
+                } else {
                     // "Daily Quest" section header
                     item {
                         Row(
@@ -358,19 +340,19 @@ fun HabitListScreen(
                             onDelete = { habitToDelete = habit },
                         )
                     }
-
-                    // Pet Mood + Level/XP bento grid
-                    item {
-                        PetStatusBentoGrid(
-                            mood = chorebooStats?.mood ?: ChorebooMood.IDLE,
-                            level = chorebooStats?.level ?: 1,
-                            xp = chorebooStats?.xp ?: 0,
-                            xpToNextLevel = chorebooStats?.xpToNextLevel ?: 50,
-                        )
-                    }
-
-                    item { Spacer(modifier = Modifier.height(80.dp)) }
                 }
+
+                // Pet Mood + Level/XP bento grid
+                item {
+                    PetStatusBentoGrid(
+                        mood = chorebooStats?.mood ?: ChorebooMood.IDLE,
+                        level = chorebooStats?.level ?: 1,
+                        xp = chorebooStats?.xp ?: 0,
+                        xpToNextLevel = chorebooStats?.xpToNextLevel ?: 50,
+                    )
+                }
+
+                item { Spacer(modifier = Modifier.height(80.dp)) }
             }
         }
 
@@ -488,7 +470,7 @@ private fun WeeklyStreakCard(
         modifier = Modifier
             .fillMaxWidth()
             .clip(RoundedCornerShape(20.dp))
-            .background(MaterialTheme.colorScheme.surfaceContainerLow),
+            .background(MaterialTheme.colorScheme.surfaceContainerLowest),
     ) {
         // Fire watermark — faint, overlapping top-right
         Box(
@@ -601,7 +583,7 @@ private fun StreakXpBentoGrid(
             modifier = Modifier
                 .weight(1f)
                 .clip(RoundedCornerShape(16.dp))
-                .background(MaterialTheme.colorScheme.surfaceContainerLow)
+                .background(MaterialTheme.colorScheme.surfaceContainerLowest)
                 .clickable { onBadgesTapped() },
         ) {
             Column(

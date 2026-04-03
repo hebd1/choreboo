@@ -36,6 +36,7 @@ class HabitRepository @Inject constructor(
     private val habitDao: HabitDao,
     private val habitLogDao: HabitLogDao,
     private val userPreferences: UserPreferences,
+    private val firebaseAuth: FirebaseAuth,
 ) {
     private val connector by lazy { ChorebooConnector.instance }
     private val dateFormatter = DateTimeFormatter.ISO_LOCAL_DATE
@@ -149,7 +150,8 @@ class HabitRepository @Inject constructor(
         val habitEntity = habitDao.getHabitByIdSync(habitId)
             ?: return CompletionResult(xpEarned = 0, newStreak = 0, alreadyComplete = true)
 
-        // Ensure habit is only completed once per day
+        // Early return if already completed (avoids unnecessary work; the real
+        // enforcement is the UNIQUE(habitId, date) index on insertLog below).
         val todayCount = habitLogDao.getCompletionCountForDate(habitId, today)
         if (todayCount >= 1) {
             return CompletionResult(xpEarned = 0, newStreak = 0, alreadyComplete = true)
@@ -159,26 +161,34 @@ class HabitRepository @Inject constructor(
         val baseXp = habitEntity.baseXp
         val xpEarned = (baseXp + (streak * 2)).coerceAtMost(baseXp * 3)
 
+        val currentUid = firebaseAuth.currentUser?.uid
         val log = HabitLogEntity(
             habitId = habitId,
             date = today,
             xpEarned = xpEarned,
             streakAtCompletion = streak + 1,
+            completedByUid = currentUid,
         )
-        habitLogDao.insertLog(log)
+        // Atomic duplicate prevention: UNIQUE(habitId, date) + IGNORE returns -1 on conflict
+        val localLogId = habitLogDao.insertLog(log)
+        if (localLogId == -1L) {
+            return CompletionResult(xpEarned = 0, newStreak = 0, alreadyComplete = true)
+        }
         userPreferences.addPoints(xpEarned)
         userPreferences.addLifetimeXp(xpEarned)
 
-        // Write-through: create log in Data Connect
+        // Write-through: create log in Data Connect and save remoteId back
         habitEntity.remoteId?.let { remoteHabitId ->
             try {
-                connector.createHabitLog.execute(
+                val result = connector.createHabitLog.execute(
                     habitId = UUID.fromString(remoteHabitId),
                     date = today,
                     xpEarned = xpEarned,
                     streakAtCompletion = streak + 1,
                 )
-                Log.d(TAG, "Created habit log in cloud for habit: $remoteHabitId")
+                val remoteLogId = result.data.habitLog_insert.id.toString()
+                habitLogDao.updateLogRemoteId(localLogId, remoteLogId)
+                Log.d(TAG, "Created habit log in cloud for habit: $remoteHabitId (remoteLogId: $remoteLogId)")
             } catch (e: Exception) {
                 Log.e(TAG, "Failed to sync habit log to cloud", e)
             }
@@ -245,11 +255,19 @@ class HabitRepository @Inject constructor(
     }
 
     /**
+     * Clear all local habit and habit log data — used for sign-out cleanup.
+     */
+    suspend fun clearLocalData() {
+        habitLogDao.deleteAllLogs()
+        habitDao.deleteAllHabits()
+    }
+
+    /**
      * Pull habits from Data Connect and merge into Room (cloud wins).
      * Called once after successful authentication.
      */
     suspend fun syncHabitsFromCloud() {
-        val uid = FirebaseAuth.getInstance().currentUser?.uid ?: return
+        val uid = firebaseAuth.currentUser?.uid ?: return
         try {
             val result = connector.getMyHabits.execute()
             val cloudHabits = result.data.habits
@@ -290,7 +308,7 @@ class HabitRepository @Inject constructor(
      * Requires habits to be synced first so remoteId → local ID mapping is available.
      */
     suspend fun syncHabitLogsFromCloud() {
-        val uid = FirebaseAuth.getInstance().currentUser?.uid ?: return
+        val uid = firebaseAuth.currentUser?.uid ?: return
         val endDate = LocalDate.now().format(dateFormatter)
         val startDate = LocalDate.now().minusDays(30).format(dateFormatter)
 
@@ -344,7 +362,7 @@ private fun HabitEntity.toDomain() = Habit(
     title = title,
     description = description,
     iconName = iconName,
-    customDays = customDays.split(",").map { it.trim() },
+    customDays = customDays.split(",").map { it.trim() }.filter { it.isNotEmpty() },
     difficulty = difficulty,
     baseXp = baseXp,
     reminderEnabled = reminderEnabled,

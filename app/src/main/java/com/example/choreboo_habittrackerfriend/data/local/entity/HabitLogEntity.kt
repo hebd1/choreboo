@@ -13,7 +13,12 @@ import androidx.room.PrimaryKey
             onDelete = ForeignKey.CASCADE
         )
     ],
-    indices = [Index("habitId"), Index("date")]
+    indices = [
+        Index("habitId"),
+        Index("date"),
+        Index("remoteId"),
+        Index(value = ["habitId", "date"], unique = true),
+    ]
 )
 data class HabitLogEntity(
     @PrimaryKey(autoGenerate = true) val id: Long = 0,

@@ -73,7 +73,7 @@ fun HabitCard(
             containerColor = if (isComplete)
                 MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.18f)
             else
-                MaterialTheme.colorScheme.surfaceContainerLow,
+                MaterialTheme.colorScheme.surfaceContainerLowest,
         ),
         elevation = CardDefaults.cardElevation(defaultElevation = 0.dp),
     ) {

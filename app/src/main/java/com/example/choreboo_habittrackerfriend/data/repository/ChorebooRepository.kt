@@ -100,7 +100,10 @@ class ChorebooRepository @Inject constructor(
         if (hoursSinceInteraction <= 0) {
             // Clear sleep if it's expired
             if (choreboo.sleepUntil > 0 && choreboo.sleepUntil <= now) {
-                chorebooDao.updateChoreboo(choreboo.copy(sleepUntil = 0, lastInteractionAt = now))
+                val updated = choreboo.copy(sleepUntil = 0, lastInteractionAt = now)
+                chorebooDao.updateChoreboo(updated)
+                // Sync cleared sleep state to cloud
+                syncSleepToCloud(updated)
             }
             return
         }
@@ -117,6 +120,10 @@ class ChorebooRepository @Inject constructor(
 
         // Write-through: update stats in Data Connect
         syncStatsToCloud(updated)
+        // Sync cleared sleep state to cloud
+        if (choreboo.sleepUntil > 0) {
+            syncSleepToCloud(updated)
+        }
     }
 
     suspend fun addXp(amount: Int): XpResult {
@@ -222,6 +229,7 @@ class ChorebooRepository @Inject constructor(
         if (deducted) {
             val updated = choreboo.copy(
                 hunger = (choreboo.hunger + 20).coerceAtMost(100),
+                lastInteractionAt = System.currentTimeMillis(),
             )
             chorebooDao.updateChoreboo(updated)
 
@@ -279,6 +287,23 @@ class ChorebooRepository @Inject constructor(
     }
 
     /**
+     * Sync sleepUntil state to Data Connect (used when sleep expires during decay).
+     */
+    private suspend fun syncSleepToCloud(entity: ChorebooEntity) {
+        entity.remoteId?.let { remoteId ->
+            try {
+                connector.updateChorebooSleep.execute(
+                    chorebooId = UUID.fromString(remoteId),
+                ) {
+                    sleepUntil = if (entity.sleepUntil > 0) Timestamp(Date(entity.sleepUntil)) else null
+                }
+            } catch (e: Exception) {
+                Log.e(TAG, "Failed to sync sleep state to cloud", e)
+            }
+        }
+    }
+
+    /**
      * Pull choreboo from Data Connect and merge into Room (cloud wins).
      * Called once after successful authentication.
      */
@@ -326,6 +351,13 @@ class ChorebooRepository @Inject constructor(
             Log.e(TAG, "Failed to sync choreboo from cloud", e)
             throw e
         }
+    }
+
+    /**
+     * Clear all local choreboo data — used for sign-out cleanup.
+     */
+    suspend fun clearLocalData() {
+        chorebooDao.deleteAllChoreboos()
     }
 }
 

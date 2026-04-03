@@ -12,7 +12,6 @@ import com.example.choreboo_habittrackerfriend.domain.model.PetType
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.asStateFlow
-import java.util.UUID
 import javax.inject.Inject
 import javax.inject.Singleton
 
@@ -149,23 +148,25 @@ class HouseholdRepository @Inject constructor(
 
     /**
      * Fetch household members from Data Connect.
+     * Auth-scoped: traverses from the authenticated user to their household's members.
      */
     suspend fun refreshHouseholdMembers() {
-        val household = _currentHousehold.value ?: return
         try {
-            val householdUuid = UUID.fromString(household.id)
-            val result = connector.getHouseholdMembers.execute(
-                householdId = householdUuid,
-            )
-            _householdMembers.value = result.data.users.map { user ->
-                HouseholdMember(
-                    uid = user.id,
-                    displayName = user.displayName,
-                    photoUrl = user.photoUrl,
-                    email = user.email,
-                )
+            val result = connector.getMyHouseholdMembers.execute()
+            val members = result.data.user?.household?.users_on_household
+            if (members != null) {
+                _householdMembers.value = members.map { user ->
+                    HouseholdMember(
+                        uid = user.id,
+                        displayName = user.displayName,
+                        photoUrl = user.photoUrl,
+                        email = user.email,
+                    )
+                }
+                Log.d(TAG, "Refreshed ${members.size} household members")
+            } else {
+                _householdMembers.value = emptyList()
             }
-            Log.d(TAG, "Refreshed ${result.data.users.size} household members")
         } catch (e: Exception) {
             Log.e(TAG, "Failed to refresh household members", e)
         }
@@ -173,60 +174,66 @@ class HouseholdRepository @Inject constructor(
 
     /**
      * Fetch all Choreboos belonging to household members from Data Connect.
+     * Auth-scoped: traverses from the authenticated user to their household's
+     * members' choreboos. Pets are nested under each user (singular choreboo_on_owner
+     * because of @unique constraint on Choreboo.owner).
      */
     suspend fun refreshHouseholdPets() {
-        val household = _currentHousehold.value ?: return
         try {
-            val householdUuid = UUID.fromString(household.id)
-            val result = connector.getChoreboosByHousehold.execute(
-                householdId = householdUuid,
-            )
-            _householdPets.value = result.data.choreboos.map { pet ->
-                HouseholdPet(
-                    chorebooId = pet.id.toString(),
-                    name = pet.name,
-                    stage = try { ChorebooStage.valueOf(pet.stage) } catch (_: Exception) { ChorebooStage.EGG },
-                    level = pet.level,
-                    xp = pet.xp,
-                    hunger = pet.hunger,
-                    happiness = pet.happiness,
-                    energy = pet.energy,
-                    petType = try { PetType.valueOf(pet.petType) } catch (_: Exception) { PetType.FOX },
-                    ownerName = pet.owner.displayName,
-                    ownerUid = pet.owner.id,
-                    ownerPhotoUrl = pet.owner.photoUrl,
-                )
+            val result = connector.getMyHouseholdChoreboos.execute()
+            val users = result.data.user?.household?.users_on_household
+            if (users != null) {
+                _householdPets.value = users.mapNotNull { user ->
+                    val pet = user.choreboo_on_owner ?: return@mapNotNull null
+                    HouseholdPet(
+                        chorebooId = pet.id.toString(),
+                        name = pet.name,
+                        stage = try { ChorebooStage.valueOf(pet.stage) } catch (_: Exception) { ChorebooStage.EGG },
+                        level = pet.level,
+                        xp = pet.xp,
+                        hunger = pet.hunger,
+                        happiness = pet.happiness,
+                        energy = pet.energy,
+                        petType = try { PetType.valueOf(pet.petType) } catch (_: Exception) { PetType.FOX },
+                        ownerName = user.displayName,
+                        ownerUid = user.id,
+                        ownerPhotoUrl = user.photoUrl,
+                    )
+                }
+                Log.d(TAG, "Refreshed ${_householdPets.value.size} household pets")
+            } else {
+                _householdPets.value = emptyList()
             }
-            Log.d(TAG, "Refreshed ${result.data.choreboos.size} household pets")
         } catch (e: Exception) {
             Log.e(TAG, "Failed to refresh household pets", e)
         }
     }
 
     /**
-     * Refresh all household data (household info from user profile, then members and pets).
+     * Clear in-memory household state — used for sign-out cleanup.
+     */
+    fun clearState() {
+        _currentHousehold.value = null
+        _householdMembers.value = emptyList()
+        _householdPets.value = emptyList()
+    }
+
+    /**
+     * Refresh all household data (household info, members, and pets).
+     * Auth-scoped: uses GetMyHousehold which traverses from auth.uid.
      */
     suspend fun refreshAll() {
         try {
-            // Fetch user's current household from their cloud profile
-            val cloudUser = userRepository.fetchCurrentUserFromCloud()
-            if (cloudUser?.householdId != null) {
-                val householdUuid = UUID.fromString(cloudUser.householdId)
-                val result = connector.getHouseholdById.execute(
-                    householdId = householdUuid,
+            val result = connector.getMyHousehold.execute()
+            val h = result.data.user?.household
+            if (h != null) {
+                _currentHousehold.value = Household(
+                    id = h.id.toString(),
+                    name = h.name,
+                    inviteCode = h.inviteCode,
+                    createdByUid = h.createdBy.id,
+                    createdByName = h.createdBy.displayName,
                 )
-                val h = result.data.household
-                if (h != null) {
-                    _currentHousehold.value = Household(
-                        id = h.id.toString(),
-                        name = h.name,
-                        inviteCode = h.inviteCode,
-                        createdByUid = h.createdBy.id,
-                        createdByName = h.createdBy.displayName,
-                    )
-                } else {
-                    _currentHousehold.value = null
-                }
             } else {
                 _currentHousehold.value = null
             }

@@ -14,6 +14,7 @@ import javax.inject.Singleton
 sealed class AuthResult {
     data class Success(val user: FirebaseUser) : AuthResult()
     data class Error(val message: String) : AuthResult()
+    data object ResetEmailSent : AuthResult()
 }
 
 @Singleton
@@ -69,10 +70,7 @@ class AuthRepository @Inject constructor(
     suspend fun sendPasswordReset(email: String): AuthResult {
         return try {
             firebaseAuth.sendPasswordResetEmail(email).await()
-            // Return a success with the current user (may be null for reset, but the call succeeded)
-            val user = firebaseAuth.currentUser
-            if (user != null) AuthResult.Success(user)
-            else AuthResult.Error("Reset email sent.")
+            AuthResult.ResetEmailSent
         } catch (e: Exception) {
             AuthResult.Error(e.toFriendlyMessage())
         }

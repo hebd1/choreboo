@@ -1,8 +1,8 @@
 {
   "formatVersion": 1,
   "database": {
-    "version": 7,
-    "identityHash": "62059f9bcccdd2ba53c12a416118360c",
+    "version": 9,
+    "identityHash": "6376d32cd1bedaeccb684a12f816f0e6",
     "entities": [
       {
         "tableName": "habits",
@@ -196,6 +196,16 @@
             ],
             "orders": [],
             "createSql": "CREATE INDEX IF NOT EXISTS `index_habit_logs_remoteId` ON `${TABLE_NAME}` (`remoteId`)"
+          },
+          {
+            "name": "index_habit_logs_habitId_date",
+            "unique": true,
+            "columnNames": [
+              "habitId",
+              "date"
+            ],
+            "orders": [],
+            "createSql": "CREATE UNIQUE INDEX IF NOT EXISTS `index_habit_logs_habitId_date` ON `${TABLE_NAME}` (`habitId`, `date`)"
           }
         ],
         "foreignKeys": [
@@ -320,7 +330,7 @@
     ],
     "setupQueries": [
       "CREATE TABLE IF NOT EXISTS room_master_table (id INTEGER PRIMARY KEY,identity_hash TEXT)",
-      "INSERT OR REPLACE INTO room_master_table (id,identity_hash) VALUES(42, '62059f9bcccdd2ba53c12a416118360c')"
+      "INSERT OR REPLACE INTO room_master_table (id,identity_hash) VALUES(42, '6376d32cd1bedaeccb684a12f816f0e6')"
     ]
   }
 }

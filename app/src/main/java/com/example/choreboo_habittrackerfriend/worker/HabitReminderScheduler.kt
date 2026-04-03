@@ -7,7 +7,6 @@ import android.content.Intent
 import java.time.LocalDate
 import java.time.LocalTime
 import java.time.ZonedDateTime
-import java.time.temporal.ChronoUnit
 
 object HabitReminderScheduler {
 
@@ -137,22 +136,10 @@ object HabitReminderScheduler {
         val today = LocalDate.now()
         val now = ZonedDateTime.now()
         
-        // Normalize day-of-month: D31 on months with fewer days becomes the last day
-        val validDaysThisMonth = monthlyDays.filter { day ->
-            when {
-                day <= 0 -> false
-                day <= 28 -> true  // Valid in all months
-                day == 29 -> today.month.maxLength() >= 29
-                day == 30 -> today.month.maxLength() >= 30
-                day == 31 -> today.month.maxLength() == 31
-                else -> false
-            }
-        }
-
-        val lastDayOfMonth = today.month.maxLength()
+        val lastDayOfMonth = today.lengthOfMonth()
         val normalizedDays = monthlyDays.map { day ->
             if (day > lastDayOfMonth) lastDayOfMonth else day
-        }.distinct()
+        }.distinct().sorted()
 
         // Check if today is a scheduled day
         if (today.dayOfMonth in normalizedDays) {
@@ -171,7 +158,7 @@ object HabitReminderScheduler {
 
         // If no match this month, try next month
         val nextMonth = today.plusMonths(1)
-        val nextMonthLastDay = nextMonth.month.maxLength()
+        val nextMonthLastDay = nextMonth.lengthOfMonth()
         val nextMonthNormalizedDays = monthlyDays.map { day ->
             if (day > nextMonthLastDay) nextMonthLastDay else day
         }.distinct().sorted()

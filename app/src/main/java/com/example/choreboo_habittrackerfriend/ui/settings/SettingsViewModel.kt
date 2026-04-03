@@ -6,6 +6,8 @@ import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.example.choreboo_habittrackerfriend.data.datastore.UserPreferences
 import com.example.choreboo_habittrackerfriend.data.repository.AuthRepository
+import com.example.choreboo_habittrackerfriend.data.repository.ChorebooRepository
+import com.example.choreboo_habittrackerfriend.data.repository.HabitRepository
 import com.example.choreboo_habittrackerfriend.data.repository.HouseholdRepository
 import com.example.choreboo_habittrackerfriend.data.repository.HouseholdResult
 import com.example.choreboo_habittrackerfriend.domain.model.Household
@@ -26,6 +28,8 @@ class SettingsViewModel @Inject constructor(
     private val userPreferences: UserPreferences,
     private val authRepository: AuthRepository,
     private val householdRepository: HouseholdRepository,
+    private val habitRepository: HabitRepository,
+    private val chorebooRepository: ChorebooRepository,
 ) : ViewModel() {
     val themeMode: StateFlow<String> = userPreferences.themeMode
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), "system")
@@ -107,8 +111,20 @@ class SettingsViewModel @Inject constructor(
     }
 
      fun signOut() {
-        authRepository.signOut()
-        viewModelScope.launch { _events.emit(SettingsEvent.SignedOut) }
+        viewModelScope.launch {
+            // Clear all local data before signing out
+            try {
+                habitRepository.clearLocalData()
+                chorebooRepository.clearLocalData()
+                householdRepository.clearState()
+                userPreferences.clearAllData()
+            } catch (e: Exception) {
+                // Best-effort cleanup — proceed with sign-out even if cleanup fails
+                android.util.Log.e("SettingsViewModel", "Error during sign-out cleanup", e)
+            }
+            authRepository.signOut()
+            _events.emit(SettingsEvent.SignedOut)
+        }
     }
 
     fun onProfilePhotoPicked(contentUri: Uri) {

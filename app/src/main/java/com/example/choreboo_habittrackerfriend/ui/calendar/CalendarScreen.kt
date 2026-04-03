@@ -41,7 +41,6 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.shadow
-import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
@@ -109,7 +108,7 @@ fun CalendarScreen(
                         Icon(
                             Icons.Default.Stars,
                             contentDescription = "Points",
-                            tint = MaterialTheme.colorScheme.secondary,
+                            tint = MaterialTheme.colorScheme.secondaryContainer,
                             modifier = Modifier.size(16.dp),
                         )
                         Spacer(modifier = Modifier.width(4.dp))
@@ -137,7 +136,7 @@ fun CalendarScreen(
                 Card(
                     modifier = Modifier.fillMaxWidth(),
                     shape = RoundedCornerShape(16.dp),
-                    colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceContainerLow),
+                    colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceContainerLowest),
                 ) {
                     Column(modifier = Modifier.padding(20.dp)) {
                         // Month navigation
@@ -315,14 +314,7 @@ fun CalendarScreen(
                             .weight(2f)
                             .height(140.dp)
                             .clip(RoundedCornerShape(16.dp))
-                            .background(
-                                Brush.linearGradient(
-                                    colors = listOf(
-                                        MaterialTheme.colorScheme.primary,
-                                        MaterialTheme.colorScheme.primaryContainer,
-                                    ),
-                                ),
-                            )
+                            .background(MaterialTheme.colorScheme.primary)
                             .padding(20.dp),
                     ) {
                         Column(
@@ -429,7 +421,7 @@ fun CalendarScreen(
                             modifier = Modifier
                                 .fillMaxWidth()
                                 .clip(RoundedCornerShape(16.dp))
-                                .background(MaterialTheme.colorScheme.surfaceContainerLow)
+                                .background(MaterialTheme.colorScheme.surfaceContainerLowest)
                                 .padding(32.dp),
                             contentAlignment = Alignment.Center,
                         ) {

@@ -20,4 +20,8 @@ interface ChorebooDao {
     suspend fun insertChoreboo(choreboo: ChorebooEntity): Long
     @Update
     suspend fun updateChoreboo(choreboo: ChorebooEntity)
+
+    /** Delete all choreboos — used for sign-out data cleanup. */
+    @Query("DELETE FROM choreboos")
+    suspend fun deleteAllChoreboos()
 }

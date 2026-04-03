@@ -37,4 +37,8 @@ interface HabitDao {
     /** Total count of all habits (including archived) — used for badge computation. */
     @Query("SELECT COUNT(*) FROM habits")
     fun getTotalHabitCount(): Flow<Int>
+
+    /** Delete all habits — used for sign-out data cleanup. */
+    @Query("DELETE FROM habits")
+    suspend fun deleteAllHabits()
 }

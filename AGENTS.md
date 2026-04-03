@@ -15,7 +15,8 @@ Repositories also call the **Firebase Data Connect generated SDK** for cloud wri
 - **Mapping** uses extension functions (`toDomain()` / `toEntity()`) defined at the bottom of each Repository file (private).
 - **DI**: Single `AppModule` provides DB, all DAOs, DataStore, `UserPreferences`, and `FirebaseAuth`. All wiring is constructor injection.
 - **Desugaring**: `isCoreLibraryDesugaringEnabled = true` — `java.time` APIs work on minSdk 24.
-- **TypeConverters**: `Converters.kt` uses Gson for `List<String>` conversion. Enums are stored as plain Strings (no TypeConverter).
+- **TypeConverters**: `data/local/converter/Converters.kt` uses Gson for `List<String>` conversion. Enums are stored as plain Strings (no TypeConverter).
+- **Typography**: Custom `PlusJakartaSans` font family (5 weights: Light, Regular, Medium, SemiBold, Bold) applied to all Material3 typography styles in `Type.kt`.
 
 ## Cloud Sync Architecture
 
@@ -25,7 +26,7 @@ Repositories also call the **Firebase Data Connect generated SDK** for cloud wri
 - **Write-through**: All Room mutations (habit CRUD, choreboo updates, habit log inserts) also fire the corresponding Data Connect mutation. Failures are **silent** — no user-facing error for write-through.
 - **Cloud-to-local sync**: Triggered **after auth only** (not on app resume or periodically). Order: habits → choreboo → habit logs (last 30 days). Conflict resolution: **cloud wins**.
 - **Error visibility**: Only the post-auth sync shows errors (snackbar). Write-through failures are silent.
-- **Security**: All 14 queries and 15 mutations have `@auth(level: USER)` directives with auth-scoped filters. `connector.yaml` has `authMode: PUBLIC` (each operation has its own auth check).
+- **Security**: All 14 queries and 15 mutations have `@auth(level: USER)` directives with auth-scoped filters. `connector.yaml` has `authMode: PUBLIC` (each operation has its own auth check). 4 household queries (`GetMyHousehold`, `GetMyHouseholdMembers`, `GetMyHouseholdChoreboos`, `GetMyHouseholdHabits`) are **inherently auth-scoped** — they traverse from `auth.uid` to the user's household, so no `householdId` parameter is needed and callers can only see their own household data.
 
 ### Data Connect Schema (5 cloud tables)
 
@@ -58,16 +59,18 @@ Defined in `dataconnect/schema/schema.gql`:
 - **Streaks**: `HabitRepository.getStreaksForToday()` returns `Flow<Map<Long, Int>>` for StreakBadge display.
 - **Cloud-to-local sync**: `HabitRepository.syncHabitsFromCloud()`, `HabitRepository.syncHabitLogsFromCloud()`, `ChorebooRepository.syncFromCloud()`. Called from `AuthViewModel.syncCloudDataToLocal()`.
 
-## Room Database (v7, 3 entities)
+## Room Database (v9, 3 entities)
 
-| Table | Columns |
-|-------|---------|
-| **habits** | id, title, description, iconName, customDays, difficulty, baseXp, reminderEnabled, reminderTime, createdAt, isArchived, isHouseholdHabit, ownerUid, householdId, remoteId |
-| **habit_logs** | id, habitId (FK→habits CASCADE), completedAt, date (ISO string), xpEarned, streakAtCompletion, completedByUid, remoteId |
-| **choreboos** | id, name, stage, level, xp, hunger, happiness, energy, petType, lastInteractionAt, createdAt, sleepUntil, ownerUid, remoteId |
+| Table | Columns | Indexes |
+|-------|---------|---------|
+| **habits** | id, title, description, iconName, customDays, difficulty, baseXp, reminderEnabled, reminderTime, createdAt, isArchived, isHouseholdHabit, ownerUid, householdId, remoteId | `remoteId` |
+| **habit_logs** | id, habitId (FK→habits CASCADE), completedAt, date (ISO string), xpEarned, streakAtCompletion, completedByUid, remoteId | `remoteId`, UNIQUE(`habitId`, `date`) |
+| **choreboos** | id, name, stage, level, xp, hunger, happiness, energy, petType, lastInteractionAt, createdAt, sleepUntil, ownerUid, remoteId | `remoteId` |
 
-- `remoteId` maps to the Data Connect UUID for cloud sync.
+- `remoteId` maps to the Data Connect UUID for cloud sync. Indexed on all 3 entities.
 - `ownerUid` / `completedByUid` / `householdId` map to Firebase Auth UIDs and household references.
+- `habit_logs` has a UNIQUE(`habitId`, `date`) index for atomic duplicate prevention on habit completion.
+- `insertLog` uses `OnConflictStrategy.IGNORE` — returns -1L when duplicate is ignored.
 - Uses `fallbackToDestructiveMigration()` during development.
 - Schemas exported to `app/schemas/`.
 
@@ -162,13 +165,14 @@ Defined in `dataconnect/schema/schema.gql`:
 ## UI Rules
 
 - Material3 only — use `MaterialTheme.colorScheme.*` and `MaterialTheme.typography.*`. No hardcoded text styles.
-- Dynamic color is **disabled** (`dynamicColor = false`) — custom Choreboo green/teal/orange palette always applied.
+- Dynamic color is **disabled** (`dynamicColor = false`) — custom Choreboo palette always applied. Primary `#006E1C` (deep green), Secondary `#8B5000` (warm orange), Tertiary `#6833EA` (purple). See `Color.kt` for full Stitch design system.
 - Card corners: `RoundedCornerShape(16.dp)`. Input corners: `RoundedCornerShape(12.dp)`.
 - Always handle `innerPadding` from `Scaffold`. Use `Modifier.fillMaxWidth()` over hardcoded widths.
-- Icons: `Icons.Default.*` or `Icons.AutoMirrored.Filled.*` from material-icons-extended, always with `contentDescription`.
+- Habit icons: **emoji-based** system (`EmojiIcon` data class with 15 preset emoji + custom emoji input). Not Material Icons.
 - Touch targets >= 48dp. Empty states show emoji + friendly message + CTA.
 - Use `AlertDialog` for confirmations; `ModalBottomSheet` for selection lists (feed).
 - Pet animations: emoji placeholders per `ChorebooMood`; designed to swap to Lottie JSON in `res/raw/`.
+- Pet size scales by `ChorebooStage`.
 - **Auth screen**: Syncing overlay blocks interaction during cloud-to-local sync after login.
 
 ## Package Structure
@@ -180,12 +184,13 @@ com.example.choreboo_habittrackerfriend/
 ├── navigation/                      # ChorebooNavGraph.kt, Screen sealed class (8 routes)
 ├── data/
 │   ├── local/
-│   │   ├── ChorebooDatabase.kt      # Room DB v7, 3 entities, fallbackToDestructiveMigration
-│   │   ├── Converters.kt            # Gson TypeConverter for List<String>
+│   │   ├── ChorebooDatabase.kt      # Room DB v9, 3 entities, fallbackToDestructiveMigration
+│   │   ├── converter/
+│   │   │   └── Converters.kt        # Gson TypeConverter for List<String>
 │   │   ├── entity/                  # HabitEntity, HabitLogEntity, ChorebooEntity
 │   │   └── dao/                     # HabitDao, HabitLogDao, ChorebooDao
-│   ├── datastore/                   # UserPreferences (theme, reminders, onboarding, sound)
-│   └── repository/                  # HabitRepository, ChorebooRepository, AuthRepository, HouseholdRepository, UserRepository
+│   ├── datastore/                   # UserPreferences (theme, onboarding, sound, totalPoints, totalLifetimeXp, profilePhotoUri, householdNotifications)
+│   └── repository/                  # HabitRepository, ChorebooRepository, AuthRepository, HouseholdRepository, UserRepository, BadgeRepository
 ├── di/                              # AppModule (DB, DAOs, DataStore, UserPreferences, FirebaseAuth)
 ├── domain/model/                    # Habit, ChorebooStats, ChorebooMood, ChorebooStage, PetType, Household, AppUser, Badge
 ├── ui/
@@ -196,9 +201,14 @@ com.example.choreboo_habittrackerfriend/
 │   ├── pet/                         # PetScreen, PetViewModel, components/StatBar
 │   ├── household/                   # HouseholdScreen, HouseholdViewModel, components/HouseholdPetCard
 │   ├── calendar/                    # CalendarScreen, CalendarViewModel
-│   ├── onboarding/                  # OnboardingScreen
+│   ├── onboarding/                  # OnboardingScreen, OnboardingViewModel
 │   └── settings/                    # SettingsScreen, SettingsViewModel
-└── worker/                          # ReminderWorker (daily notifications with random messages)
+└── worker/                          # AlarmManager-based reminders (see below)
+    ├── HabitReminderScheduler.kt    # Schedules per-habit alarms via AlarmManager
+    ├── HabitReminderReceiver.kt     # BroadcastReceiver that shows reminder notification
+    ├── HabitCompleteReceiver.kt     # BroadcastReceiver for "Complete" action on notification
+    ├── ReminderRescheduleWorker.kt  # WorkManager job that reschedules alarms after reboot/update
+    └── BootReceiver.kt              # BOOT_COMPLETED receiver that triggers ReminderRescheduleWorker
 ```
 
 ## Adding a New Feature (Screen)
@@ -216,8 +226,42 @@ Additional context lives in `.github/copilot-instructions.md` (color palette hex
 - Always use Material3 APIs (not Material2).
 - Room queries: `Flow<>` for observable, `suspend` for one-shot.
 - For level-up detection, use `XpResult` from `ChorebooRepository.addXp()`.
-- When adding habit icons, update both `iconOptions` in `AddEditHabitScreen` and `getIconForName()` in `HabitCard`.
+- When adding habit icons, update `iconOptions` in `AddEditHabitScreen` (emoji-based `EmojiIcon` system).
 - Write-through: any Room mutation should also call the corresponding Data Connect mutation.
+
+## Known Issues (as of 2026-04-03)
+
+### Bugs (all resolved)
+
+All bugs B1–B15 have been fixed:
+- **B1**: Sign-out now clears Room tables, DataStore, and household state.
+- **B2**: `completeHabit()` saves cloud `remoteId` back to local log.
+- **B3**: `completeHabit()` sets `completedByUid` on local log entity.
+- **B4/B5**: `HabitCompleteReceiver` rewritten — uses Hilt `@AndroidEntryPoint`, delegates to repositories instead of duplicating logic. Now syncs to cloud and updates `TOTAL_LIFETIME_XP`.
+- **B6**: `sendPasswordReset()` returns `AuthResult.ResetEmailSent`.
+- **B7**: Habit completion race condition fixed — UNIQUE(`habitId`, `date`) index + `OnConflictStrategy.IGNORE` with -1L check.
+- **B8**: `applyStatDecay()` syncs cleared `sleepUntil` to cloud.
+- **B9**: `autoFeedIfNeeded()` updates `lastInteractionAt`.
+- **B10**: `customDays` split filters empty strings.
+- **B11**: `HabitReminderScheduler` uses `today.lengthOfMonth()`.
+- **B12**: `saveHabit()` now preserves `remoteId`, `ownerUid`, `householdId`, `createdAt`, and `isArchived` from the existing habit when editing. Previously these fields were reset to defaults on every edit, causing cloud duplicates and ownership loss.
+- **B13**: `householdId` is now resolved from `HouseholdRepository.currentHousehold` when `isHouseholdHabit` is toggled on. Previously the toggle set a boolean flag but never associated the habit with the user's actual household.
+- **B14**: `HabitReminderScheduler.calculateNextMonthlyTrigger()` now sorts `normalizedDays` so the loop finds the nearest scheduled day, not an arbitrary one. Dead `validDaysThisMonth` variable and unused `ChronoUnit` import removed.
+- **B15**: `HabitRepository` now receives `FirebaseAuth` via Hilt constructor injection instead of calling `FirebaseAuth.getInstance()` directly in 3 places.
+
+### Security Gaps (resolved)
+
+- **G20**: 4 household queries restructured to be inherently auth-scoped (traverse from `auth.uid`). No `householdId` parameter needed. `HouseholdRepository` updated to use new SDK query names and response shapes.
+
+### Sync Gaps
+
+| ID | Description |
+|----|-------------|
+| G11 | Sync only runs on auth, not on app resume or periodically |
+| G12 | Archived habits not filtered during sync — may overwrite local archive status |
+| G13 | No deletion reconciliation — deleted-on-cloud items reappear locally on re-sync |
+| G14 | 30-day habit log sync limit means older logs are never synced |
+| G16 | UserPreferences (totalPoints, totalLifetimeXp) never synced to cloud |
 
 ## Not Yet Implemented
 

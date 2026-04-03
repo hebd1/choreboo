@@ -1,7 +1,11 @@
 package com.example.choreboo_habittrackerfriend.data.local.entity
 import androidx.room.Entity
+import androidx.room.Index
 import androidx.room.PrimaryKey
-@Entity(tableName = "choreboos")
+@Entity(
+    tableName = "choreboos",
+    indices = [Index("remoteId")],
+)
 data class ChorebooEntity(
     @PrimaryKey(autoGenerate = true) val id: Long = 0,
     val name: String = "Choreboo",

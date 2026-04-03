@@ -19,7 +19,7 @@ import com.example.choreboo_habittrackerfriend.data.local.entity.ChorebooEntity
         HabitLogEntity::class,
         ChorebooEntity::class,
     ],
-    version = 7,
+    version = 9,
     exportSchema = true,
 )
 @TypeConverters(Converters::class)

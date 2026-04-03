@@ -5,6 +5,7 @@ import androidx.lifecycle.SavedStateHandle
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.example.choreboo_habittrackerfriend.data.repository.HabitRepository
+import com.example.choreboo_habittrackerfriend.data.repository.HouseholdRepository
 import com.example.choreboo_habittrackerfriend.data.datastore.UserPreferences
 import com.example.choreboo_habittrackerfriend.data.repository.AuthRepository
 import com.example.choreboo_habittrackerfriend.domain.model.Habit
@@ -20,6 +21,7 @@ import kotlinx.coroutines.flow.asSharedFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.debounce
 import kotlinx.coroutines.flow.distinctUntilChanged
+import kotlinx.coroutines.flow.firstOrNull
 import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.flow.update
@@ -50,12 +52,16 @@ enum class FrequencyMode {
 class AddEditHabitViewModel @Inject constructor(
     savedStateHandle: SavedStateHandle,
     private val habitRepository: HabitRepository,
+    private val householdRepository: HouseholdRepository,
     private val userPreferences: UserPreferences,
     private val authRepository: AuthRepository,
     @ApplicationContext private val context: Context,
 ) : ViewModel() {
 
     private val habitId: Long = savedStateHandle.get<Long>("habitId") ?: -1L
+
+    /** Cached existing habit for preserving non-editable fields on save. */
+    private var existingHabit: Habit? = null
 
     private val _formState = MutableStateFlow(HabitFormState())
     val formState = _formState.asStateFlow()
@@ -72,21 +78,21 @@ class AddEditHabitViewModel @Inject constructor(
     init {
         if (habitId > 0) {
             viewModelScope.launch {
-                habitRepository.getHabitById(habitId).collect { habit ->
-                    if (habit != null) {
-                        _formState.value = HabitFormState(
-                            title = habit.title,
-                            description = habit.description ?: "",
-                            iconName = habit.iconName,
-                            customDays = habit.customDays,
-                            difficulty = habit.difficulty,
-                            baseXp = habit.baseXp,
-                            reminderEnabled = habit.reminderEnabled,
-                            reminderTime = habit.reminderTime ?: LocalTime.of(9, 0),
-                            isEditing = true,
-                            isHouseholdHabit = habit.isHouseholdHabit,
-                        )
-                    }
+                val habit = habitRepository.getHabitById(habitId).firstOrNull()
+                if (habit != null) {
+                    existingHabit = habit
+                    _formState.value = HabitFormState(
+                        title = habit.title,
+                        description = habit.description ?: "",
+                        iconName = habit.iconName,
+                        customDays = habit.customDays,
+                        difficulty = habit.difficulty,
+                        baseXp = habit.baseXp,
+                        reminderEnabled = habit.reminderEnabled,
+                        reminderTime = habit.reminderTime ?: LocalTime.of(9, 0),
+                        isEditing = true,
+                        isHouseholdHabit = habit.isHouseholdHabit,
+                    )
                 }
             }
         }
@@ -134,11 +140,6 @@ class AddEditHabitViewModel @Inject constructor(
             val newXp = xpForDifficulty(newDifficulty)
             state.copy(difficulty = newDifficulty, baseXp = newXp)
         }
-    }
-
-    fun updateBaseXp(xp: Int) {
-        // Deprecated: XP is now auto-calculated from difficulty
-        // Kept for backward compatibility but will be overridden by updateTargetCount
     }
 
     private fun xpForDifficulty(difficulty: Int): Int {
@@ -211,6 +212,14 @@ class AddEditHabitViewModel @Inject constructor(
         }
 
         viewModelScope.launch {
+            // Resolve householdId: keep existing value, or look up from current household
+            val resolvedHouseholdId = if (state.isHouseholdHabit) {
+                existingHabit?.householdId
+                    ?: (householdRepository.currentHousehold as StateFlow).value?.id
+            } else {
+                null
+            }
+
             val habit = Habit(
                 id = if (habitId > 0) habitId else 0,
                 title = state.title.trim(),
@@ -222,6 +231,11 @@ class AddEditHabitViewModel @Inject constructor(
                 reminderEnabled = state.reminderEnabled,
                 reminderTime = if (state.reminderEnabled) state.reminderTime else null,
                 isHouseholdHabit = state.isHouseholdHabit,
+                remoteId = existingHabit?.remoteId,
+                ownerUid = existingHabit?.ownerUid,
+                householdId = resolvedHouseholdId,
+                createdAt = existingHabit?.createdAt ?: System.currentTimeMillis(),
+                isArchived = existingHabit?.isArchived ?: false,
             )
             val savedHabitId = habitRepository.upsertHabit(habit)
 

@@ -4,7 +4,6 @@ import androidx.compose.animation.Crossfade
 import androidx.compose.animation.animateColorAsState
 import androidx.compose.animation.core.tween
 import androidx.compose.foundation.background
-import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -51,9 +50,10 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.rotate
-import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.hapticfeedback.HapticFeedbackType
+import androidx.compose.ui.platform.LocalHapticFeedback
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.hilt.navigation.compose.hiltViewModel
@@ -64,16 +64,10 @@ import com.airbnb.lottie.compose.rememberLottieAnimatable
 import com.airbnb.lottie.compose.rememberLottieComposition
 import com.example.choreboo_habittrackerfriend.domain.model.ChorebooMood
 import com.example.choreboo_habittrackerfriend.domain.model.PetType
-import com.example.choreboo_habittrackerfriend.ui.theme.GradientUtils
-import com.example.choreboo_habittrackerfriend.ui.theme.PetMoodContentEnd
 import com.example.choreboo_habittrackerfriend.ui.theme.PetMoodContentStart
-import com.example.choreboo_habittrackerfriend.ui.theme.PetMoodHappyEnd
 import com.example.choreboo_habittrackerfriend.ui.theme.PetMoodHappyStart
-import com.example.choreboo_habittrackerfriend.ui.theme.PetMoodHungryEnd
 import com.example.choreboo_habittrackerfriend.ui.theme.PetMoodHungryStart
-import com.example.choreboo_habittrackerfriend.ui.theme.PetMoodSadEnd
 import com.example.choreboo_habittrackerfriend.ui.theme.PetMoodSadStart
-import com.example.choreboo_habittrackerfriend.ui.theme.PetMoodTiredEnd
 import com.example.choreboo_habittrackerfriend.ui.theme.PetMoodTiredStart
 import com.example.choreboo_habittrackerfriend.ui.theme.XpPurple
 
@@ -125,18 +119,6 @@ fun PetScreen(
         }
     }
 
-    // Mood-based radial gradient bg
-    val moodBgColors by animateColorAsState(
-        targetValue = when (mood) {
-            ChorebooMood.HAPPY -> PetMoodHappyEnd
-            ChorebooMood.CONTENT -> PetMoodContentEnd
-            ChorebooMood.HUNGRY -> PetMoodHungryEnd
-            ChorebooMood.TIRED -> PetMoodTiredEnd
-            ChorebooMood.SAD -> PetMoodSadEnd
-            ChorebooMood.IDLE -> MaterialTheme.colorScheme.surfaceContainerHigh
-        },
-        label = "petBgColor",
-    )
     val moodBgStart by animateColorAsState(
         targetValue = when (mood) {
             ChorebooMood.HAPPY -> PetMoodHappyStart
@@ -172,7 +154,7 @@ fun PetScreen(
                         Icon(
                             Icons.Default.Stars,
                             contentDescription = "Points",
-                            tint = MaterialTheme.colorScheme.secondary,
+                            tint = MaterialTheme.colorScheme.secondaryContainer,
                             modifier = Modifier.size(18.dp),
                         )
                         Spacer(modifier = Modifier.width(4.dp))
@@ -217,17 +199,7 @@ fun PetScreen(
                             .fillMaxWidth()
                             .height(220.dp)
                             .clip(RoundedCornerShape(16.dp))
-                            .background(
-                                Brush.radialGradient(
-                                    colors = listOf(moodBgStart, moodBgColors),
-                                    radius = 600f,
-                                ),
-                            )
-                            .border(
-                                width = 1.dp,
-                                color = MaterialTheme.colorScheme.outlineVariant,
-                                shape = RoundedCornerShape(16.dp),
-                            ),
+                            .background(moodBgStart),
                         contentAlignment = Alignment.Center,
                     ) {
                         // Lottie animation — only fox has real animations for now
@@ -331,10 +303,6 @@ fun PetScreen(
                     shape = RoundedCornerShape(16.dp),
                     colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceContainerLowest.copy(alpha = 0.8f)),
                     elevation = CardDefaults.cardElevation(defaultElevation = 0.dp),
-                    border = androidx.compose.foundation.BorderStroke(
-                        width = 1.dp,
-                        color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.4f),
-                    ),
                 ) {
                     Column(modifier = Modifier.padding(16.dp)) {
                         Row(
@@ -473,7 +441,7 @@ fun PetScreen(
                         emoji = "🎮",
                         onClick = { isInteracting = true },
                         enabled = !isSleeping,
-                        isPrimary = false,
+                        isPrimary = true,
                     )
                     ActionButton(
                         modifier = Modifier.weight(1f),
@@ -481,7 +449,7 @@ fun PetScreen(
                         emoji = "😴",
                         onClick = { showSleepDialog = true },
                         enabled = !isSleeping,
-                        isPrimary = false,
+                        isPrimary = true,
                     )
                 }
 
@@ -516,28 +484,22 @@ private fun ActionButton(
     isPrimary: Boolean,
     modifier: Modifier = Modifier,
 ) {
+    val haptic = LocalHapticFeedback.current
     Box(
         modifier = modifier
             .height(64.dp)
             .clip(RoundedCornerShape(50.dp))
             .background(
                 when {
-                    !enabled -> Brush.linearGradient(
-                        colors = listOf(
-                            MaterialTheme.colorScheme.surfaceContainerHighest,
-                            MaterialTheme.colorScheme.surfaceContainerHighest,
-                        ),
-                    )
-                    isPrimary -> GradientUtils.primaryGradient()
-                    else -> Brush.linearGradient(
-                        colors = listOf(
-                            MaterialTheme.colorScheme.surfaceContainerHigh,
-                            MaterialTheme.colorScheme.surfaceContainerHigh,
-                        ),
-                    )
+                    !enabled -> MaterialTheme.colorScheme.surfaceContainerHighest
+                    isPrimary -> MaterialTheme.colorScheme.primary
+                    else -> MaterialTheme.colorScheme.surfaceContainerHigh
                 },
             )
-            .clickable(enabled = enabled) { onClick() },
+            .clickable(enabled = enabled) {
+                haptic.performHapticFeedback(HapticFeedbackType.LongPress)
+                onClick()
+            },
         contentAlignment = Alignment.Center,
     ) {
         Column(
@@ -709,14 +671,7 @@ private fun EnergyBentoCard(
                             .fillMaxWidth((value / 100f).coerceIn(0f, 1f))
                             .height(8.dp)
                             .clip(RoundedCornerShape(4.dp))
-                            .background(
-                                Brush.horizontalGradient(
-                                    colors = listOf(
-                                        MaterialTheme.colorScheme.tertiary,
-                                        MaterialTheme.colorScheme.tertiaryContainer,
-                                    ),
-                                ),
-                            ),
+                            .background(MaterialTheme.colorScheme.tertiary),
                     )
                 }
             }

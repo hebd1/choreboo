@@ -4,23 +4,27 @@ import android.app.PendingIntent
 import android.content.BroadcastReceiver
 import android.content.Context
 import android.content.Intent
+import android.util.Log
 import androidx.core.app.NotificationCompat
 import androidx.core.app.NotificationManagerCompat
-import androidx.datastore.preferences.core.edit
 import com.example.choreboo_habittrackerfriend.ChorebooApplication
 import com.example.choreboo_habittrackerfriend.data.datastore.UserPreferences
-import com.example.choreboo_habittrackerfriend.data.datastore.dataStore
-import com.example.choreboo_habittrackerfriend.data.local.ChorebooDatabase
-import com.example.choreboo_habittrackerfriend.data.local.entity.HabitLogEntity
-import com.example.choreboo_habittrackerfriend.domain.model.ChorebooStage
+import com.example.choreboo_habittrackerfriend.data.repository.ChorebooRepository
+import com.example.choreboo_habittrackerfriend.data.repository.HabitRepository
+import dagger.hilt.android.AndroidEntryPoint
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
-import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.launch
-import java.time.LocalDate
-import java.time.format.DateTimeFormatter
+import javax.inject.Inject
 
+private const val TAG = "HabitCompleteReceiver"
+
+@AndroidEntryPoint
 class HabitCompleteReceiver : BroadcastReceiver() {
+
+    @Inject lateinit var habitRepository: HabitRepository
+    @Inject lateinit var chorebooRepository: ChorebooRepository
+    @Inject lateinit var userPreferences: UserPreferences
 
     override fun onReceive(context: Context?, intent: Intent?) {
         if (context == null || intent == null) return
@@ -32,20 +36,14 @@ class HabitCompleteReceiver : BroadcastReceiver() {
         if (habitId <= 0) return
 
         val pendingResult = goAsync()
+        val notificationId = (2000 + habitId).toInt()
 
         CoroutineScope(Dispatchers.Default).launch {
             try {
-                val database = ChorebooDatabase.getInstance(context)
-                val habitDao = database.habitDao()
-                val habitLogDao = database.habitLogDao()
-                val chorebooDao = database.chorebooDao()
-                val notificationId = (2000 + habitId).toInt()
+                // Delegate to repositories — same flow as HabitListViewModel.completeHabit()
+                val result = habitRepository.completeHabit(habitId)
 
-                val today = LocalDate.now().format(DateTimeFormatter.ISO_LOCAL_DATE)
-
-                // Guard: already completed today
-                val todayCount = habitLogDao.getCompletionCountForDate(habitId, today)
-                if (todayCount >= 1) {
+                if (result.alreadyComplete) {
                     replaceWithConfirmation(
                         context = context,
                         notificationId = notificationId,
@@ -55,118 +53,40 @@ class HabitCompleteReceiver : BroadcastReceiver() {
                     return@launch
                 }
 
-                // Fetch habit for baseXp
-                val habitEntity = habitDao.getHabitByIdSync(habitId) ?: return@launch
+                // Add XP to pet (handles level-up, stage evolution, cloud sync)
+                val xpResult = chorebooRepository.addXp(result.xpEarned)
 
-                // Calculate streak (same logic as HabitRepository.calculateStreak)
-                val dates = habitLogDao.getCompletionDatesForHabit(habitId)
-                var streak = 0
-                if (dates.isNotEmpty()) {
-                    var checkDate = LocalDate.parse(today, DateTimeFormatter.ISO_LOCAL_DATE).minusDays(1)
-                    for (dateStr in dates) {
-                        val logDate = LocalDate.parse(dateStr, DateTimeFormatter.ISO_LOCAL_DATE)
-                        if (logDate == checkDate) {
-                            streak++
-                            checkDate = checkDate.minusDays(1)
-                        } else if (logDate.isBefore(checkDate)) {
-                            break
-                        }
-                    }
-                    if (dates.contains(today)) streak++
-                }
+                // Auto-feed if hungry (handles point deduction, cloud sync)
+                chorebooRepository.autoFeedIfNeeded(userPreferences)
 
-                val baseXp = habitEntity.baseXp
-                val xpEarned = (baseXp + (streak * 2)).coerceAtMost(baseXp * 3)
-                val newStreak = streak + 1
-
-                // Insert habit log
-                habitLogDao.insertLog(
-                    HabitLogEntity(
-                        habitId = habitId,
-                        date = today,
-                        xpEarned = xpEarned,
-                        streakAtCompletion = newStreak,
-                    )
-                )
-
-                // Add points to DataStore
-                context.dataStore.edit { prefs ->
-                    val current = prefs[UserPreferences.TOTAL_POINTS] ?: 0
-                    prefs[UserPreferences.TOTAL_POINTS] = current + xpEarned
-                }
-
-                // Add XP to pet (mirrors ChorebooRepository.addXp)
-                val choreboo = chorebooDao.getChorebooSync()
-                if (choreboo != null) {
-                    val oldStage = try {
-                        ChorebooStage.valueOf(choreboo.stage)
-                    } catch (_: Exception) {
-                        ChorebooStage.EGG
-                    }
-                    var newXp = choreboo.xp + xpEarned
-                    var newLevel = choreboo.level
-                    var xpNeeded = newLevel * 50
-                    while (newXp >= xpNeeded) {
-                        newXp -= xpNeeded
-                        newLevel++
-                        xpNeeded = newLevel * 50
-                    }
-                    val totalXpEarned = (1 until newLevel).sumOf { it * 50 } + newXp
-                    val newStage = ChorebooStage.fromTotalXp(totalXpEarned)
-                    chorebooDao.updateChoreboo(
-                        choreboo.copy(
-                            xp = newXp,
-                            level = newLevel,
-                            stage = newStage.name,
-                            lastInteractionAt = System.currentTimeMillis(),
-                        )
-                    )
-
-                    // Auto-feed: if hunger < 30 and user has enough points, silently feed
-                    // (mirrors ChorebooRepository.autoFeedIfNeeded)
-                    val updatedChoreboo = chorebooDao.getChorebooSync()
-                    if (updatedChoreboo != null && updatedChoreboo.hunger < 30) {
-                        val points = context.dataStore.data.first()[UserPreferences.TOTAL_POINTS] ?: 0
-                        if (points >= 10) {
-                            var deducted = false
-                            context.dataStore.edit { prefs ->
-                                val current = prefs[UserPreferences.TOTAL_POINTS] ?: 0
-                                if (current >= 10) {
-                                    prefs[UserPreferences.TOTAL_POINTS] = current - 10
-                                    deducted = true
-                                }
-                            }
-                            if (deducted) {
-                                chorebooDao.updateChoreboo(
-                                    updatedChoreboo.copy(
-                                        hunger = (updatedChoreboo.hunger + 20).coerceAtMost(100),
-                                    )
-                                )
-                            }
-                        }
-                    }
-
-                    // Build confirmation message; include level-up hint if applicable
-                    val streakText = if (newStreak > 1) " | $newStreak day streak!" else ""
-                    val evolvedHint = if (newStage != oldStage) " ✦ ${newStage.displayName}!" else ""
-                    val message = "+$xpEarned XP$streakText$evolvedHint"
-
-                    replaceWithConfirmation(
-                        context = context,
-                        notificationId = notificationId,
-                        habitTitle = habitTitle,
-                        message = message,
-                    )
+                // Build confirmation message
+                val streakText = if (result.newStreak > 1) " | ${result.newStreak} day streak!" else ""
+                val evolvedHint = if (xpResult.evolved && xpResult.newStage != null) {
+                    " ✦ ${xpResult.newStage.displayName}!"
                 } else {
-                    // No pet yet, still confirm completion
-                    val streakText = if (newStreak > 1) " | $newStreak day streak!" else ""
-                    replaceWithConfirmation(
-                        context = context,
-                        notificationId = notificationId,
-                        habitTitle = habitTitle,
-                        message = "+$xpEarned XP$streakText",
-                    )
+                    ""
                 }
+                val levelUpHint = if (xpResult.levelsGained > 0 && !xpResult.evolved) {
+                    " ↑ Level ${xpResult.newLevel}!"
+                } else {
+                    ""
+                }
+                val message = "+${result.xpEarned} XP$streakText$levelUpHint$evolvedHint"
+
+                replaceWithConfirmation(
+                    context = context,
+                    notificationId = notificationId,
+                    habitTitle = habitTitle,
+                    message = message,
+                )
+            } catch (e: Exception) {
+                Log.e(TAG, "Failed to complete habit from notification", e)
+                replaceWithConfirmation(
+                    context = context,
+                    notificationId = notificationId,
+                    habitTitle = habitTitle,
+                    message = "Failed to complete. Try in the app.",
+                )
             } finally {
                 pendingResult.finish()
             }

@@ -4,7 +4,7 @@ import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.PickVisualMediaRequest
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.background
-import androidx.compose.foundation.border
+
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -475,7 +475,7 @@ fun SettingsScreen(
                         modifier = Modifier
                             .padding(end = 16.dp)
                             .clip(RoundedCornerShape(50.dp))
-                            .background(MaterialTheme.colorScheme.surfaceContainerLow)
+                            .background(MaterialTheme.colorScheme.surfaceContainerLowest)
                             .padding(horizontal = 10.dp, vertical = 6.dp),
                     ) {
                         Icon(
@@ -516,13 +516,7 @@ fun SettingsScreen(
             Card(
                 shape = RoundedCornerShape(16.dp),
                 colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceContainerLowest),
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .border(
-                        width = 1.dp,
-                        color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.15f),
-                        shape = RoundedCornerShape(16.dp),
-                    ),
+                modifier = Modifier.fillMaxWidth(),
             ) {
                 Column(modifier = Modifier.padding(20.dp)) {
                     Text(
@@ -576,13 +570,7 @@ fun SettingsScreen(
             Card(
                 shape = RoundedCornerShape(16.dp),
                 colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceContainerLowest),
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .border(
-                        width = 1.dp,
-                        color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.15f),
-                        shape = RoundedCornerShape(16.dp),
-                    ),
+                modifier = Modifier.fillMaxWidth(),
             ) {
                 Column(modifier = Modifier.padding(20.dp)) {
                     if (currentHousehold != null) {
@@ -748,13 +736,7 @@ fun SettingsScreen(
             Card(
                 shape = RoundedCornerShape(16.dp),
                 colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceContainerLowest),
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .border(
-                        width = 1.dp,
-                        color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.15f),
-                        shape = RoundedCornerShape(16.dp),
-                    ),
+                modifier = Modifier.fillMaxWidth(),
             ) {
                 Row(
                     modifier = Modifier
@@ -782,13 +764,7 @@ fun SettingsScreen(
             Card(
                 shape = RoundedCornerShape(16.dp),
                 colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceContainerLowest),
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .border(
-                        width = 1.dp,
-                        color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.15f),
-                        shape = RoundedCornerShape(16.dp),
-                    ),
+                modifier = Modifier.fillMaxWidth(),
             ) {
                 Column(modifier = Modifier.padding(20.dp)) {
                     // Profile photo section

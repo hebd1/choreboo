@@ -45,7 +45,6 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
-import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalUriHandler
 import androidx.compose.ui.text.font.FontWeight
@@ -74,31 +73,11 @@ fun OnboardingScreen(
         showContent = true
     }
 
-    // Mesh gradient background
     Box(
         modifier = Modifier
             .fillMaxSize()
-            .background(
-                Brush.radialGradient(
-                    colors = listOf(MaterialTheme.colorScheme.primaryContainer, MaterialTheme.colorScheme.surface),
-                    radius = 1200f,
-                )
-            ),
+            .background(MaterialTheme.colorScheme.surface),
     ) {
-        // Decorative blobs
-        Box(
-            modifier = Modifier
-                .size(240.dp)
-                .align(Alignment.TopStart)
-                .background(Brush.radialGradient(listOf(MaterialTheme.colorScheme.primary.copy(alpha = 0.06f), Color.Transparent))),
-        )
-        Box(
-            modifier = Modifier
-                .size(240.dp)
-                .align(Alignment.BottomEnd)
-                .background(Brush.radialGradient(listOf(MaterialTheme.colorScheme.secondary.copy(alpha = 0.05f), Color.Transparent))),
-        )
-
         Column(
             modifier = Modifier
                 .fillMaxSize()
@@ -116,10 +95,7 @@ fun OnboardingScreen(
                 Column(horizontalAlignment = Alignment.CenterHorizontally) {
                     Box(
                         modifier = Modifier
-                            .size(120.dp)
-                            .background(
-                                Brush.radialGradient(listOf(MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.25f), Color.Transparent))
-                            ),
+                            .size(120.dp),
                         contentAlignment = Alignment.Center,
                     ) {
                         Text(
@@ -248,7 +224,7 @@ private fun PetSelectionStep(
                 .fillMaxWidth()
                 .height(60.dp)
                 .clip(RoundedCornerShape(16.dp))
-                .background(Brush.linearGradient(colors = listOf(MaterialTheme.colorScheme.primary, MaterialTheme.colorScheme.primaryContainer)))
+                .background(MaterialTheme.colorScheme.primary)
                 .clickable { onNext() },
             contentAlignment = Alignment.Center,
         ) {
@@ -274,7 +250,7 @@ private fun PetSelectionCard(
             .clip(RoundedCornerShape(20.dp))
             .background(
                 if (isSelected) MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.25f)
-                else MaterialTheme.colorScheme.surface.copy(alpha = 0.65f)
+                else MaterialTheme.colorScheme.surfaceContainerLowest
             )
             .border(
                 width = if (isSelected) 2.dp else 1.dp,
@@ -333,7 +309,7 @@ private fun NameStep(
             modifier = Modifier
                 .fillMaxWidth()
                 .clip(RoundedCornerShape(24.dp))
-                .background(MaterialTheme.colorScheme.surface.copy(alpha = 0.65f))
+                .background(MaterialTheme.colorScheme.surfaceContainerLowest)
                 .padding(24.dp),
         ) {
             Column {
@@ -382,7 +358,7 @@ private fun NameStep(
                         .fillMaxWidth()
                         .height(60.dp)
                         .clip(RoundedCornerShape(16.dp))
-                        .background(Brush.linearGradient(colors = listOf(MaterialTheme.colorScheme.primary, MaterialTheme.colorScheme.primaryContainer)))
+                        .background(MaterialTheme.colorScheme.primary)
                         .clickable { onComplete() },
                     contentAlignment = Alignment.Center,
                 ) {
@@ -446,7 +422,7 @@ private fun NameStep(
                 modifier = Modifier
                     .weight(1f)
                     .clip(RoundedCornerShape(16.dp))
-                    .background(MaterialTheme.colorScheme.surfaceContainerLow)
+                    .background(MaterialTheme.colorScheme.surfaceContainerLowest)
                     .padding(16.dp),
             ) {
                 Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
@@ -473,7 +449,7 @@ private fun NameStep(
                 modifier = Modifier
                     .weight(1f)
                     .clip(RoundedCornerShape(16.dp))
-                    .background(MaterialTheme.colorScheme.surfaceContainerLow)
+                    .background(MaterialTheme.colorScheme.surfaceContainerLowest)
                     .padding(16.dp),
             ) {
                 Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {

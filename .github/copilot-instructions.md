@@ -26,7 +26,7 @@ A Tamagotchi-style habit tracker Android app where users complete daily habits t
 - **Preferences:** DataStore
 - **Animations:** Lottie Compose (placeholder emoji for now, swappable to Lottie later)
 - **Images:** Coil
-- **Background Work:** WorkManager (ReminderWorker for daily notifications)
+- **Background Work:** AlarmManager (per-habit reminders) + WorkManager (reschedule on reboot)
 - **Widget:** Glance (not yet implemented)
 - **Navigation:** Navigation Compose with bottom tabs
 - **Serialization:** Gson (for Room TypeConverters)
@@ -43,12 +43,13 @@ A Tamagotchi-style habit tracker Android app where users complete daily habits t
   ├── navigation/                      # ChorebooNavGraph.kt, Screen sealed class (8 routes)
   ├── data/
   │   ├── local/
-  │   │   ├── ChorebooDatabase.kt      # Room DB v7, 3 entities, fallbackToDestructiveMigration
-  │   │   ├── Converters.kt            # Gson TypeConverter for List<String>
+  │   │   ├── ChorebooDatabase.kt      # Room DB v9, 3 entities, fallbackToDestructiveMigration
+  │   │   ├── converter/
+  │   │   │   └── Converters.kt        # Gson TypeConverter for List<String>
   │   │   ├── entity/                  # HabitEntity, HabitLogEntity, ChorebooEntity
   │   │   └── dao/                     # HabitDao, HabitLogDao, ChorebooDao
-  │   ├── datastore/                   # UserPreferences (theme, reminders, onboarding, sound)
-  │   └── repository/                  # HabitRepository, ChorebooRepository, AuthRepository, HouseholdRepository, UserRepository
+  │   ├── datastore/                   # UserPreferences (theme, onboarding, sound, totalPoints, totalLifetimeXp, profilePhotoUri, householdNotifications)
+  │   └── repository/                  # HabitRepository, ChorebooRepository, AuthRepository, HouseholdRepository, UserRepository, BadgeRepository
   ├── di/                              # AppModule (DB, DAOs, DataStore, UserPreferences, FirebaseAuth)
   ├── domain/model/                    # Habit, ChorebooStats, ChorebooMood, ChorebooStage, PetType, Household, AppUser, Badge
   ├── ui/
@@ -59,18 +60,25 @@ A Tamagotchi-style habit tracker Android app where users complete daily habits t
   │   ├── pet/                         # PetScreen (feed bottom sheet), PetViewModel, components/StatBar
   │   ├── household/                   # HouseholdScreen, HouseholdViewModel, components/HouseholdPetCard
   │   ├── calendar/                    # CalendarScreen (single LazyColumn, heatmap legend), CalendarViewModel
-  │   ├── onboarding/                  # OnboardingScreen (name your Choreboo, hatch egg)
+  │   ├── onboarding/                  # OnboardingScreen (name your Choreboo, hatch egg), OnboardingViewModel
   │   └── settings/                    # SettingsScreen (theme, sound, reminders with permission request), SettingsViewModel
-  └── worker/                          # ReminderWorker (daily notifications with random messages)
+  └── worker/                          # AlarmManager-based reminders (see below)
+      ├── HabitReminderScheduler.kt    # Schedules per-habit alarms via AlarmManager
+      ├── HabitReminderReceiver.kt     # BroadcastReceiver that shows reminder notification
+      ├── HabitCompleteReceiver.kt     # BroadcastReceiver for "Complete" action on notification
+      ├── ReminderRescheduleWorker.kt  # WorkManager job that reschedules alarms after reboot/update
+      └── BootReceiver.kt             # BOOT_COMPLETED receiver that triggers ReminderRescheduleWorker
   ```
 
-## Room Database Schema (v7, 3 entities)
-- **habits** – id, title, description, iconName, customDays, difficulty, baseXp, reminderEnabled, reminderTime, createdAt, isArchived, isHouseholdHabit, ownerUid, householdId, remoteId
-- **habit_logs** – id, habitId (FK→habits CASCADE), completedAt, date (ISO string), xpEarned, streakAtCompletion, completedByUid, remoteId
-- **choreboos** – id, name, stage, level, xp, hunger, happiness, energy, petType, lastInteractionAt, createdAt, sleepUntil, ownerUid, remoteId
+## Room Database Schema (v9, 3 entities)
+- **habits** – id, title, description, iconName, customDays, difficulty, baseXp, reminderEnabled, reminderTime, createdAt, isArchived, isHouseholdHabit, ownerUid, householdId, remoteId (`remoteId` indexed)
+- **habit_logs** – id, habitId (FK→habits CASCADE), completedAt, date (ISO string), xpEarned, streakAtCompletion, completedByUid, remoteId (`remoteId` indexed, UNIQUE(`habitId`, `date`))
+- **choreboos** – id, name, stage, level, xp, hunger, happiness, energy, petType, lastInteractionAt, createdAt, sleepUntil, ownerUid, remoteId (`remoteId` indexed)
 
-- `remoteId` maps to Data Connect UUIDs for cloud sync.
+- `remoteId` maps to Data Connect UUIDs for cloud sync. Indexed on all 3 entities.
 - `ownerUid` / `completedByUid` / `householdId` map to Firebase Auth UIDs and household references.
+- `habit_logs` has a UNIQUE(`habitId`, `date`) index for atomic duplicate prevention on habit completion.
+- `insertLog` uses `OnConflictStrategy.IGNORE` — returns -1L when duplicate is ignored.
 - Uses `fallbackToDestructiveMigration()` during development.
 
 ## Cloud Backend (Firebase Data Connect)
@@ -79,7 +87,7 @@ A Tamagotchi-style habit tracker Android app where users complete daily habits t
 
 - **Write-through**: All Room mutations also fire the corresponding Data Connect mutation. Failures are silent.
 - **Cloud-to-local sync**: Triggered after auth only. Order: habits → choreboo → habit logs (last 30 days). Cloud wins on conflict.
-- **Security**: 14 queries + 15 mutations, all with `@auth(level: USER)` and auth-scoped filters.
+- **Security**: 14 queries + 15 mutations, all with `@auth(level: USER)` and auth-scoped filters. 4 household queries (`GetMyHousehold`, `GetMyHouseholdMembers`, `GetMyHouseholdChoreboos`, `GetMyHouseholdHabits`) are **inherently auth-scoped** — they traverse from `auth.uid` to the user's household, so no `householdId` parameter is needed.
 - **SDK regen**: `npx firebase-tools@latest dataconnect:sdk:generate`
 
 ## Navigation
@@ -111,14 +119,13 @@ A Tamagotchi-style habit tracker Android app where users complete daily habits t
 - **Delete confirmation** — AlertDialog before deleting a habit
 - **Level-up celebration** — AlertDialog shown when XP causes level-up or stage evolution
 - **Theme wiring** — Settings theme picker (system/light/dark) propagated to Theme.kt via `themeMode` param
-- **ReminderWorker** — Daily WorkManager job with randomized notification messages, POST_NOTIFICATIONS permission handled
+- **ReminderWorker** — AlarmManager-based per-habit reminders with notification "Complete" action, POST_NOTIFICATIONS permission handled
 - **Calendar heatmap** — Single LazyColumn with color-coded days + legend + detail logs with habit names
 
 ## Color Palette
-- **Light:** Primary `#2E7D32` (forest green), Secondary `#00897B` (teal), Tertiary `#F57C00` (orange)
-- **Dark:** Primary `#81C784`, Secondary `#4DB6AC`, Tertiary `#FFB74D`
-- **Pet mood colors:** Happy=`#E8F5E9`, Hungry=`#FFF3E0`, Tired=`#E3F2FD`, Sad=`#ECEFF1`
-- **Accent:** XpPurple=`#7C4DFF`, StreakFlame=`#FF6D00`, GoldGlow=`#FFD54F`
+- **Light:** Primary `#006E1C` (deep green), Secondary `#8B5000` (warm orange), Tertiary `#6833EA` (purple)
+- **Dark:** Primary `#78DC77`, Secondary `#FFB870`, Tertiary `#CDBDFF`
+- **Accent:** StreakFlame=`#FF6D00`, GoldGlow=`#FFD54F`
 - Dynamic color is **disabled** so the custom Choreboo palette always shows
 
 ## Style Guidelines
@@ -131,7 +138,7 @@ A Tamagotchi-style habit tracker Android app where users complete daily habits t
 - Destructive actions (delete) require confirmation dialog
 
 ## Available Habit Icons
-CheckCircle, FitnessCenter, MenuBook, WaterDrop, SelfImprovement, MusicNote, LocalFireDepartment, DirectionsRun, Bedtime, Code, Restaurant, CleaningServices, School, Brush, Favorite
+Emoji-based system using `EmojiIcon` data class. 15 preset emoji (e.g., "🥗", "💧", "🏃", "📚", "🧘", "🎵", "🔥", "🏋️", "😴", "💻", "🍽️", "🧹", "📖", "🎨", "❤️") plus custom emoji input. Not Material Icons.
 
 ## Pet Animation Strategy
 - Currently using placeholder emoji per stage
@@ -156,7 +163,7 @@ CheckCircle, FitnessCenter, MenuBook, WaterDrop, SelfImprovement, MusicNote, Loc
 - When creating new screens, follow the existing pattern: ViewModel + Screen composable + components/ subfolder
 - Use `AlertDialog` for confirmations (delete, level-up); `ModalBottomSheet` for selection lists (feed)
 - For new features that need level-up detection, use the `XpResult` return from `ChorebooRepository.addXp()`
-- When adding new habit icons, update both `iconOptions` in AddEditHabitScreen and `getIconForName()` in HabitCard
+- When adding new habit icons, update `iconOptions` in AddEditHabitScreen (emoji-based `EmojiIcon` system)
 - Write-through: any Room mutation should also call the corresponding Data Connect mutation
 
 ## Not Yet Implemented (Future)

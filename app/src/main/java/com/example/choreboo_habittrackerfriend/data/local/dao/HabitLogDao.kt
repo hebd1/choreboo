@@ -7,7 +7,7 @@ import com.example.choreboo_habittrackerfriend.data.local.entity.HabitLogEntity
 import kotlinx.coroutines.flow.Flow
 @Dao
 interface HabitLogDao {
-    @Insert
+    @Insert(onConflict = OnConflictStrategy.IGNORE)
     suspend fun insertLog(log: HabitLogEntity): Long
 
     @Insert(onConflict = OnConflictStrategy.IGNORE)
@@ -63,6 +63,14 @@ interface HabitLogDao {
     /** Distinct dates with completions in a date range — used for weekly streak circles. */
     @Query("SELECT DISTINCT date FROM habit_logs WHERE date >= :startDate AND date <= :endDate")
     fun getCompletionDatesInRange(startDate: String, endDate: String): Flow<List<String>>
+
+    /** Update the remoteId on a habit log after cloud write-through. */
+    @Query("UPDATE habit_logs SET remoteId = :remoteId WHERE id = :logId")
+    suspend fun updateLogRemoteId(logId: Long, remoteId: String)
+
+    /** Delete all habit logs — used for sign-out data cleanup. */
+    @Query("DELETE FROM habit_logs")
+    suspend fun deleteAllLogs()
 }
 
 data class HabitStreak(

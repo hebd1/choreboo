@@ -94,5 +94,10 @@ class UserPreferences @Inject constructor(
     suspend fun setHouseholdNotificationsEnabled(enabled: Boolean) {
         dataStore.edit { it[HOUSEHOLD_NOTIFICATIONS] = enabled }
     }
+
+    /** Clear all preferences — used for sign-out data cleanup. */
+    suspend fun clearAllData() {
+        dataStore.edit { it.clear() }
+    }
 }
 

@@ -96,9 +96,15 @@ class AuthViewModel @Inject constructor(
         }
         viewModelScope.launch {
             _formState.update { it.copy(isLoading = true) }
-            authRepository.sendPasswordReset(email)
+            val result = authRepository.sendPasswordReset(email)
             _formState.update { it.copy(isLoading = false, showForgotPassword = false) }
-            _events.emit(AuthEvent.ShowMessage("Password reset email sent to $email"))
+            when (result) {
+                is AuthResult.ResetEmailSent ->
+                    _events.emit(AuthEvent.ShowMessage("Password reset email sent to $email"))
+                is AuthResult.Error ->
+                    _events.emit(AuthEvent.ShowError(result.message))
+                is AuthResult.Success -> { /* Should not happen for password reset */ }
+            }
         }
     }
 
@@ -143,6 +149,7 @@ class AuthViewModel @Inject constructor(
                 _events.emit(AuthEvent.AuthSuccess(result.user.uid))
             }
             is AuthResult.Error -> _events.emit(AuthEvent.ShowError(result.message))
+            is AuthResult.ResetEmailSent -> { /* Handled separately in sendPasswordReset() */ }
         }
     }
 
