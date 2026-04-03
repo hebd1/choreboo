@@ -39,6 +39,7 @@ import androidx.compose.material3.Scaffold
 import androidx.compose.material3.SnackbarDuration
 import androidx.compose.material3.SnackbarHost
 import androidx.compose.material3.SnackbarHostState
+import com.example.choreboo_habittrackerfriend.ui.components.StitchSnackbar
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.material3.TopAppBar
@@ -82,7 +83,7 @@ import com.example.choreboo_habittrackerfriend.ui.theme.PetMoodTiredEnd
 import com.example.choreboo_habittrackerfriend.ui.theme.PetMoodTiredStart
 import com.example.choreboo_habittrackerfriend.ui.theme.XpPurple
 
-private enum class AnimationPhase { MOOD, IDLE, EATING, INTERACTING }
+private enum class AnimationPhase { MOOD, IDLE, EATING, INTERACTING, START_SLEEPING, SLEEPING }
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -97,6 +98,7 @@ fun PetScreen(
     val snackbarHostState = remember { SnackbarHostState() }
     var showSleepDialog by remember { mutableStateOf(false) }
     var isInteracting by remember { mutableStateOf(false) }
+    var showStartSleepAnimation by remember { mutableStateOf(false) }
 
     LaunchedEffect(Unit) {
         viewModel.events.collect { event ->
@@ -170,7 +172,7 @@ fun PetScreen(
                         modifier = Modifier
                             .padding(end = 16.dp)
                             .clip(RoundedCornerShape(50.dp))
-                            .background(MaterialTheme.colorScheme.surfaceContainerHigh)
+                            .background(MaterialTheme.colorScheme.surfaceContainerHigh.copy(alpha = 0.85f))
                             .padding(horizontal = 12.dp, vertical = 6.dp),
                     ) {
                         Icon(
@@ -187,10 +189,10 @@ fun PetScreen(
                         )
                     }
                 },
-                colors = TopAppBarDefaults.topAppBarColors(containerColor = MaterialTheme.colorScheme.surface),
+                colors = TopAppBarDefaults.topAppBarColors(containerColor = Color.Transparent),
             )
         },
-        snackbarHost = { SnackbarHost(snackbarHostState) },
+        snackbarHost = { },
     ) { padding ->
         if (choreboo == null) {
             Box(Modifier.fillMaxSize().padding(padding), contentAlignment = Alignment.Center) {
@@ -237,8 +239,11 @@ fun PetScreen(
                         mood = mood,
                         isEating = isEating,
                         isInteracting = isInteracting,
+                        isSleeping = isSleeping,
+                        showStartSleepAnimation = showStartSleepAnimation,
                         onEatingComplete = { viewModel.onEatingAnimationComplete() },
                         onInteractComplete = { isInteracting = false },
+                        onStartSleepComplete = { showStartSleepAnimation = false },
                         onTap = { isInteracting = true },
                         modifier = Modifier.size(160.dp),
                     )
@@ -253,7 +258,7 @@ fun PetScreen(
                             .padding(horizontal = 14.dp, vertical = 6.dp),
                     ) {
                         Text(
-                            text = "${mood.emoji} ${mood.displayName.uppercase()}",
+                            text = if (isSleeping) "😴 SLEEPING" else "${mood.emoji} ${mood.displayName.uppercase()}",
                             style = MaterialTheme.typography.labelMedium,
                             fontWeight = FontWeight.Bold,
                             color = MaterialTheme.colorScheme.onSurface,
@@ -300,7 +305,7 @@ fun PetScreen(
                         label = "Feed",
                         emoji = "🍖",
                         onClick = { viewModel.feedChoreboo() },
-                        enabled = totalPoints >= 10,
+                        enabled = totalPoints >= 10 && !isSleeping,
                     )
                 }
                 item {
@@ -308,7 +313,7 @@ fun PetScreen(
                         label = "Play",
                         emoji = "🎮",
                         onClick = { isInteracting = true },
-                        enabled = true,
+                        enabled = !isSleeping,
                     )
                 }
                 item {
@@ -336,6 +341,7 @@ fun PetScreen(
                     confirmButton = {
                         Button(
                             onClick = {
+                                showStartSleepAnimation = true
                                 viewModel.sleepChoreboo()
                                 showSleepDialog = false
                             },
@@ -361,8 +367,12 @@ fun PetScreen(
                     .fillMaxWidth()
                     .padding(horizontal = 16.dp),
                 shape = RoundedCornerShape(16.dp),
-                colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceContainerLowest),
-                elevation = CardDefaults.cardElevation(defaultElevation = 2.dp),
+                colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceContainerLowest.copy(alpha = 0.8f)),
+                elevation = CardDefaults.cardElevation(defaultElevation = 0.dp),
+                border = androidx.compose.foundation.BorderStroke(
+                    width = 1.dp,
+                    color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.4f),
+                ),
             ) {
                 Column(modifier = Modifier.padding(16.dp)) {
                     Row(
@@ -432,7 +442,11 @@ fun PetScreen(
                     .fillMaxWidth()
                     .padding(horizontal = 16.dp),
                 shape = RoundedCornerShape(16.dp),
-                colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceContainerLow),
+                colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceContainerLow.copy(alpha = 0.8f)),
+                border = androidx.compose.foundation.BorderStroke(
+                    width = 1.dp,
+                    color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.4f),
+                ),
             ) {
                 Column(
                     modifier = Modifier.padding(16.dp),
@@ -454,7 +468,7 @@ fun PetScreen(
                     .height(48.dp)
                     .clip(CircleShape)
                     .background(
-                        if (totalPoints >= 10) {
+                        if (totalPoints >= 10 && !isSleeping) {
                             Brush.linearGradient(
                                 colors = listOf(
                                     MaterialTheme.colorScheme.primary,
@@ -474,7 +488,7 @@ fun PetScreen(
             ) {
                 Button(
                     onClick = { viewModel.feedChoreboo() },
-                    enabled = totalPoints >= 10,
+                    enabled = totalPoints >= 10 && !isSleeping,
                     modifier = Modifier.fillMaxSize(),
                     shape = CircleShape,
                     colors = ButtonDefaults.buttonColors(
@@ -487,18 +501,30 @@ fun PetScreen(
                         Icons.Default.Restaurant,
                         contentDescription = null,
                         modifier = Modifier.size(20.dp),
-                        tint = if (totalPoints >= 10) MaterialTheme.colorScheme.onPrimary else MaterialTheme.colorScheme.onSurfaceVariant,
+                        tint = if (totalPoints >= 10 && !isSleeping) MaterialTheme.colorScheme.onPrimary else MaterialTheme.colorScheme.onSurfaceVariant,
                     )
                     Spacer(modifier = Modifier.width(8.dp))
                     Text(
-                        text = if (totalPoints >= 10) "Feed (10 pts)" else "Feed (need 10 pts)",
+                        text = if (totalPoints >= 10 && !isSleeping) "Feed (10 pts)" else "Feed (need 10 pts)",
                         fontWeight = FontWeight.Bold,
-                        color = if (totalPoints >= 10) MaterialTheme.colorScheme.onPrimary else MaterialTheme.colorScheme.onSurfaceVariant,
+                        color = if (totalPoints >= 10 && !isSleeping) MaterialTheme.colorScheme.onPrimary else MaterialTheme.colorScheme.onSurfaceVariant,
                     )
                 }
             }
 
-            Spacer(modifier = Modifier.height(24.dp))
+            Spacer(modifier = Modifier.height(80.dp))
+        }
+
+        // Snackbar pinned to the top of the view area
+        Box(
+            modifier = Modifier
+                .fillMaxSize()
+                .padding(top = padding.calculateTopPadding()),
+            contentAlignment = Alignment.TopCenter,
+        ) {
+            SnackbarHost(snackbarHostState) { data ->
+                StitchSnackbar(data)
+            }
         }
     }
 }
@@ -569,8 +595,11 @@ private fun PetAnimation(
     mood: ChorebooMood,
     isEating: Boolean,
     isInteracting: Boolean,
+    isSleeping: Boolean,
+    showStartSleepAnimation: Boolean,
     onEatingComplete: () -> Unit,
     onInteractComplete: () -> Unit,
+    onStartSleepComplete: () -> Unit,
     onTap: () -> Unit,
     modifier: Modifier = Modifier,
 ) {
@@ -597,20 +626,38 @@ private fun PetAnimation(
         val interactComposition by rememberLottieComposition(
             LottieCompositionSpec.Asset("animations/fox/fox_interact_lottie.json"),
         )
+        val startSleepComposition by rememberLottieComposition(
+            LottieCompositionSpec.Asset("animations/fox/fox_start_sleep_lottie.json"),
+        )
+        val sleepingComposition by rememberLottieComposition(
+            LottieCompositionSpec.Asset("animations/fox/fox_loop_sleeping_lottie.json"),
+        )
 
         // Lottie animatable for manual control over animation playback
         val lottieAnimatable = rememberLottieAnimatable()
 
-        // Handle external triggers: isEating or isInteracting
+        // Handle external triggers: isEating or isInteracting (suppressed while sleeping)
         LaunchedEffect(isEating) {
-            if (isEating) {
+            if (isEating && !isSleeping) {
                 phase = AnimationPhase.EATING
             }
         }
 
         LaunchedEffect(isInteracting) {
-            if (isInteracting && !isEating) {
+            if (isInteracting && !isEating && !isSleeping) {
                 phase = AnimationPhase.INTERACTING
+            }
+        }
+
+        // Drive sleep phase transitions.
+        // On initial composition when already sleeping, showStartSleepAnimation is false
+        // (fresh remember state), so we skip straight to the looping SLEEPING phase.
+        LaunchedEffect(isSleeping) {
+            if (isSleeping) {
+                phase = if (showStartSleepAnimation) AnimationPhase.START_SLEEPING else AnimationPhase.SLEEPING
+            } else if (phase == AnimationPhase.SLEEPING || phase == AnimationPhase.START_SLEEPING) {
+                // Sleep expired — resume normal mood/idle cycle
+                phase = AnimationPhase.MOOD
             }
         }
 
@@ -629,6 +676,8 @@ private fun PetAnimation(
             AnimationPhase.IDLE -> idleComposition
             AnimationPhase.EATING -> eatingComposition
             AnimationPhase.INTERACTING -> interactComposition
+            AnimationPhase.START_SLEEPING -> startSleepComposition
+            AnimationPhase.SLEEPING -> sleepingComposition
         }
 
         // State machine: advance phase when animation completes.
@@ -644,6 +693,10 @@ private fun PetAnimation(
                         AnimationPhase.IDLE -> 3
                         AnimationPhase.EATING -> 1
                         AnimationPhase.INTERACTING -> 1
+                        AnimationPhase.START_SLEEPING -> 1
+                        // IterateForever keeps looping until the coroutine is cancelled
+                        // (which happens automatically when phase or isSleeping changes)
+                        AnimationPhase.SLEEPING -> LottieConstants.IterateForever
                     },
                 )
 
@@ -658,6 +711,14 @@ private fun PetAnimation(
                     AnimationPhase.INTERACTING -> {
                         onInteractComplete()
                         phase = AnimationPhase.MOOD
+                    }
+                    AnimationPhase.START_SLEEPING -> {
+                        onStartSleepComplete()
+                        phase = AnimationPhase.SLEEPING
+                    }
+                    AnimationPhase.SLEEPING -> {
+                        // IterateForever never completes normally; defensive guard only
+                        phase = if (isSleeping) AnimationPhase.SLEEPING else AnimationPhase.MOOD
                     }
                 }
             }
@@ -681,6 +742,8 @@ private fun PetAnimation(
                 AnimationPhase.IDLE -> idleComposition
                 AnimationPhase.EATING -> eatingComposition
                 AnimationPhase.INTERACTING -> interactComposition
+                AnimationPhase.START_SLEEPING -> startSleepComposition
+                AnimationPhase.SLEEPING -> sleepingComposition
             }
 
             LottieAnimation(

@@ -52,6 +52,7 @@ import androidx.compose.material3.Slider
 import androidx.compose.material3.SliderDefaults
 import androidx.compose.material3.SnackbarHost
 import androidx.compose.material3.SnackbarHostState
+import com.example.choreboo_habittrackerfriend.ui.components.StitchSnackbar
 import androidx.compose.material3.Switch
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
@@ -126,7 +127,7 @@ fun AddEditHabitScreen(
     }
 
     Scaffold(
-        snackbarHost = { SnackbarHost(snackbarHostState) },
+        snackbarHost = { },
     ) { padding ->
         Column(
             modifier = Modifier
@@ -476,6 +477,18 @@ fun AddEditHabitScreen(
                 }
 
                 Spacer(modifier = Modifier.height(32.dp))
+            }
+        }
+
+        // Snackbar pinned to the top of the view area
+        Box(
+            modifier = Modifier
+                .fillMaxSize()
+                .padding(top = padding.calculateTopPadding()),
+            contentAlignment = Alignment.TopCenter,
+        ) {
+            SnackbarHost(snackbarHostState) { data ->
+                StitchSnackbar(data)
             }
         }
     }

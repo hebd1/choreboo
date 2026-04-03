@@ -55,6 +55,7 @@ data class BottomNavItem(
 fun BottomNavBar(
     navController: NavController,
     petMood: ChorebooMood = ChorebooMood.IDLE,
+    modifier: Modifier = Modifier,
 ) {
     val petIcon = when (petMood) {
         ChorebooMood.HAPPY -> Icons.Default.Favorite
@@ -77,7 +78,7 @@ fun BottomNavBar(
 
     // Glassmorphic floating nav container
     Box(
-        modifier = Modifier
+        modifier = modifier
             .fillMaxWidth()
             .shadow(
                 elevation = 0.dp,

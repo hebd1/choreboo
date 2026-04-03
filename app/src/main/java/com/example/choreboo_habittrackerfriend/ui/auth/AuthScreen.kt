@@ -47,6 +47,7 @@ import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.SnackbarHost
 import androidx.compose.material3.SnackbarHostState
+import com.example.choreboo_habittrackerfriend.ui.components.StitchSnackbar
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
@@ -139,7 +140,7 @@ fun AuthScreen(
     }
 
     Scaffold(
-        snackbarHost = { SnackbarHost(snackbarHostState) },
+        snackbarHost = { },
         containerColor = MaterialTheme.colorScheme.surface,
     ) { padding ->
         Box(
@@ -457,6 +458,18 @@ fun AuthScreen(
                 }
 
                 Spacer(modifier = Modifier.height(40.dp))
+            }
+        }
+
+        // Snackbar pinned to the top of the view area
+        Box(
+            modifier = Modifier
+                .fillMaxSize()
+                .padding(top = padding.calculateTopPadding()),
+            contentAlignment = Alignment.TopCenter,
+        ) {
+            SnackbarHost(snackbarHostState) { data ->
+                StitchSnackbar(data)
             }
         }
     }

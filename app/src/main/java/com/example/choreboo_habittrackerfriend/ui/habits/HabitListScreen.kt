@@ -15,7 +15,6 @@ import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
-import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
@@ -31,6 +30,9 @@ import androidx.compose.material.icons.filled.Stars
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
+import androidx.compose.ui.window.Dialog
+import androidx.compose.ui.window.DialogProperties
+import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.FloatingActionButton
 import androidx.compose.material3.Icon
@@ -38,7 +40,6 @@ import androidx.compose.material3.IconButton
 import androidx.compose.material3.LinearProgressIndicator
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Scaffold
-import androidx.compose.material3.SnackbarData
 import androidx.compose.material3.SnackbarDuration
 import androidx.compose.material3.SnackbarHost
 import androidx.compose.material3.SnackbarHostState
@@ -71,6 +72,7 @@ import com.example.choreboo_habittrackerfriend.domain.model.Habit
 import com.example.choreboo_habittrackerfriend.ui.habits.components.HabitCard
 import com.example.choreboo_habittrackerfriend.ui.theme.GradientUtils
 import com.example.choreboo_habittrackerfriend.ui.components.ProfileAvatar
+import com.example.choreboo_habittrackerfriend.ui.components.StitchSnackbar
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 
@@ -84,6 +86,7 @@ fun HabitListScreen(
     viewModel: HabitListViewModel = hiltViewModel(),
 ) {
     val habits by viewModel.habits.collectAsState()
+    val isLoading by viewModel.isLoading.collectAsState()
     val totalPoints by viewModel.totalPoints.collectAsState()
     val profilePhotoUri by viewModel.profilePhotoUri.collectAsState()
     val todayCompletions by viewModel.todayCompletions.collectAsState()
@@ -105,19 +108,21 @@ fun HabitListScreen(
 
     LaunchedEffect(showCompletionAnimation, completionComposition) {
         if (showCompletionAnimation && completionComposition != null) {
-            val animDurationMs = completionComposition!!.duration.toLong()
-            val hideDelay = (animDurationMs - 2000L).coerceAtLeast(0L)
-
             val animJob = launch {
                 completionAnimatable.animate(composition = completionComposition, iterations = 1)
             }
 
-            delay(hideDelay)
-            isOverlayVisible = false
-
             animJob.join()
+            isOverlayVisible = false
+            delay(500) // wait for slide-out exit transition to complete
+
             lastAnimationEndTime = System.currentTimeMillis()
             showCompletionAnimation = false
+        } else if (showCompletionAnimation && completionComposition == null) {
+            // Composition failed to load (e.g. missing asset for non-fox pet types).
+            // Reset state so future completions are not permanently blocked.
+            showCompletionAnimation = false
+            isOverlayVisible = false
         }
     }
 
@@ -202,7 +207,7 @@ fun HabitListScreen(
                     }
                 },
                 colors = TopAppBarDefaults.topAppBarColors(
-                    containerColor = MaterialTheme.colorScheme.surface,
+                    containerColor = androidx.compose.ui.graphics.Color.Transparent,
                 ),
             )
         },
@@ -212,105 +217,79 @@ fun HabitListScreen(
                 containerColor = MaterialTheme.colorScheme.secondary,
                 contentColor = MaterialTheme.colorScheme.onSecondary,
                 shape = RoundedCornerShape(16.dp),
+                modifier = Modifier.padding(bottom = 72.dp),
             ) {
                 Icon(Icons.Default.Add, contentDescription = "Add Habit")
             }
         },
-        snackbarHost = {
-            SnackbarHost(snackbarHostState) { data ->
-                StitchSnackbar(data)
-            }
-        },
     ) { padding ->
-        AnimatedVisibility(
-            visible = habits.isEmpty(),
-            enter = fadeIn(),
-            exit = fadeOut(),
-        ) {
-            Box(
-                modifier = Modifier
-                    .fillMaxSize()
-                    .padding(padding),
-                contentAlignment = Alignment.Center,
-            ) {
-                Column(horizontalAlignment = Alignment.CenterHorizontally) {
-                    Text(text = "📋", style = MaterialTheme.typography.displayLarge)
-                    Spacer(modifier = Modifier.height(16.dp))
-                    Text(
-                        text = "No habits yet!",
-                        style = MaterialTheme.typography.titleLarge,
-                        fontWeight = FontWeight.SemiBold,
-                    )
-                    Spacer(modifier = Modifier.height(8.dp))
-                    Text(
-                        text = "Tap + to create your first habit\nand start earning rewards for your Choreboo!",
-                        style = MaterialTheme.typography.bodyMedium,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant,
-                        textAlign = TextAlign.Center,
-                    )
-                }
-            }
-        }
-
-        if (habits.isNotEmpty()) {
-            LazyColumn(
-                modifier = Modifier
-                    .fillMaxSize()
-                    .padding(padding)
-                    .padding(horizontal = 16.dp),
-                verticalArrangement = Arrangement.spacedBy(12.dp),
-            ) {
-                item { Spacer(modifier = Modifier.height(8.dp)) }
-
-                // "Weekly Narrative" hero card
-                item {
-                    WeeklyNarrativeCard(
-                        completionPct = completionPct,
-                        completionFraction = completionFraction,
-                    )
-                }
-
-                items(habits, key = { it.id }) { habit ->
-                    HabitCard(
-                        habit = habit,
-                        completedToday = todayCompletions[habit.id] ?: 0,
-                        currentStreak = streaks[habit.id] ?: 0,
-                        isScheduledToday = habit.isScheduledForToday(),
-                        onComplete = { viewModel.completeHabit(habit.id) },
-                        onEdit = { onEditHabit(habit.id) },
-                        onDelete = { habitToDelete = habit },
-                    )
-                }
-                item { Spacer(modifier = Modifier.height(80.dp)) }
-            }
-        }
-
-        // Overscreen completion animation — renders above the habit list but below the snackbar
-        Box(
-            modifier = Modifier
-                .fillMaxSize()
-                .padding(padding),
-            contentAlignment = Alignment.BottomCenter,
-        ) {
-            AnimatedVisibility(
-                visible = isOverlayVisible && completionComposition != null,
-                enter = slideInVertically(
-                    animationSpec = tween(durationMillis = 500),
-                    initialOffsetY = { it },
-                ),
-                exit = slideOutVertically(
-                    animationSpec = tween(durationMillis = 500),
-                    targetOffsetY = { it },
-                ),
-            ) {
-                LottieAnimation(
-                    composition = completionComposition,
-                    progress = { completionAnimatable.progress },
+        when {
+            isLoading -> {
+                Box(
                     modifier = Modifier
-                        .fillMaxWidth()
-                        .height(400.dp)
-                        .offset(y = 80.dp),
-                )
+                        .fillMaxSize()
+                        .padding(padding),
+                    contentAlignment = Alignment.Center,
+                ) {
+                    CircularProgressIndicator()
+                }
+            }
+            habits.isEmpty() -> {
+                Box(
+                    modifier = Modifier
+                        .fillMaxSize()
+                        .padding(padding),
+                    contentAlignment = Alignment.Center,
+                ) {
+                    Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                        Text(text = "📋", style = MaterialTheme.typography.displayLarge)
+                        Spacer(modifier = Modifier.height(16.dp))
+                        Text(
+                            text = "No habits yet!",
+                            style = MaterialTheme.typography.titleLarge,
+                            fontWeight = FontWeight.SemiBold,
+                        )
+                        Spacer(modifier = Modifier.height(8.dp))
+                        Text(
+                            text = "Tap + to create your first habit\nand start earning rewards for your Choreboo!",
+                            style = MaterialTheme.typography.bodyMedium,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                            textAlign = TextAlign.Center,
+                        )
+                    }
+                }
+            }
+            else -> {
+                LazyColumn(
+                    modifier = Modifier
+                        .fillMaxSize()
+                        .padding(padding)
+                        .padding(horizontal = 16.dp),
+                    verticalArrangement = Arrangement.spacedBy(12.dp),
+                ) {
+                    item { Spacer(modifier = Modifier.height(8.dp)) }
+
+                    // "Weekly Narrative" hero card
+                    item {
+                        WeeklyNarrativeCard(
+                            completionPct = completionPct,
+                            completionFraction = completionFraction,
+                        )
+                    }
+
+                    items(habits, key = { it.id }) { habit ->
+                        HabitCard(
+                            habit = habit,
+                            completedToday = todayCompletions[habit.id] ?: 0,
+                            currentStreak = streaks[habit.id] ?: 0,
+                            isScheduledToday = habit.isScheduledForToday(),
+                            onComplete = { viewModel.completeHabit(habit.id) },
+                            onEdit = { onEditHabit(habit.id) },
+                            onDelete = { habitToDelete = habit },
+                        )
+                    }
+                    item { Spacer(modifier = Modifier.height(80.dp)) }
+                }
             }
         }
 
@@ -340,33 +319,51 @@ fun HabitListScreen(
             )
         }
 
-        // Level-up celebration dialog
+        // Achievement snackbar pinned to the top of the view area
+        Box(
+            modifier = Modifier
+                .fillMaxSize()
+                .padding(top = padding.calculateTopPadding()),
+            contentAlignment = Alignment.TopCenter,
+        ) {
+            SnackbarHost(snackbarHostState) { data ->
+                StitchSnackbar(data)
+            }
+        }
+
+        // Overscreen completion animation — rendered last so it draws above the snackbar
+        Box(
+            modifier = Modifier
+                .fillMaxSize()
+                .padding(padding),
+            contentAlignment = Alignment.BottomCenter,
+        ) {
+            AnimatedVisibility(
+                visible = isOverlayVisible && completionComposition != null,
+                enter = slideInVertically(
+                    animationSpec = tween(durationMillis = 500),
+                    initialOffsetY = { it },
+                ),
+                exit = slideOutVertically(
+                    animationSpec = tween(durationMillis = 500),
+                    targetOffsetY = { it },
+                ),
+            ) {
+                LottieAnimation(
+                    composition = completionComposition,
+                    progress = { completionAnimatable.progress },
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .fillMaxSize(),
+                )
+            }
+        }
+
+        // Level-up celebration dialog pinned to top with secondary color
         showLevelUpDialog?.let { event ->
-            AlertDialog(
-                onDismissRequest = { showLevelUpDialog = null },
-                title = {
-                    Text(
-                        text = if (event.evolved) "🎉 Evolution! 🎉" else "🎉 Level Up! 🎉",
-                        fontWeight = FontWeight.Bold,
-                    )
-                },
-                text = {
-                    Column(horizontalAlignment = Alignment.CenterHorizontally) {
-                        Text(
-                            text = if (event.evolved)
-                                "Your Choreboo evolved to ${event.newStageName}! 🌟\nNow Level ${event.newLevel}!"
-                            else
-                                "Your Choreboo reached Level ${event.newLevel}! 🌟\nKeep completing habits to evolve!",
-                            style = MaterialTheme.typography.bodyLarge,
-                            textAlign = TextAlign.Center,
-                        )
-                    }
-                },
-                confirmButton = {
-                    TextButton(onClick = { showLevelUpDialog = null }) {
-                        Text("Awesome! 🎊")
-                    }
-                },
+            LevelUpDialog(
+                event = event,
+                onDismiss = { showLevelUpDialog = null },
             )
         }
     }
@@ -445,43 +442,63 @@ private fun WeeklyNarrativeCard(
     }
 }
 
+
 @Composable
-private fun StitchSnackbar(data: SnackbarData) {
-    Row(
-        modifier = Modifier
-            .padding(start = 16.dp, end = 16.dp, bottom = 8.dp)
-            .fillMaxWidth()
-            .clip(RoundedCornerShape(50.dp))
-            .background(
-                MaterialTheme.colorScheme.inverseSurface.copy(alpha = 0.92f),
-            )
-            .padding(horizontal = 8.dp, vertical = 8.dp),
-        verticalAlignment = Alignment.CenterVertically,
+private fun LevelUpDialog(
+    event: HabitListEvent.HabitCompleted,
+    onDismiss: () -> Unit,
+) {
+    Dialog(
+        onDismissRequest = onDismiss,
+        properties = DialogProperties(usePlatformDefaultWidth = false),
     ) {
         Box(
             modifier = Modifier
-                .size(40.dp)
-                .clip(CircleShape)
-                .background(MaterialTheme.colorScheme.secondaryContainer),
-            contentAlignment = Alignment.Center,
+                .fillMaxSize()
+                .padding(top = 80.dp)
+                .padding(horizontal = 24.dp),
+            contentAlignment = Alignment.TopCenter,
         ) {
-            Text("🎉", fontSize = 18.sp)
-        }
-        Spacer(modifier = Modifier.width(12.dp))
-        Column(modifier = Modifier.weight(1f)) {
-            Text(
-                text = "Achievement",
-                style = MaterialTheme.typography.labelSmall,
-                fontWeight = FontWeight.Bold,
-                color = MaterialTheme.colorScheme.inverseOnSurface.copy(alpha = 0.6f),
-                letterSpacing = 0.8.sp,
-            )
-            Text(
-                text = data.visuals.message,
-                style = MaterialTheme.typography.bodySmall,
-                fontWeight = FontWeight.Bold,
-                color = MaterialTheme.colorScheme.inverseOnSurface,
-            )
+            Card(
+                shape = RoundedCornerShape(24.dp),
+                colors = CardDefaults.cardColors(
+                    containerColor = MaterialTheme.colorScheme.secondary,
+                    contentColor = MaterialTheme.colorScheme.onSecondary,
+                ),
+                elevation = CardDefaults.cardElevation(defaultElevation = 8.dp),
+            ) {
+                Column(
+                    modifier = Modifier.padding(24.dp),
+                    horizontalAlignment = Alignment.CenterHorizontally,
+                ) {
+                    Text(
+                        text = if (event.evolved) "🎉 Evolution! 🎉" else "🎉 Level Up! 🎉",
+                        style = MaterialTheme.typography.titleLarge,
+                        fontWeight = FontWeight.Bold,
+                        color = MaterialTheme.colorScheme.onSecondary,
+                        textAlign = TextAlign.Center,
+                    )
+                    Spacer(modifier = Modifier.height(12.dp))
+                    Text(
+                        text = if (event.evolved)
+                            "Your Choreboo evolved to ${event.newStageName}! 🌟\nNow Level ${event.newLevel}!"
+                        else
+                            "Your Choreboo reached Level ${event.newLevel}! 🌟\nKeep completing habits to evolve!",
+                        style = MaterialTheme.typography.bodyLarge,
+                        color = MaterialTheme.colorScheme.onSecondary,
+                        textAlign = TextAlign.Center,
+                    )
+                    Spacer(modifier = Modifier.height(20.dp))
+                    TextButton(onClick = onDismiss) {
+                        Text(
+                            text = "Awesome! 🎊",
+                            style = MaterialTheme.typography.labelLarge,
+                            fontWeight = FontWeight.Bold,
+                            color = MaterialTheme.colorScheme.onSecondary,
+                        )
+                    }
+                }
+            }
         }
     }
 }

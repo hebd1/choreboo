@@ -204,7 +204,7 @@ fun HabitCard(
                     // Complete button — filled primary circle vs outlined
                     Row(verticalAlignment = Alignment.CenterVertically) {
                         IconButton(
-                            onClick = { if (!isComplete && isScheduledToday) onEdit() },
+                            onClick = onEdit,
                             modifier = Modifier.size(32.dp),
                         ) {
                             Icon(
@@ -215,7 +215,7 @@ fun HabitCard(
                             )
                         }
                         IconButton(
-                            onClick = { if (!isComplete && isScheduledToday) onDelete() },
+                            onClick = onDelete,
                             modifier = Modifier.size(32.dp),
                         ) {
                             Icon(
