@@ -84,9 +84,31 @@ fun HouseholdHabitCard(
                     overflow = TextOverflow.Ellipsis,
                 )
                 Text(
-                    text = "by ${habit.ownerName}",
+                    text = if (habit.assignedToName != null) {
+                        "Assigned to ${habit.assignedToName}"
+                    } else {
+                        "Unassigned"
+                    },
                     style = MaterialTheme.typography.bodySmall,
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
+                )
+            }
+
+            Spacer(modifier = Modifier.width(8.dp))
+
+            // XP badge
+            Box(
+                modifier = Modifier
+                    .clip(RoundedCornerShape(50.dp))
+                    .background(MaterialTheme.colorScheme.tertiaryContainer.copy(alpha = 0.5f))
+                    .padding(horizontal = 6.dp, vertical = 2.dp),
+            ) {
+                Text(
+                    text = "+${habit.baseXp} XP",
+                    style = MaterialTheme.typography.labelSmall,
+                    fontWeight = FontWeight.Bold,
+                    color = MaterialTheme.colorScheme.onTertiaryContainer,
+                    fontSize = 10.sp,
                 )
             }
 

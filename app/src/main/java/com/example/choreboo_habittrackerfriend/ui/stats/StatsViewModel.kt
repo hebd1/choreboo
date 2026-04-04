@@ -54,8 +54,13 @@ class StatsViewModel @Inject constructor(
     val profilePhotoUri: StateFlow<String?> = userPreferences.profilePhotoUri
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), null)
 
-    val googlePhotoUrl: String?
-        get() = authRepository.currentFirebaseUser?.photoUrl?.toString()
+    val googlePhotoUrl: StateFlow<String?> = authRepository.currentUser
+        .map { it?.photoUrl?.toString() }
+        .stateIn(
+            viewModelScope,
+            SharingStarted.WhileSubscribed(5000),
+            authRepository.currentFirebaseUser?.photoUrl?.toString(),
+        )
 
     val streaks: StateFlow<Map<Long, Int>> = habitRepository.getStreaksForToday()
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), emptyMap())
@@ -95,12 +100,13 @@ class StatsViewModel @Inject constructor(
         .map { logs -> logs.groupBy { it.habitId }.mapValues { it.value.size } }
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), emptyMap())
 
-    /** Percentage of days in the current month that have at least one habit completion. */
+    /** Percentage of days in the current month (up to today) that have at least one habit completion. */
     val monthlyCompletionRate: StateFlow<Int> = habitRepository.getLogsForMonth(YearMonth.now().toString())
         .map { logs ->
-            val daysInMonth = YearMonth.now().lengthOfMonth()
+            val today = LocalDate.now()
+            val daysElapsed = today.dayOfMonth
             val daysWithAny = logs.groupBy { it.date }.keys.size
-            if (daysInMonth > 0) (daysWithAny * 100 / daysInMonth) else 0
+            if (daysElapsed > 0) (daysWithAny * 100 / daysElapsed) else 0
         }
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), 0)
 }

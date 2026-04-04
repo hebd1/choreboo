@@ -61,6 +61,7 @@ fun StatsScreen(
 ) {
     val totalPoints by viewModel.totalPoints.collectAsState()
     val profilePhotoUri by viewModel.profilePhotoUri.collectAsState()
+    val googlePhotoUrl by viewModel.googlePhotoUrl.collectAsState()
     val maxStreak by viewModel.maxStreak.collectAsState()
     val todayXp by viewModel.todayXp.collectAsState()
     val chorebooStats by viewModel.chorebooStats.collectAsState()
@@ -85,7 +86,7 @@ fun StatsScreen(
                     Row(verticalAlignment = Alignment.CenterVertically) {
                         ProfileAvatar(
                             profilePhotoUri = profilePhotoUri,
-                            googlePhotoUrl = viewModel.googlePhotoUrl,
+                            googlePhotoUrl = googlePhotoUrl,
                             size = 40.dp,
                         )
                         Spacer(modifier = Modifier.width(12.dp))

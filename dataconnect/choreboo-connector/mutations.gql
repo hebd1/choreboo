@@ -270,3 +270,29 @@ mutation DeleteHabitLog($logId: UUID!) @auth(level: USER) {
     where: { id: { eq: $logId }, completedById: { eq_expr: "auth.uid" } }
   )
 }
+
+# ---- Dev Reset Mutations ----
+# These four mutations are called in sequence to fully wipe a user's cloud data.
+# Order matters: logs → habits → choreboo → household → user (FK-safe).
+
+# Step 1: Delete all habit logs completed by the current user.
+mutation DeleteAllMyHabitLogs @auth(level: USER) {
+  habitLog_deleteMany(where: { completedById: { eq_expr: "auth.uid" } })
+}
+
+# Step 2: Delete all habits owned by the current user.
+mutation DeleteAllMyHabits @auth(level: USER) {
+  habit_deleteMany(where: { ownerId: { eq_expr: "auth.uid" } })
+}
+
+# Step 3: Delete the current user's Choreboo.
+mutation DeleteMyChoreboo @auth(level: USER) {
+  choreboo_deleteMany(where: { ownerId: { eq_expr: "auth.uid" } })
+}
+
+# Step 4 (last): Delete the current user record.
+# Must be called after all dependent data (habits, logs, choreboo) is removed.
+# Household FK is nulled out via UpdateUserHousehold before this call.
+mutation DeleteMyUser @auth(level: USER) {
+  user_delete(key: { id_expr: "auth.uid" })
+}

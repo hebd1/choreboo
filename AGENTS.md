@@ -25,8 +25,9 @@ Repositories also call the **Firebase Data Connect generated SDK** for cloud wri
 - **Auth**: Firebase Auth (email/password + Google sign-in). `AuthRepository` wraps `FirebaseAuth`. `AuthViewModel` orchestrates login/register flows.
 - **Write-through**: All Room mutations (habit CRUD, choreboo updates, habit log inserts) also fire the corresponding Data Connect mutation. Failures are **silent** — no user-facing error for write-through.
 - **Cloud-to-local sync**: Triggered **after auth** (`force = true`, bypasses cooldown) and **on every app foreground** (`force = false`, 5-minute cooldown). `SyncManager` orchestrates all sync with a `Mutex` to prevent concurrent runs. `SyncManager.syncAll()` calls `getIdToken(false).await()` before any Data Connect calls to ensure the auth token is cached and available for the gRPC interceptor. Order: habits + choreboo + user points (parallel) → habit logs (sequential, needs habit remoteIds) → household habit logs (best-effort). Conflict resolution: **cloud wins**.
+- **App foreground sync**: `AppLifecycleObserver` (registered via `ProcessLifecycleOwner`) calls `syncManager.syncAll(force = false)` on every `onStart`. Cold-start sync is **skipped** here — `MainViewModel` handles it as part of the coordinated splash-screen startup sequence. Only subsequent warm resumes trigger the observer's sync.
 - **Error visibility**: Only the post-auth sync shows errors (snackbar). Write-through failures are silent.
-- **Security**: All 16 queries and 16 mutations have `@auth(level: USER)` directives with auth-scoped filters. `connector.yaml` has `authMode: PUBLIC` (each operation has its own auth check). 4 household queries (`GetMyHousehold`, `GetMyHouseholdMembers`, `GetMyHouseholdChoreboos`, `GetMyHouseholdHabits`) are **inherently auth-scoped** — they traverse from `auth.uid` to the user's household, so no `householdId` parameter is needed and callers can only see their own household data.
+- **Security**: All 16 queries and 20 mutations have `@auth(level: USER)` directives with auth-scoped filters. `connector.yaml` has `authMode: PUBLIC` (each operation has its own auth check). 4 household queries (`GetMyHousehold`, `GetMyHouseholdMembers`, `GetMyHouseholdChoreboos`, `GetMyHouseholdHabits`) are **inherently auth-scoped** — they traverse from `auth.uid` to the user's household, so no `householdId` parameter is needed and callers can only see their own household data.
 
 ### Data Connect Schema (5 cloud tables)
 
@@ -46,7 +47,7 @@ Defined in `dataconnect/schema/schema.gql`:
 - `dataconnect/schema/schema.gql` — 5 tables
 - `dataconnect/choreboo-connector/connector.yaml` — authMode: PUBLIC
 - `dataconnect/choreboo-connector/queries.gql` — 16 queries, all auth-scoped
-- `dataconnect/choreboo-connector/mutations.gql` — 16 mutations, all auth-scoped
+- `dataconnect/choreboo-connector/mutations.gql` — 20 mutations, all auth-scoped (16 operational + 4 dev reset)
 
 ## Data Flow Patterns
 
@@ -59,18 +60,20 @@ Defined in `dataconnect/schema/schema.gql`:
 - **Streaks**: `HabitRepository.getStreaksForToday()` returns `Flow<Map<Long, Int>>` for StreakBadge display.
 - **Cloud-to-local sync**: `HabitRepository.syncHabitsFromCloud()`, `HabitRepository.syncHabitLogsFromCloud()`, `ChorebooRepository.syncFromCloud()`. Called from `SyncManager.syncAll()`.
 
-## Room Database (v10, 3 entities)
+## Room Database (v12, 4 entities)
 
 | Table | Columns | Indexes |
 |-------|---------|---------|
-| **habits** | id, title, description, iconName, customDays, difficulty, baseXp, reminderEnabled, reminderTime, createdAt, isArchived, isHouseholdHabit, ownerUid, householdId, remoteId | `remoteId` |
+| **habits** | id, title, description, iconName, customDays, difficulty, baseXp, reminderEnabled, reminderTime, createdAt, isArchived, isHouseholdHabit, ownerUid, householdId, assignedToName, remoteId | `remoteId` |
 | **habit_logs** | id, habitId (FK→habits CASCADE), completedAt, date (ISO string), xpEarned, streakAtCompletion, completedByUid, remoteId | `remoteId`, UNIQUE(`habitId`, `date`) |
 | **choreboos** | id, name, stage, level, xp, hunger, happiness, energy, petType, lastInteractionAt, createdAt, sleepUntil, ownerUid, remoteId | `remoteId` |
+| **household_members** | uid (String PK = Firebase Auth UID), displayName, photoUrl, chorebooId, chorebooName, chorebooStage, chorebooLevel, chorebooXp, chorebooHunger, chorebooHappiness, chorebooEnergy, chorebooPetType, lastSyncedAt | — |
 
-- `remoteId` maps to the Data Connect UUID for cloud sync. Indexed on all 3 entities.
+- `remoteId` maps to the Data Connect UUID for cloud sync. Indexed on `habits`, `habit_logs`, and `choreboos`.
 - `ownerUid` / `completedByUid` / `householdId` map to Firebase Auth UIDs and household references.
 - `habit_logs` has a UNIQUE(`habitId`, `date`) index for atomic duplicate prevention on habit completion.
 - `insertLog` uses `OnConflictStrategy.IGNORE` — returns -1L when duplicate is ignored.
+- `household_members` is a **read-only cloud cache** — written by `HouseholdRepository.refreshHouseholdPets()`, cleared on sign-out/leave. Only members who have created a Choreboo are stored. Uses `uid` as PK so INSERT OR REPLACE upserts are idiomatic. No `remoteId` needed (uid is the stable cloud key).
 - Uses `fallbackToDestructiveMigration()` during development.
 - Schemas exported to `app/schemas/`.
 
@@ -100,7 +103,7 @@ Defined in `dataconnect/schema/schema.gql`:
 | Gradle version check | `powershell.exe -File build.ps1 --version` |
 | SDK regen | `npx firebase-tools@latest dataconnect:sdk:generate` |
 
-> **Note**: No real tests exist yet — only default Android Studio template stubs. JUnit 4 for unit tests, AndroidX Test + Espresso + Compose UI Test JUnit4 for instrumented tests. No lint configuration, detekt, or ktlint is set up.
+> **Note**: 267 unit tests across domain models, repositories, and ViewModels. See the [Testing](#testing) section for details. No lint configuration, detekt, or ktlint is set up.
 
 ## Code Style
 
@@ -157,7 +160,7 @@ Defined in `dataconnect/schema/schema.gql`:
 - **Enums stored as `String` in Room** — parse with `try/catch` in `toDomain()`.
 - **Dates**: ISO-8601 strings (`"2026-03-24"`) in `habit_logs.date`; timestamps (`Long`) for `createdAt`, `lastInteractionAt`.
 - **`customDays`**: Comma-separated string in entity (`"MON,TUE,WED"`), `List<String>` in domain model.
-- **Navigation**: `Screen` sealed class in `navigation/ChorebooNavGraph.kt`. Start destination is dynamic: Auth → Onboarding → HabitList. 5 bottom tabs (`habits_list`, `pet`, `household`, `calendar`, `settings`); bottom bar hidden on `auth`, `onboarding`, `add_edit_habit`.
+- **Navigation**: `Screen` sealed class in `navigation/ChorebooNavGraph.kt`. Start destination is dynamic: Auth → Onboarding → HabitList. 5 bottom tabs (`habits_list`, `pet`, `household`, `calendar`, `settings`); bottom bar hidden on `auth`, `onboarding`, `add_edit_habit`. `MainViewModel.isAppReady` gates the splash screen before the first destination renders.
 - **Destructive actions** (delete habit) require `AlertDialog` confirmation.
 - **Level-up celebrations** shown via `AlertDialog` when XP causes level/stage change.
 - **Cloud sync**: `remoteId` field on all 3 Room entities links local rows to Data Connect UUIDs. Write-through on every mutation; cloud-to-local on auth + app foreground (via `SyncManager`).
@@ -174,24 +177,26 @@ Defined in `dataconnect/schema/schema.gql`:
 - Pet animations: emoji placeholders per `ChorebooMood`; designed to swap to Lottie JSON in `res/raw/`.
 - Pet size scales by `ChorebooStage`.
 - **Auth screen**: Syncing overlay blocks interaction during cloud-to-local sync after login.
+- **Splash screen**: `MainActivity` shows a branded splash until `MainViewModel.isAppReady` becomes `true`. Authenticated+onboarded users wait for Room warmup, cloud sync, and Lottie preload (15-second timeout safety net).
 
 ## Package Structure
 
 ```
 com.example.choreboo_habittrackerfriend/
 ├── MainActivity.kt                  # @AndroidEntryPoint, dynamic startDestination (Auth/Onboarding/HabitList)
-├── ChorebooApplication.kt           # @HiltAndroidApp, notification channels
+├── MainViewModel.kt                 # @HiltViewModel — startup sequencer (DataStore → Room warmup → sync → Lottie); exposes isAppReady StateFlow
+├── ChorebooApplication.kt           # @HiltAndroidApp, notification channels, LottiePreloadManager.preloadAll()
 ├── navigation/                      # ChorebooNavGraph.kt, Screen sealed class (8 routes)
 ├── data/
 │   ├── local/
-│   │   ├── ChorebooDatabase.kt      # Room DB v10, 3 entities, fallbackToDestructiveMigration
+│   │   ├── ChorebooDatabase.kt      # Room DB v11, 3 entities, fallbackToDestructiveMigration
 │   │   ├── converter/
 │   │   │   └── Converters.kt        # Gson TypeConverter for List<String>
 │   │   ├── entity/                  # HabitEntity, HabitLogEntity, ChorebooEntity
 │   │   └── dao/                     # HabitDao, HabitLogDao, ChorebooDao
 │   ├── datastore/                   # UserPreferences (theme, onboarding, sound, totalPoints, totalLifetimeXp, profilePhotoUri, householdNotifications)
 │   └── repository/                  # HabitRepository, ChorebooRepository, AuthRepository, HouseholdRepository, UserRepository, BadgeRepository
-├── di/                              # AppModule (DB, DAOs, DataStore, UserPreferences, FirebaseAuth), SyncManager, AppLifecycleObserver
+├── di/                              # AppModule (DB, DAOs, DataStore, UserPreferences, FirebaseAuth), SyncManager, AppLifecycleObserver, LottiePreloadManager
 ├── domain/model/                    # Habit, ChorebooStats, ChorebooMood, ChorebooStage, PetType, Household, AppUser, Badge
 ├── ui/
 │   ├── theme/                       # Color.kt, Theme.kt, Type.kt
@@ -199,10 +204,10 @@ com.example.choreboo_habittrackerfriend/
 │   ├── auth/                        # AuthScreen, AuthViewModel (login/register/sync orchestration)
 │   ├── habits/                      # HabitListScreen, AddEditHabitScreen, components/ (HabitCard, StreakBadge)
 │   ├── pet/                         # PetScreen, PetViewModel, components/StatBar
-│   ├── household/                   # HouseholdScreen, HouseholdViewModel, components/HouseholdPetCard
+│   ├── household/                   # HouseholdScreen (tap pet card → member habits dialog), HouseholdViewModel (enriches pet photos), components/HouseholdPetCard
 │   ├── calendar/                    # CalendarScreen, CalendarViewModel
 │   ├── onboarding/                  # OnboardingScreen, OnboardingViewModel
-│   └── settings/                    # SettingsScreen, SettingsViewModel
+│   └── settings/                    # SettingsScreen, SettingsViewModel (+ dev Reset Account flow)
 └── worker/                          # AlarmManager-based reminders (see below)
     ├── HabitReminderScheduler.kt    # Schedules per-habit alarms via AlarmManager
     ├── HabitReminderReceiver.kt     # BroadcastReceiver that shows reminder notification
@@ -210,6 +215,72 @@ com.example.choreboo_habittrackerfriend/
     ├── ReminderRescheduleWorker.kt  # WorkManager job that reschedules alarms after reboot/update
     └── BootReceiver.kt              # BOOT_COMPLETED receiver that triggers ReminderRescheduleWorker
 ```
+
+## Dev Reset Account
+
+A dev-only utility for wiping a test account and starting enrollment from scratch. Accessible via **Settings → Account → Reset Account (Dev)**.
+
+### What it does
+
+Deletes all cloud data for the currently signed-in user in FK-safe order, deletes the Firebase Auth user (freeing the email for re-registration), then clears all local Room tables and DataStore. Other users' data is completely untouched — all mutations are scoped to `auth.uid` server-side.
+
+**Deletion order** (respects FK constraints):
+1. All `HabitLog` rows where `completedById == auth.uid`
+2. All `Habit` rows where `ownerId == auth.uid`
+3. `Choreboo` row where `ownerId == auth.uid`
+4. Null out `User.household` FK (breaks circular dep with Household)
+5. `Household` row — only if the current user is its creator
+6. `User` record
+7. Firebase Auth user (`currentUser.delete()`)
+8. Local Room tables (`habits`, `habit_logs`, `choreboos`) + DataStore
+
+Cloud steps are individually try/caught — a failure at one step logs a warning and continues. Auth deletion and local cleanup always run.
+
+### Key files
+
+| File | Role |
+|------|------|
+| `dataconnect/choreboo-connector/mutations.gql` | 4 new mutations: `DeleteAllMyHabitLogs`, `DeleteAllMyHabits`, `DeleteMyChoreboo`, `DeleteMyUser` |
+| `data/repository/ResetRepository.kt` | `@Singleton` — orchestrates the full reset sequence |
+| `ui/settings/SettingsViewModel.kt` | `resetAccount()` + `isResetting: StateFlow<Boolean>` + `SettingsEvent.AccountReset` |
+| `ui/settings/SettingsScreen.kt` | "Reset Account (Dev)" button with spinner + two-step confirmation dialog |
+
+### After reset
+
+The app navigates to the Auth screen. Re-register with the same email (or any email) and go through onboarding for a clean slate.
+
+## App Startup / Splash Screen
+
+`MainViewModel` owns the entire startup sequence and exposes `isAppReady: StateFlow<Boolean>`. `MainActivity` shows a branded splash screen until `isAppReady` becomes `true`.
+
+### Startup sequence
+
+1. **Wait for DataStore** — `onboardingComplete.first { it != null }` blocks until the first real DataStore value resolves.
+2. **Fast path** (unauthenticated or not-yet-onboarded users) — sets `_startupComplete = true` immediately. Room and sync are never touched.
+3. **Full path** (authenticated + onboarded users) — runs all three tasks in parallel inside `withTimeoutOrNull(15_000ms)`:
+   - **Room warmup**: `chorebooRepository.getOrCreateChoreboo()` + `applyStatDecay()` ensures the local DB is consistent before the first screen renders.
+   - **Cloud sync**: `syncManager.syncAll(force = false)` pulls the latest cloud data.
+   - **Lottie preload**: `lottiePreloadManager.isReady.first { it }` waits until all 9 fox animations are parsed into Lottie's LRU cache.
+4. **Timeout safety net** — if any task hangs past 15 seconds, the app proceeds anyway (`_startupComplete = true`).
+
+### Key files
+
+| File | Role |
+|------|------|
+| `MainViewModel.kt` | `@HiltViewModel` — orchestrates startup, exposes `isAppReady` and `themeMode`/`onboardingComplete`/`petMood` state flows |
+| `di/LottiePreloadManager.kt` | `@Singleton` — kicks off async `LottieCompositionFactory.fromAsset()` for 9 animations; `isReady` flips to `true` when all finish (success or failure) |
+| `di/AppLifecycleObserver.kt` | `@Singleton` — skips cold-start `onStart` (handled by `MainViewModel`); triggers `syncAll(force = false)` on subsequent warm resumes |
+| `ChorebooApplication.kt` | Calls `lottiePreloadManager.preloadAll()` in `onCreate()` so parsing starts before any Activity |
+
+### isAppReady derivation
+
+```
+isAppReady = combine(onboardingComplete, _startupComplete) { onboarding, startup ->
+    onboarding != null && startup
+}
+```
+
+`onboardingComplete` (from DataStore) must resolve to a non-null value AND the startup coroutine must finish before the splash screen dismisses.
 
 ## Adding a New Feature (Screen)
 
@@ -219,6 +290,7 @@ com.example.choreboo_habittrackerfriend/
 4. If it needs a bottom tab, add to `bottomNavRoutes` in `MainActivity.kt` and `BottomNavBar.kt`.
 5. If it needs new data: add Entity → DAO → provide DAO in `AppModule` → create/update Repository.
 6. If it needs cloud persistence: add table to `schema.gql`, add queries/mutations to `.gql` files, run `npx firebase-tools@latest dataconnect:sdk:generate`, add write-through calls in Repository, add sync logic if needed.
+7. Add unit tests: create `<FeatureName>Test.kt` files in mirrored test packages. See [Testing → Adding Tests for a New Feature](#adding-tests-for-a-new-feature) for conventions.
 
 ## Copilot Instructions
 
@@ -229,11 +301,111 @@ Additional context lives in `.github/copilot-instructions.md` (color palette hex
 - When adding habit icons, update `iconOptions` in `AddEditHabitScreen` (emoji-based `EmojiIcon` system).
 - Write-through: any Room mutation should also call the corresponding Data Connect mutation.
 
-## Known Issues (as of 2026-04-03)
+## Testing
+
+267 unit tests across 3 layers: domain models, repositories, and ViewModels. All tests are JVM-only (no Android emulator required).
+
+### Test Stack
+
+| Library | Version | Purpose |
+|---------|---------|---------|
+| JUnit 4 | 4.13.2 | Test framework |
+| MockK | 1.13.16 | Kotlin-first mocking (relaxed mocks, coEvery/coVerify, slot captures) |
+| Turbine | 1.2.0 | Flow/StateFlow testing with `.test {}` blocks |
+| kotlinx-coroutines-test | 1.9.0 | `UnconfinedTestDispatcher`, `runTest`, `Dispatchers.setMain` |
+
+### Test Configuration
+
+- **`unitTests.isReturnDefaultValues = true`** in `app/build.gradle.kts` — prevents `android.util.Log` and other Android framework stubs from throwing in JVM tests.
+- **`TestDispatcherRule`** (`TestDispatcherRule.kt`) — JUnit 4 `TestWatcher` that swaps `Dispatchers.Main` with `UnconfinedTestDispatcher` for each test. Required by all ViewModel tests and any test that uses `viewModelScope`.
+
+### Test Structure
+
+```
+app/src/test/java/com/example/choreboo_habittrackerfriend/
+├── TestDispatcherRule.kt                              # Shared JUnit rule for coroutine tests
+├── ExampleUnitTest.kt                                 # Template stub (1 test)
+├── MainViewModelTest.kt                               # isAppReady, fast-path, full startup, timeout, sync (11)
+├── domain/model/
+│   ├── HabitTest.kt                                   # isScheduledForToday, calculateStreak, calculateSuggestedXp (16)
+│   ├── ChorebooStatsTest.kt                           # fromEntity, mood calculation, stat clamping, decay (33)
+│   ├── ChorebooStageTest.kt                           # fromTotalXp thresholds, edge cases, negative XP (18)
+│   └── HouseholdPetTest.kt                            # HouseholdPet domain model fields, mood derivation (14)
+├── data/repository/
+│   ├── AuthRepositoryFriendlyMessageTest.kt           # Firebase exception → user-friendly string mapping (19)
+│   ├── ChorebooRepositoryAddXpTest.kt                 # XP addition, level-up, stage evolution, validation (12)
+│   ├── HabitRepositoryTest.kt                         # completeHabit, upsertHabit, custom-schedule streaks, validation guards (19)
+│   ├── HouseholdRepositoryValidationTest.kt           # createHousehold / joinHousehold validation guards (6)
+│   ├── SyncManagerTest.kt                             # Cooldown, mutex, force bypass, partial failure (11)
+│   └── UserRepositoryTest.kt                          # Points sync to/from cloud, validation guards (8)
+├── di/
+│   └── AppLifecycleObserverTest.kt                    # Cold-start skip, warm-resume sync, exception handling (3)
+└── ui/
+    ├── auth/AuthViewModelTest.kt                       # Form state, validation, Google sign-in, sync, returning-user (23)
+    ├── calendar/CalendarViewModelTest.kt               # Month navigation, date parsing, heatmap colors (18)
+    ├── habits/AddEditHabitViewModelTest.kt             # Form state, save/load, XP suggestion, validation (33)
+    └── pet/PetViewModelTest.kt                         # Stat display, feeding, sleep, XP events (22)
+```
+
+### Test Conventions
+
+- **File naming**: `<ClassUnderTest>Test.kt` in a mirrored package under `src/test/`.
+- **Test method naming**: backtick-quoted descriptive names: `` `completeHabit returns alreadyComplete when duplicate` ``.
+- **Setup**: Use `@Before fun setUp()` to initialize mocks and create the class under test. ViewModel tests often use a `createViewModel()` helper so mock flows can be configured first.
+- **Mocking**: `mockk<T>(relaxed = true)` for dependencies. Use `coEvery` for suspend functions, `every` for regular functions. Use `slot<T>()` + `capture(slot)` to assert on arguments passed to mocked functions.
+- **Flow testing (Turbine)**: Always use `.test {}` blocks when testing `StateFlow` exposed via `stateIn(WhileSubscribed)` — reading `.value` directly won't activate collection.
+- **Mock flows**: Use `MutableStateFlow` (not `flowOf()`) for mocked DAO/Repository flows that feed into `stateIn(WhileSubscribed)`. `flowOf()` completes immediately and the downstream `stateIn` may not collect.
+- **ViewModel creation timing**: Set mock return values BEFORE calling `createViewModel()` because `init {}` blocks collect flows immediately with `UnconfinedTestDispatcher`.
+- **Assertions**: JUnit `assertEquals`, `assertTrue`, `assertFalse`, `assertNotNull`. MockK `coVerify` / `verify` for interaction assertions.
+- **No Android instrumented tests** are included in the current suite — all tests run on JVM.
+
+### Running Tests
+
+| Task | Command |
+|------|---------|
+| All unit tests | `powershell.exe -File build.ps1 testDebugUnitTest` |
+| Single test class | `powershell.exe -File build.ps1 testDebugUnitTest --tests "com.example.choreboo_habittrackerfriend.domain.model.HabitTest"` |
+| Single test method | `powershell.exe -File build.ps1 testDebugUnitTest --tests "com.example.choreboo_habittrackerfriend.domain.model.HabitTest.isScheduledForToday returns true for daily habit"` |
+
+### Adding Tests for a New Feature
+
+1. Create `<FeatureName>Test.kt` in the mirrored test package (e.g., `src/test/.../ui/newfeature/NewFeatureViewModelTest.kt`).
+2. Add `@get:Rule val dispatcherRule = TestDispatcherRule()` if testing a ViewModel or anything using `Dispatchers.Main`.
+3. Mock dependencies with `mockk<T>(relaxed = true)` in `@Before`.
+4. For ViewModel tests: create a `createViewModel()` helper, set mock return values before calling it, and use Turbine `.test {}` blocks for `StateFlow` assertions.
+5. For Repository tests: mock DAOs and Firebase SDK calls with `coEvery`, test both success and error paths, and verify write-through calls with `coVerify`.
+6. For domain model tests: test pure functions directly — no mocking needed.
+
+### Input Validation Guards
+
+19 `require()` guards across 5 repositories validate preconditions at the repository boundary:
+
+| Repository | Method | Guard |
+|------------|--------|-------|
+| HabitRepository | `upsertHabit()` | title non-blank |
+| HabitRepository | `upsertHabit()` | title <= 100 chars |
+| HabitRepository | `upsertHabit()` | baseXp > 0 |
+| HabitRepository | `completeHabit()` | habitId > 0 |
+| ChorebooRepository | `getOrCreateChoreboo()` | name non-blank |
+| ChorebooRepository | `getOrCreateChoreboo()` | name <= 20 chars |
+| ChorebooRepository | `addXp()` | amount > 0 |
+| ChorebooRepository | `updateName()` | name non-blank |
+| ChorebooRepository | `updateName()` | name <= 20 chars |
+| HouseholdRepository | `createHousehold()` | name non-blank |
+| HouseholdRepository | `createHousehold()` | name <= 50 chars |
+| HouseholdRepository | `joinHousehold()` | inviteCode non-blank |
+| UserRepository | `syncPointsToCloud()` | totalPoints >= 0 |
+| UserRepository | `syncPointsToCloud()` | totalLifetimeXp >= 0 |
+| UserRepository | `updateDisplayName()` | name non-blank (after trim) |
+| UserRepository | `updateDisplayName()` | name <= 30 chars (after trim) |
+| AuthRepository | `signInWithEmail()` / `signUpWithEmail()` | email & password non-blank |
+| AuthRepository | `sendPasswordReset()` | email non-blank |
+
+## Known Issues (as of 2026-04-04)
 
 ### Bugs (all resolved)
 
-All bugs B1–B17 have been fixed:
+All bugs B1–B26 have been fixed:
 - **B1**: Sign-out now clears Room tables, DataStore, and household state.
 - **B2**: `completeHabit()` saves cloud `remoteId` back to local log.
 - **B3**: `completeHabit()` sets `completedByUid` on local log entity.
@@ -250,6 +422,15 @@ All bugs B1–B17 have been fixed:
 - **B15**: `HabitRepository` now receives `FirebaseAuth` via Hilt constructor injection instead of calling `FirebaseAuth.getInstance()` directly in 3 places.
 - **B16**: `SyncManager.syncAll()` now calls `getIdToken(false).await()` before any Data Connect calls. Fixes `UNAUTHENTICATED` gRPC errors caused by a race condition where `FirebaseAuth.currentUser` is non-null but the Data Connect SDK's internal `IdTokenListener` hasn't received the token yet.
 - **B17**: `HabitRepository.syncHouseholdHabitLogsForToday()` now checks `hasHouseholdHabits()` via `HabitDao` and returns early if the user has none. Prevents `NOT_FOUND` errors from `GetHouseholdHabitLogsForDate` when the user has no household habits.
+- **B18**: `SyncManager.getIdToken()` reverted to always pass `false` (prime cache only). Previously it reused `syncAll`'s `force` parameter, causing unnecessary token refresh on every post-auth sync.
+- **B19**: `ResetRepository.resetAll()` now runs inside `SyncManager.runExclusive()` to prevent `AppLifecycleObserver` from triggering `syncAll()` concurrently during account reset.
+- **B20**: `SettingsViewModel._isResetting` is now set to `false` on the success path before emitting `AccountReset`. Previously the spinner would persist if the event was lost (e.g., config change).
+- **B21**: `ResetRepository` household deletion now fetches from cloud (`GetMyHousehold`) instead of relying on the in-memory `MutableStateFlow` which may be `null` even when the user has a cloud household. Prevents orphaned Household records.
+- **B22**: `calculateStreak()` in `HabitRepository` rewritten to be schedule-aware. The old algorithm walked backward through consecutive calendar days, causing any non-scheduled gap day (e.g., Tuesday for a Mon/Wed/Fri habit) to break the streak. The new algorithm skips non-scheduled days and only counts a streak break when a scheduled day was actually missed. Handles weekly codes (`MON`/`WED`/`FRI`), monthly codes (`D1`/`D15`/`D31` where `D31` matches the last day of any month), and falls back to daily if no recognizable codes are present. 365-day lookback safety limit prevents infinite loops. Fixed both `streakAtCompletion` stored in logs and the XP streak bonus.
+- **B23**: `assignedToName` was present in the `Habit` domain model but never backed by Room or populated from cloud sync. Added `assignedToName: String?` column to `HabitEntity`, bumped Room DB to v11, and updated both `syncHabitsFromCloud()` paths to populate it from `assignedTo.displayName` in the cloud response.
+- **B24**: No max-length validation on text inputs allowed oversized strings past the UI. Added `require()` guards in `HabitRepository.upsertHabit()` (title ≤ 100 chars), `ChorebooRepository.getOrCreateChoreboo()` and `updateName()` (name ≤ 20 chars), and `HouseholdRepository.createHousehold()` (name ≤ 50 chars). UI layer also enforces limits via `onValueChange` filters and character counters that appear near the limit.
+- **B25**: `AddEditHabitViewModel.currentHousehold` used `SharingStarted.WhileSubscribed(5000)` but nothing in `AddEditHabitScreen` ever collected it. This meant `.value` was always `null` when `saveHabit()` checked it, causing a spurious "Join a household first to create shared habits" error even when the user was in a household. Changed to `SharingStarted.Eagerly` so the `StateFlow` activates immediately.
+- **B26**: Profile photos not appearing on household pet cards. The cloud `User.photoUrl` is only set for Google sign-in users (via `FirebaseAuth.currentUser.photoUrl`). Email/password users who pick a photo in Settings store it locally in DataStore (`profilePhotoUri`) but it was never propagated to the household view. `HouseholdViewModel.householdPets` now enriches the current user's pet card with the best available local/Google photo via `combine()` when the cloud value is null.
 
 ### Security Gaps (resolved)
 

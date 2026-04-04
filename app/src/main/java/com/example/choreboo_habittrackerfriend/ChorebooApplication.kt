@@ -8,6 +8,7 @@ import androidx.hilt.work.HiltWorkerFactory
 import androidx.lifecycle.ProcessLifecycleOwner
 import androidx.work.Configuration
 import com.example.choreboo_habittrackerfriend.di.AppLifecycleObserver
+import com.example.choreboo_habittrackerfriend.di.LottiePreloadManager
 import dagger.hilt.android.HiltAndroidApp
 import javax.inject.Inject
 
@@ -20,10 +21,14 @@ class ChorebooApplication : Application(), Configuration.Provider {
     @Inject
     lateinit var appLifecycleObserver: AppLifecycleObserver
 
+    @Inject
+    lateinit var lottiePreloadManager: LottiePreloadManager
+
     override fun onCreate() {
         super.onCreate()
         createNotificationChannels()
         ProcessLifecycleOwner.get().lifecycle.addObserver(appLifecycleObserver)
+        lottiePreloadManager.preloadAll()
     }
 
     override val workManagerConfiguration: Configuration

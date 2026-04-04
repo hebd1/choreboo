@@ -4,6 +4,7 @@ import android.util.Log
 import com.google.firebase.auth.FirebaseAuth
 import kotlinx.coroutines.async
 import kotlinx.coroutines.coroutineScope
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
 import kotlinx.coroutines.tasks.await
@@ -36,6 +37,13 @@ class SyncManager @Inject constructor(
         System.currentTimeMillis() - lastSyncTimestampMs >= SYNC_COOLDOWN_MS
 
     /**
+     * Runs the given [block] while holding the sync mutex.
+     * Use this to prevent `syncAll()` from running concurrently with a destructive operation
+     * (e.g., account reset).
+     */
+    suspend fun <T> runExclusive(block: suspend () -> T): T = syncMutex.withLock { block() }
+
+    /**
      * Run a full cloud-to-local sync: habits → choreboo → habit logs → user points.
      *
      * @param force If true, skips the cooldown check (used after explicit auth events).
@@ -49,10 +57,23 @@ class SyncManager @Inject constructor(
         // After sign-in, currentUser is non-null immediately but the Data Connect SDK's
         // internal IdTokenListener receives the token asynchronously. Calling getIdToken()
         // here forces the token to be resolved so the gRPC auth interceptor can include it.
+        // We always pass false here — the goal is only to prime the SDK's token cache, not to
+        // force-refresh. After sign-in the token is already fresh; forcing a refresh would be
+        // a wasteful network round-trip.
         try {
             firebaseAuth.currentUser?.getIdToken(false)?.await()
         } catch (_: Exception) {
             Log.w(TAG, "Failed to pre-fetch auth token — sync may fail with UNAUTHENTICATED")
+        }
+
+        // After sign-in (force=true), getIdToken(false) may resolve synchronously from
+        // Firebase's in-memory cache without suspending. This means the coroutine never
+        // yields, and the Data Connect SDK's internal IdTokenListener (which propagates
+        // the token to the gRPC interceptor) may still be pending in the main thread's
+        // message queue when the parallel sync coroutines launch. Yielding here gives
+        // the main thread a chance to dispatch that callback before we send any gRPC calls.
+        if (force) {
+            delay(500)
         }
 
         if (!force && !shouldSync()) {
@@ -128,7 +149,11 @@ class SyncManager @Inject constructor(
                 }
             }
 
-            lastSyncTimestampMs = System.currentTimeMillis()
+            // Only reset cooldown if at least one step succeeded — a total failure
+            // should not block the next foreground-triggered retry.
+            if (anySuccess) {
+                lastSyncTimestampMs = System.currentTimeMillis()
+            }
             Log.d(TAG, "Sync complete (anySuccess=$anySuccess)")
             anySuccess
         }

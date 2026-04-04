@@ -115,6 +115,7 @@ fun AddEditHabitScreen(
 ) {
     val formState by viewModel.formState.collectAsState()
     val profilePhotoUri by viewModel.profilePhotoUri.collectAsState()
+    val googlePhotoUrl by viewModel.googlePhotoUrl.collectAsState()
     val householdMembers by viewModel.householdMembers.collectAsState()
     val snackbarHostState = remember { SnackbarHostState() }
     var showTimePicker by remember { mutableStateOf(false) }
@@ -125,7 +126,10 @@ fun AddEditHabitScreen(
             when (event) {
                 is AddEditHabitEvent.Saved -> onNavigateBack()
                 is AddEditHabitEvent.ValidationError -> {
-                    snackbarHostState.showSnackbar(event.message)
+                    snackbarHostState.showSnackbar(
+                        message = event.message,
+                        actionLabel = "error",
+                    )
                 }
             }
         }
@@ -144,7 +148,7 @@ fun AddEditHabitScreen(
             ChorebooTopBar(
                 onNavigateBack = onNavigateBack,
                 profilePhotoUri = profilePhotoUri,
-                googlePhotoUrl = viewModel.googlePhotoUrl,
+                googlePhotoUrl = googlePhotoUrl,
             )
 
             Column(
@@ -212,12 +216,25 @@ fun AddEditHabitScreen(
                         Spacer(modifier = Modifier.height(6.dp))
                         OutlinedTextField(
                             value = formState.title,
-                            onValueChange = viewModel::updateTitle,
+                            onValueChange = { if (it.length <= 100) viewModel.updateTitle(it) },
                             placeholder = { Text("Drink more water...") },
                             singleLine = true,
                             shape = RoundedCornerShape(12.dp),
                             modifier = Modifier.fillMaxWidth(),
                             textStyle = MaterialTheme.typography.bodyLarge.copy(fontWeight = FontWeight.SemiBold),
+                            trailingIcon = if (formState.title.length > 80) {
+                                {
+                                    Text(
+                                        text = "${formState.title.length}/100",
+                                        style = MaterialTheme.typography.labelSmall,
+                                        color = if (formState.title.length >= 100)
+                                            MaterialTheme.colorScheme.error
+                                        else
+                                            MaterialTheme.colorScheme.onSurfaceVariant,
+                                        modifier = Modifier.padding(end = 8.dp),
+                                    )
+                                }
+                            } else null,
                             colors = OutlinedTextFieldDefaults.colors(
                                 unfocusedContainerColor = MaterialTheme.colorScheme.surfaceContainerHigh,
                                 focusedContainerColor = MaterialTheme.colorScheme.surfaceContainerLowest,

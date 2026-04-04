@@ -1,6 +1,8 @@
 package com.example.choreboo_habittrackerfriend.data.repository
 
 import android.util.Log
+import com.example.choreboo_habittrackerfriend.data.local.dao.HouseholdMemberDao
+import com.example.choreboo_habittrackerfriend.data.local.entity.HouseholdMemberEntity
 import com.example.choreboo_habittrackerfriend.dataconnect.ChorebooConnector
 import com.example.choreboo_habittrackerfriend.dataconnect.execute
 import com.example.choreboo_habittrackerfriend.dataconnect.instance
@@ -15,6 +17,7 @@ import kotlinx.coroutines.coroutineScope
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.launch
 import java.time.LocalDate
 import javax.inject.Inject
@@ -29,6 +32,7 @@ sealed class HouseholdResult {
 
 @Singleton
 class HouseholdRepository @Inject constructor(
+    private val householdMemberDao: HouseholdMemberDao,
     private val userRepository: UserRepository,
     private val habitRepository: HabitRepository,
 ) {
@@ -40,8 +44,13 @@ class HouseholdRepository @Inject constructor(
     private val _householdMembers = MutableStateFlow<List<HouseholdMember>>(emptyList())
     val householdMembers: Flow<List<HouseholdMember>> = _householdMembers.asStateFlow()
 
-    private val _householdPets = MutableStateFlow<List<HouseholdPet>>(emptyList())
-    val householdPets: Flow<List<HouseholdPet>> = _householdPets.asStateFlow()
+    /**
+     * Household pets backed by Room — persists across process death and is available
+     * immediately on cold start without a network round-trip. [refreshHouseholdPets]
+     * writes cloud data into this table; Room emits updates reactively.
+     */
+    val householdPets: Flow<List<HouseholdPet>> = householdMemberDao.getAllMembers()
+        .map { entities -> entities.map { it.toDomain() } }
 
     private val _householdHabits = MutableStateFlow<List<HouseholdHabitStatus>>(emptyList())
     val householdHabits: Flow<List<HouseholdHabitStatus>> = _householdHabits.asStateFlow()
@@ -58,6 +67,9 @@ class HouseholdRepository @Inject constructor(
      * Create a new household and set the current user as creator.
      */
     suspend fun createHousehold(name: String): HouseholdResult {
+        require(name.isNotBlank()) { "Household name must not be blank" }
+        require(name.length <= 50) { "Household name must be 50 characters or fewer, was ${name.length}" }
+
         val uid = userRepository.getCurrentUid()
             ?: return HouseholdResult.Error("Not authenticated")
 
@@ -95,6 +107,8 @@ class HouseholdRepository @Inject constructor(
      * Join an existing household by invite code.
      */
     suspend fun joinHousehold(inviteCode: String): HouseholdResult {
+        require(inviteCode.isNotBlank()) { "Invite code must not be blank" }
+
         val uid = userRepository.getCurrentUid()
             ?: return HouseholdResult.Error("Not authenticated")
 
@@ -126,7 +140,7 @@ class HouseholdRepository @Inject constructor(
             _currentHousehold.value = household
             Log.d(TAG, "Joined household: ${found.name} (${found.id})")
 
-            // Refresh members and pets
+            // Refresh members and pets (pets write-through to Room)
             refreshHouseholdMembers()
             refreshHouseholdPets()
 
@@ -156,7 +170,8 @@ class HouseholdRepository @Inject constructor(
 
             _currentHousehold.value = null
             _householdMembers.value = emptyList()
-            _householdPets.value = emptyList()
+            householdMemberDao.deleteAll()
+            _householdHabits.value = emptyList()
             Log.d(TAG, "Left household")
             HouseholdResult.Success(
                 Household(id = "", name = "", inviteCode = "", createdByUid = ""),
@@ -194,36 +209,46 @@ class HouseholdRepository @Inject constructor(
     }
 
     /**
-     * Fetch all Choreboos belonging to household members from Data Connect.
-     * Auth-scoped: traverses from the authenticated user to their household's
-     * members' choreboos. Pets are nested under each user (singular choreboo_on_owner
-     * because of @unique constraint on Choreboo.owner).
+     * Fetch all Choreboos belonging to household members from Data Connect and persist
+     * them to Room. Auth-scoped: traverses from the authenticated user to their
+     * household's members' choreboos. Only members who have created a Choreboo are
+     * stored — members without pets are excluded. Departed members are reconciled out of
+     * the local cache.
      */
     suspend fun refreshHouseholdPets() {
         try {
             val result = connector.getMyHouseholdChoreboos.execute()
             val users = result.data.user?.household?.users_on_household
             if (users != null) {
-                _householdPets.value = users.mapNotNull { user ->
+                val entities = users.mapNotNull { user ->
                     val pet = user.choreboo_on_owner ?: return@mapNotNull null
-                    HouseholdPet(
+                    HouseholdMemberEntity(
+                        uid = user.id,
+                        displayName = user.displayName,
+                        photoUrl = user.photoUrl,
                         chorebooId = pet.id.toString(),
-                        name = pet.name,
-                        stage = try { ChorebooStage.valueOf(pet.stage) } catch (_: Exception) { ChorebooStage.EGG },
-                        level = pet.level,
-                        xp = pet.xp,
-                        hunger = pet.hunger,
-                        happiness = pet.happiness,
-                        energy = pet.energy,
-                        petType = try { PetType.valueOf(pet.petType) } catch (_: Exception) { PetType.FOX },
-                        ownerName = user.displayName,
-                        ownerUid = user.id,
-                        ownerPhotoUrl = user.photoUrl,
+                        chorebooName = pet.name,
+                        chorebooStage = pet.stage,
+                        chorebooLevel = pet.level,
+                        chorebooXp = pet.xp,
+                        chorebooHunger = pet.hunger,
+                        chorebooHappiness = pet.happiness,
+                        chorebooEnergy = pet.energy,
+                        chorebooPetType = pet.petType,
+                        lastSyncedAt = System.currentTimeMillis(),
                     )
                 }
-                Log.d(TAG, "Refreshed ${_householdPets.value.size} household pets")
+                if (entities.isEmpty()) {
+                    householdMemberDao.deleteAll()
+                } else {
+                    householdMemberDao.upsertAll(entities)
+                    // Reconcile: remove any cached member no longer in the household
+                    householdMemberDao.deleteMembersNotIn(entities.map { it.uid })
+                }
+                Log.d(TAG, "Persisted ${entities.size} household pets to Room")
             } else {
-                _householdPets.value = emptyList()
+                // User has no household — clear the local cache
+                householdMemberDao.deleteAll()
             }
         } catch (e: Exception) {
             Log.e(TAG, "Failed to refresh household pets", e)
@@ -274,6 +299,9 @@ class HouseholdRepository @Inject constructor(
                     iconName = h.iconName,
                     ownerName = h.owner.displayName,
                     ownerUid = h.owner.id,
+                    baseXp = h.baseXp,
+                    assignedToUid = h.assignedTo?.id,
+                    assignedToName = h.assignedTo?.displayName,
                     completedByUid = completedBy?.first,
                     completedByName = completedBy?.second,
                 )
@@ -285,17 +313,18 @@ class HouseholdRepository @Inject constructor(
     }
 
     /**
-     * Clear in-memory household state — used for sign-out cleanup.
+     * Clear all in-memory household state and the Room household_members cache.
+     * Called on sign-out and account reset so no stale data bleeds into the next session.
      */
-    fun clearState() {
+    suspend fun clearState() {
         _currentHousehold.value = null
         _householdMembers.value = emptyList()
-        _householdPets.value = emptyList()
+        householdMemberDao.deleteAll()
         _householdHabits.value = emptyList()
     }
 
     /**
-     * Refresh all household data (household info, members, and pets).
+     * Refresh all household data (household info, members, pets, and habits).
      * Auth-scoped: uses GetMyHousehold which traverses from auth.uid.
      */
     suspend fun refreshAll() {
@@ -324,3 +353,20 @@ class HouseholdRepository @Inject constructor(
         }
     }
 }
+
+// ── Mapping ──────────────────────────────────────────────────────────────────────────────────
+
+private fun HouseholdMemberEntity.toDomain(): HouseholdPet = HouseholdPet(
+    chorebooId = chorebooId,
+    name = chorebooName,
+    stage = try { ChorebooStage.valueOf(chorebooStage) } catch (_: Exception) { ChorebooStage.EGG },
+    level = chorebooLevel,
+    xp = chorebooXp,
+    hunger = chorebooHunger,
+    happiness = chorebooHappiness,
+    energy = chorebooEnergy,
+    petType = try { PetType.valueOf(chorebooPetType) } catch (_: Exception) { PetType.FOX },
+    ownerName = displayName,
+    ownerUid = uid,
+    ownerPhotoUrl = photoUrl,
+)

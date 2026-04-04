@@ -19,6 +19,8 @@ import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asSharedFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.combine
+import kotlinx.coroutines.flow.flatMapLatest
+import kotlinx.coroutines.flow.flowOf
 import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.onEach
 import kotlinx.coroutines.flow.stateIn
@@ -68,7 +70,18 @@ class PetViewModel @Inject constructor(
     private val _isLoading = MutableStateFlow(true)
     val isLoading: StateFlow<Boolean> = _isLoading.asStateFlow()
 
-    val habits: StateFlow<List<Habit>> = habitRepository.getAllHabits()
+    /**
+     * Habits for the current user: personal habits they own, or household habits assigned to them.
+     * Filters on UID only if authenticated; otherwise shows empty list.
+     */
+    val habits: StateFlow<List<Habit>> = authRepository.currentUser
+        .flatMapLatest { user ->
+            if (user != null) {
+                habitRepository.getHabitsForUser(user.uid)
+            } else {
+                flowOf(emptyList())
+            }
+        }
         .onEach { _isLoading.value = false }
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), emptyList())
 
@@ -88,8 +101,13 @@ class PetViewModel @Inject constructor(
     val profilePhotoUri: StateFlow<String?> = userPreferences.profilePhotoUri
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), null)
 
-    val googlePhotoUrl: String?
-        get() = authRepository.currentFirebaseUser?.photoUrl?.toString()
+    val googlePhotoUrl: StateFlow<String?> = authRepository.currentUser
+        .map { it?.photoUrl?.toString() }
+        .stateIn(
+            viewModelScope,
+            SharingStarted.WhileSubscribed(5000),
+            authRepository.currentFirebaseUser?.photoUrl?.toString(),
+        )
 
     /** UID of the currently authenticated user — used to distinguish own vs. other-member habits. */
     val currentUserUid: String?

@@ -5,12 +5,31 @@ import androidx.room.Insert
 import androidx.room.OnConflictStrategy
 import androidx.room.Query
 import androidx.room.Update
+import androidx.room.Upsert
 import com.example.choreboo_habittrackerfriend.data.local.entity.HabitEntity
 import kotlinx.coroutines.flow.Flow
 @Dao
 interface HabitDao {
     @Query("SELECT * FROM habits WHERE isArchived = 0 ORDER BY createdAt DESC")
     fun getAllHabits(): Flow<List<HabitEntity>>
+
+    /**
+     * Get habits for a specific user: personal habits they own, or household habits assigned to them.
+     * Filters by isArchived = 0.
+     */
+    @Query(
+        """
+        SELECT * FROM habits
+        WHERE isArchived = 0
+        AND (
+            (isHouseholdHabit = 0 AND ownerUid = :uid)
+            OR (isHouseholdHabit = 1 AND assignedToUid = :uid)
+        )
+        ORDER BY createdAt DESC
+        """,
+    )
+    fun getHabitsForUser(uid: String): Flow<List<HabitEntity>>
+
     @Query("SELECT * FROM habits WHERE id = :id")
     fun getHabitById(id: Long): Flow<HabitEntity?>
 
@@ -23,7 +42,7 @@ interface HabitDao {
     @Query("SELECT * FROM habits")
     suspend fun getAllHabitsSync(): List<HabitEntity>
 
-    @Insert(onConflict = OnConflictStrategy.REPLACE)
+    @Upsert
     suspend fun upsertHabit(habit: HabitEntity): Long
     @Update
     suspend fun updateHabit(habit: HabitEntity)

@@ -12,12 +12,16 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.AccountCircle
 import androidx.compose.material.icons.filled.Home
 import androidx.compose.material.icons.filled.PersonAdd
+import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.Card
@@ -25,16 +29,24 @@ import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
+import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import coil3.compose.AsyncImage
 import com.example.choreboo_habittrackerfriend.domain.model.HouseholdHabitStatus
 import com.example.choreboo_habittrackerfriend.domain.model.HouseholdPet
 import com.example.choreboo_habittrackerfriend.ui.household.components.HouseholdHabitCard
@@ -48,6 +60,17 @@ fun HouseholdScreen(
     val household by viewModel.currentHousehold.collectAsStateWithLifecycle()
     val pets by viewModel.householdPets.collectAsStateWithLifecycle()
     val habits by viewModel.householdHabits.collectAsStateWithLifecycle()
+    val selectedPet by viewModel.selectedPet.collectAsStateWithLifecycle()
+
+    // ── Member habits popup ──────────────────────────────────────────
+    selectedPet?.let { pet ->
+        val memberHabits = habits.filter { it.assignedToUid == pet.ownerUid }
+        MemberHabitsDialog(
+            pet = pet,
+            habits = memberHabits,
+            onDismiss = { viewModel.clearSelectedPet() },
+        )
+    }
 
     Column(
         modifier = Modifier
@@ -83,7 +106,10 @@ fun HouseholdScreen(
                     val displayPets = pets.take(5)
                     val rows = displayPets.chunked(2)
                     items(rows, key = { row -> "pet_row_${row[0].chorebooId}" }) { row ->
-                        PetGridRow(row = row)
+                        PetGridRow(
+                            row = row,
+                            onPetClick = { viewModel.selectPet(it) },
+                        )
                         Spacer(modifier = Modifier.height(12.dp))
                     }
                 }
@@ -111,6 +137,145 @@ fun HouseholdScreen(
     }
 }
 
+// ── Member habits dialog ─────────────────────────────────────────────────
+
+/**
+ * Popup shown when the user taps a pet card. Displays the pet owner's name,
+ * profile photo, and all household chores they own with today's completion status.
+ */
+@Composable
+private fun MemberHabitsDialog(
+    pet: HouseholdPet,
+    habits: List<HouseholdHabitStatus>,
+    onDismiss: () -> Unit,
+) {
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        confirmButton = {
+            TextButton(onClick = onDismiss) {
+                Text("Close")
+            }
+        },
+        icon = {
+            var photoFailed by remember { mutableStateOf(false) }
+
+            if (!pet.ownerPhotoUrl.isNullOrBlank() && !photoFailed) {
+                AsyncImage(
+                    model = pet.ownerPhotoUrl,
+                    contentDescription = "Profile photo of ${pet.ownerName}",
+                    contentScale = ContentScale.Crop,
+                    modifier = Modifier
+                        .size(48.dp)
+                        .clip(CircleShape),
+                    onError = { photoFailed = true },
+                )
+            } else {
+                // Fallback: green AccountCircle icon
+                Icon(
+                    imageVector = Icons.Default.AccountCircle,
+                    contentDescription = "Profile photo of ${pet.ownerName}",
+                    tint = MaterialTheme.colorScheme.primary,
+                    modifier = Modifier.size(48.dp),
+                )
+            }
+        },
+        title = {
+            Text(
+                text = "${pet.ownerName}'s Chores",
+                style = MaterialTheme.typography.titleMedium,
+                fontWeight = FontWeight.Bold,
+            )
+        },
+        text = {
+            if (habits.isEmpty()) {
+                Column(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalAlignment = Alignment.CenterHorizontally,
+                ) {
+                    Text(
+                        text = "\uD83C\uDF3F",
+                        fontSize = 36.sp,
+                    )
+                    Spacer(modifier = Modifier.height(8.dp))
+                    Text(
+                        text = "No household chores yet",
+                        style = MaterialTheme.typography.bodyMedium,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        textAlign = TextAlign.Center,
+                    )
+                }
+            } else {
+                Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                    habits.forEach { habit ->
+                        MemberHabitRow(habit = habit)
+                    }
+                }
+            }
+        },
+    )
+}
+
+/**
+ * Compact row for a single habit inside the member habits dialog.
+ * Shows the emoji icon, title, and a small status indicator.
+ */
+@Composable
+private fun MemberHabitRow(
+    habit: HouseholdHabitStatus,
+    modifier: Modifier = Modifier,
+) {
+    val isCompleted = habit.completedByName != null
+
+    Row(
+        modifier = modifier.fillMaxWidth(),
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        // Emoji icon
+        Box(
+            contentAlignment = Alignment.Center,
+            modifier = Modifier
+                .size(36.dp)
+                .clip(CircleShape)
+                .background(
+                    if (isCompleted)
+                        MaterialTheme.colorScheme.primary.copy(alpha = 0.15f)
+                    else
+                        MaterialTheme.colorScheme.surfaceContainerHighest,
+                ),
+        ) {
+            Text(
+                text = habit.iconName,
+                fontSize = 18.sp,
+            )
+        }
+
+        Spacer(modifier = Modifier.width(10.dp))
+
+        Column(modifier = Modifier.weight(1f)) {
+            Text(
+                text = habit.title,
+                style = MaterialTheme.typography.bodyMedium,
+                fontWeight = FontWeight.SemiBold,
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis,
+            )
+            if (isCompleted) {
+                Text(
+                    text = "\u2713 Done by ${habit.completedByName}",
+                    style = MaterialTheme.typography.labelSmall,
+                    color = MaterialTheme.colorScheme.primary,
+                )
+            } else {
+                Text(
+                    text = "Pending",
+                    style = MaterialTheme.typography.labelSmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                )
+            }
+        }
+    }
+}
+
 /**
  * A single row in the 2-column pet grid.
  * If the row has only 1 pet (last row when there's an odd number), that card
@@ -119,6 +284,7 @@ fun HouseholdScreen(
 @Composable
 private fun PetGridRow(
     row: List<HouseholdPet>,
+    onPetClick: (HouseholdPet) -> Unit,
     modifier: Modifier = Modifier,
 ) {
     Row(
@@ -128,6 +294,7 @@ private fun PetGridRow(
         row.forEach { pet ->
             HouseholdPetCard(
                 pet = pet,
+                onClick = { onPetClick(pet) },
                 modifier = Modifier.weight(1f),
             )
         }

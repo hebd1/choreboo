@@ -460,13 +460,13 @@ private fun NameStep(
                         modifier = Modifier.size(24.dp),
                     )
                     Text(
-                        text = "Unlock Lore",
+                        text = "Join a Household",
                         style = MaterialTheme.typography.labelLarge,
                         fontWeight = FontWeight.Bold,
                         color = MaterialTheme.colorScheme.onSurface,
                     )
                     Text(
-                        text = "Discover the secret history of your pet.",
+                        text = "Team up with friends to complete tasks and view each other's pets.",
                         style = MaterialTheme.typography.labelSmall,
                         color = MaterialTheme.colorScheme.onSurfaceVariant,
                     )

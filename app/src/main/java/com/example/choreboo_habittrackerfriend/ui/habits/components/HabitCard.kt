@@ -154,34 +154,6 @@ fun HabitCard(
                                 fontSize = 10.sp,
                             )
                         }
-                        // Household badge
-                        if (habit.isHouseholdHabit) {
-                            Box(
-                                modifier = Modifier
-                                    .clip(RoundedCornerShape(50.dp))
-                                    .background(MaterialTheme.colorScheme.secondaryContainer)
-                                    .padding(horizontal = 6.dp, vertical = 2.dp),
-                            ) {
-                                Row(
-                                    verticalAlignment = Alignment.CenterVertically,
-                                    horizontalArrangement = Arrangement.spacedBy(2.dp),
-                                ) {
-                                    Icon(
-                                        imageVector = Icons.Default.Home,
-                                        contentDescription = "Household habit",
-                                        tint = MaterialTheme.colorScheme.onSecondaryContainer,
-                                        modifier = Modifier.size(8.dp),
-                                    )
-                                    Text(
-                                        text = "HOUSEHOLD",
-                                        style = MaterialTheme.typography.labelSmall,
-                                        fontWeight = FontWeight.Bold,
-                                        color = MaterialTheme.colorScheme.onSecondaryContainer,
-                                        fontSize = 8.sp,
-                                    )
-                                }
-                            }
-                        }
                     }
                     Spacer(modifier = Modifier.height(4.dp))
                     if (isComplete) {

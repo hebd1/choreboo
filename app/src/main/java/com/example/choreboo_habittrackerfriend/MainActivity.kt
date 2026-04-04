@@ -5,20 +5,29 @@ import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
 import androidx.activity.viewModels
-import com.airbnb.lottie.LottieCompositionFactory
+import androidx.compose.foundation.background
+import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.foundation.layout.consumeWindowInsets
 import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.statusBars
 import androidx.compose.material3.CircularProgressIndicator
+import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Scaffold
+import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
 import androidx.navigation.compose.currentBackStackEntryAsState
 import androidx.navigation.compose.rememberNavController
 import com.example.choreboo_habittrackerfriend.domain.model.ChorebooMood
@@ -37,11 +46,8 @@ class MainActivity : ComponentActivity() {
         super.onCreate(savedInstanceState)
         enableEdgeToEdge()
 
-        // Preload only the idle animation — the most likely first frame the user will see.
-        // Other animations load on-demand in PetAnimation when the relevant phase triggers.
-        LottieCompositionFactory.fromAsset(this, "animations/fox/fox_idle_lottie.json")
-
         setContent {
+            val isAppReady by viewModel.isAppReady.collectAsState()
             val onboardingComplete by viewModel.onboardingComplete.collectAsState()
             val themeMode by viewModel.themeMode.collectAsState()
             val petMood by viewModel.petMood.collectAsState()
@@ -49,26 +55,62 @@ class MainActivity : ComponentActivity() {
             ChorebooHabitTrackerFriendTheme(
                 themeMode = themeMode,
             ) {
-                when (onboardingComplete) {
-                    null -> {
-                        // DataStore not yet loaded — show a brief spinner instead of blank screen
-                        Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
-                            CircularProgressIndicator()
-                        }
+                if (!isAppReady) {
+                    BrandedSplashScreen()
+                } else {
+                    val startDestination = when {
+                        !viewModel.authRepository.isAuthenticated -> Screen.Auth.route
+                        onboardingComplete == false -> Screen.Onboarding.route
+                        else -> Screen.Pet.route
                     }
-                    else -> {
-                        val startDestination = when {
-                            !viewModel.authRepository.isAuthenticated -> Screen.Auth.route
-                            onboardingComplete == false -> Screen.Onboarding.route
-                            else -> Screen.Pet.route
-                        }
-                        ChorebooApp(
-                            startDestination = startDestination,
-                            petMood = petMood,
-                        )
-                    }
+                    ChorebooApp(
+                        startDestination = startDestination,
+                        petMood = petMood,
+                    )
                 }
             }
+        }
+    }
+}
+
+/**
+ * Branded splash screen shown while the app initialises (DataStore, Room warmup,
+ * cloud sync, and Lottie animation preloading). Displays the Choreboo egg emoji,
+ * app name, and a loading spinner.
+ */
+@Composable
+private fun BrandedSplashScreen() {
+    Box(
+        modifier = Modifier
+            .fillMaxSize()
+            .background(MaterialTheme.colorScheme.surface),
+        contentAlignment = Alignment.Center,
+    ) {
+        Column(
+            horizontalAlignment = Alignment.CenterHorizontally,
+            verticalArrangement = Arrangement.Center,
+        ) {
+            Text(
+                text = "\uD83E\uDD5A",
+                fontSize = 64.sp,
+            )
+            Spacer(modifier = Modifier.height(16.dp))
+            Text(
+                text = "Choreboo",
+                style = MaterialTheme.typography.headlineLarge,
+                fontWeight = FontWeight.Bold,
+                color = MaterialTheme.colorScheme.primary,
+            )
+            Spacer(modifier = Modifier.height(24.dp))
+            CircularProgressIndicator(
+                color = MaterialTheme.colorScheme.primary,
+            )
+            Spacer(modifier = Modifier.height(12.dp))
+            Text(
+                text = "Loading...",
+                style = MaterialTheme.typography.bodyMedium,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+            )
         }
     }
 }

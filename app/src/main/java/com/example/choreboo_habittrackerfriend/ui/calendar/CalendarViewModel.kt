@@ -40,17 +40,28 @@ class CalendarViewModel @Inject constructor(
     val profilePhotoUri: StateFlow<String?> = userPreferences.profilePhotoUri
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), null)
 
-    val googlePhotoUrl: String?
-        get() = authRepository.currentFirebaseUser?.photoUrl?.toString()
+    val googlePhotoUrl: StateFlow<String?> = authRepository.currentUser
+        .map { it?.photoUrl?.toString() }
+        .stateIn(
+            viewModelScope,
+            SharingStarted.WhileSubscribed(5000),
+            authRepository.currentFirebaseUser?.photoUrl?.toString(),
+        )
 
     /** Map of date → number of completions for the currently selected month */
     val completionsForMonth: StateFlow<Map<LocalDate, Int>> = _selectedMonth
         .flatMapLatest { month ->
             habitRepository.getLogsForMonth(month.toString())
                 .map { logs ->
-                    logs.groupBy { log ->
-                        LocalDate.parse(log.date)
-                    }.mapValues { (_, logList) -> logList.size }
+                    logs.mapNotNull { log ->
+                        try {
+                            LocalDate.parse(log.date) to log
+                        } catch (_: Exception) {
+                            null // skip malformed dates
+                        }
+                    }
+                        .groupBy { it.first }
+                        .mapValues { (_, pairs) -> pairs.size }
                 }
         }
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), emptyMap())

@@ -22,5 +22,6 @@ data class HabitEntity(
     val ownerUid: String? = null,
     val householdId: String? = null,
     val assignedToUid: String? = null,
+    val assignedToName: String? = null,
     val remoteId: String? = null,
 )

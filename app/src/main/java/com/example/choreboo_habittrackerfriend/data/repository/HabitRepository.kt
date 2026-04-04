@@ -54,9 +54,20 @@ class HabitRepository @Inject constructor(
         entities.map { it.toDomain() }
     }
 
+    /**
+     * Get habits for a specific user: personal habits they own, or household habits assigned to them.
+     */
+    fun getHabitsForUser(uid: String): Flow<List<Habit>> = habitDao.getHabitsForUser(uid).map { entities ->
+        entities.map { it.toDomain() }
+    }
+
     fun getHabitById(id: Long): Flow<Habit?> = habitDao.getHabitById(id).map { it?.toDomain() }
 
     suspend fun upsertHabit(habit: Habit): Long {
+        require(habit.title.isNotBlank()) { "Habit title must not be blank" }
+        require(habit.title.length <= 100) { "Habit title must be 100 characters or fewer, was ${habit.title.length}" }
+        require(habit.baseXp > 0) { "Habit baseXp must be positive, was ${habit.baseXp}" }
+
         val localId = habitDao.upsertHabit(habit.toEntity())
 
         // Write-through to Data Connect
@@ -157,6 +168,8 @@ class HabitRepository @Inject constructor(
     }
 
     suspend fun completeHabit(habitId: Long): CompletionResult {
+        require(habitId > 0) { "habitId must be positive, was $habitId" }
+
         val today = LocalDate.now().format(dateFormatter)
         val habitEntity = habitDao.getHabitByIdSync(habitId)
             ?: return CompletionResult(xpEarned = 0, newStreak = 0, alreadyComplete = true)
@@ -203,7 +216,11 @@ class HabitRepository @Inject constructor(
             }
         }
 
-        val streak = calculateStreak(habitId, today)
+        val parsedCustomDays = habitEntity.customDays
+            .split(",")
+            .map { it.trim() }
+            .filter { it.isNotEmpty() }
+        val streak = calculateStreak(habitId, today, parsedCustomDays)
         val baseXp = habitEntity.baseXp
         val xpEarned = (baseXp + (streak * 2)).coerceAtMost(baseXp * 3)
 
@@ -259,23 +276,77 @@ class HabitRepository @Inject constructor(
         )
     }
 
-    private suspend fun calculateStreak(habitId: Long, today: String): Int {
+    /**
+     * Calculates the current streak for a habit, correctly skipping non-scheduled days.
+     *
+     * For CUSTOM habits the algorithm walks backward from yesterday, skipping any day that
+     * is not in the habit's schedule (weekly day-codes like "MON" or monthly day-of-month
+     * codes like "D15"). A streak is broken only when a *scheduled* day has no completion log.
+     *
+     * @param habitId      local Room ID of the habit
+     * @param today        today's date in ISO-8601 format (yyyy-MM-dd)
+     * @param customDays   parsed customDays list (e.g. ["MON","WED","FRI"] or ["D1","D15"])
+     */
+    private suspend fun calculateStreak(habitId: Long, today: String, customDays: List<String>): Int {
         val dates = habitLogDao.getCompletionDatesForHabit(habitId)
         if (dates.isEmpty()) return 0
 
-        var streak = 0
-        var checkDate = LocalDate.parse(today, dateFormatter).minusDays(1)
-        for (dateStr in dates) {
-            val logDate = LocalDate.parse(dateStr, dateFormatter)
-            if (logDate == checkDate) {
-                streak++
-                checkDate = checkDate.minusDays(1)
-            } else if (logDate.isBefore(checkDate)) {
-                break
+        val dateSet = dates.toHashSet()
+
+        // Separate weekly codes (e.g. "MON") from monthly codes (e.g. "D15")
+        val weeklyDays = customDays
+            .filter { it.length == 3 && it.all { c -> c.isLetter() } }
+            .map { it.uppercase() }
+            .toSet()
+        val monthlyDays = customDays
+            .filter { it.startsWith("D", ignoreCase = true) }
+            .mapNotNull { it.substring(1).toIntOrNull() }
+            .toSet()
+
+        // If no recognisable schedule codes are present, treat as daily.
+        val isDaily = weeklyDays.isEmpty() && monthlyDays.isEmpty()
+
+        /**
+         * Returns true if [date] is a scheduled day according to this habit's custom days.
+         * When [isDaily] is true every day is scheduled.
+         */
+        fun isScheduled(date: LocalDate): Boolean {
+            if (isDaily) return true
+            if (weeklyDays.isNotEmpty()) {
+                val dayCode = date.dayOfWeek.name.take(3).uppercase()
+                if (dayCode in weeklyDays) return true
             }
+            if (monthlyDays.isNotEmpty()) {
+                val dom = date.dayOfMonth
+                val lastDom = date.lengthOfMonth()
+                // "D31" matches the last day of any month
+                if (dom in monthlyDays) return true
+                if (31 in monthlyDays && dom == lastDom) return true
+            }
+            return false
         }
-        // If today already has logs, count today too
-        if (dates.contains(today)) {
+
+        var streak = 0
+        // Walk backward from yesterday (today is counted separately at the end)
+        var checkDate = LocalDate.parse(today, dateFormatter).minusDays(1)
+        val maxLookback = 365 // safety limit — no streak can span more than a year
+        var daysWalked = 0
+        while (daysWalked < maxLookback) {
+            if (isScheduled(checkDate)) {
+                val dateStr = checkDate.format(dateFormatter)
+                if (dateStr in dateSet) {
+                    streak++
+                } else {
+                    break // scheduled day was missed — streak ends here
+                }
+            }
+            // Non-scheduled day: skip without breaking the streak
+            checkDate = checkDate.minusDays(1)
+            daysWalked++
+        }
+
+        // Count today if already completed
+        if (today in dateSet) {
             streak++
         }
         return streak
@@ -337,7 +408,7 @@ class HabitRepository @Inject constructor(
             it.ownerUid == uid && it.isHouseholdHabit
         }
         for (entity in ownHouseholdHabits) {
-            val updated = entity.copy(isHouseholdHabit = false, householdId = null, assignedToUid = null)
+            val updated = entity.copy(isHouseholdHabit = false, householdId = null, assignedToUid = null, assignedToName = null)
             habitDao.upsertHabit(updated)
 
             // Write-through: update in Data Connect (silent on failure)
@@ -401,6 +472,7 @@ class HabitRepository @Inject constructor(
                     ownerUid = uid,
                     householdId = cloudHabit.household?.id?.toString(),
                     assignedToUid = cloudHabit.assignedTo?.id,
+                    assignedToName = cloudHabit.assignedTo?.displayName,
                     remoteId = remoteId,
                 )
                 habitDao.upsertHabit(entity)
@@ -412,7 +484,7 @@ class HabitRepository @Inject constructor(
                 .filter { it.ownerUid == uid && it.remoteId !in cloudRemoteIds }
                 .map { it.id }
             if (orphanIds.isNotEmpty()) {
-                habitDao.deleteByIds(orphanIds)
+                orphanIds.chunked(500).forEach { chunk -> habitDao.deleteByIds(chunk) }
                 Log.d(TAG, "Deleted ${orphanIds.size} orphaned personal habits not present in cloud")
             }
 
@@ -459,6 +531,7 @@ class HabitRepository @Inject constructor(
                     ownerUid = cloudHabit.owner.id, // preserve original owner
                     householdId = householdId,
                     assignedToUid = cloudHabit.assignedTo?.id,
+                    assignedToName = cloudHabit.assignedTo?.displayName,
                     remoteId = remoteId,
                 )
                 habitDao.upsertHabit(entity)
@@ -470,7 +543,7 @@ class HabitRepository @Inject constructor(
                 .filter { it.remoteId !in cloudHouseholdRemoteIds }
                 .map { it.id }
             if (staleIds.isNotEmpty()) {
-                habitDao.deleteByIds(staleIds)
+                staleIds.chunked(500).forEach { chunk -> habitDao.deleteByIds(chunk) }
                 Log.d(TAG, "Deleted ${staleIds.size} stale other-member household habits")
             }
 
@@ -587,7 +660,7 @@ class HabitRepository @Inject constructor(
                 .filter { it.remoteId !in cloudLogRemoteIds }
                 .map { it.id }
             if (orphanLogIds.isNotEmpty()) {
-                habitLogDao.deleteLogsByIds(orphanLogIds)
+                orphanLogIds.chunked(500).forEach { chunk -> habitLogDao.deleteLogsByIds(chunk) }
                 Log.d(TAG, "Deleted ${orphanLogIds.size} orphaned habit logs not present in cloud")
             }
         } catch (e: Exception) {
@@ -619,6 +692,7 @@ private fun HabitEntity.toDomain() = Habit(
     ownerUid = ownerUid,
     householdId = householdId,
     assignedToUid = assignedToUid,
+    assignedToName = assignedToName,
     remoteId = remoteId,
 )
 
@@ -638,5 +712,6 @@ private fun Habit.toEntity() = HabitEntity(
     ownerUid = ownerUid,
     householdId = householdId,
     assignedToUid = assignedToUid,
+    assignedToName = assignedToName,
     remoteId = remoteId,
 )

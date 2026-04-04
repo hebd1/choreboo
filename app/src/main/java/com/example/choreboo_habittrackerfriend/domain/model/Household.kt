@@ -16,9 +16,11 @@ data class HouseholdMember(
 )
 
 /**
- * Represents a household habit with its today-completion status.
+ * Represents a household habit with its today-completion status and assignment info.
  * [completedByName] is non-null when someone in the household has already completed
  * this habit today, showing who did it.
+ * [assignedToUid] and [assignedToName] show who the habit is assigned to;
+ * both null means the habit is unassigned.
  */
 data class HouseholdHabitStatus(
     val habitId: String,
@@ -26,6 +28,9 @@ data class HouseholdHabitStatus(
     val iconName: String,
     val ownerName: String,
     val ownerUid: String,
+    val baseXp: Int,
+    val assignedToUid: String? = null,
+    val assignedToName: String? = null,
     val completedByName: String? = null,
     val completedByUid: String? = null,
 )

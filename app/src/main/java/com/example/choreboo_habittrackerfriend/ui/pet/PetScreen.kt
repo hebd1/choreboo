@@ -108,6 +108,7 @@ fun PetScreen(
     val isEating by viewModel.isEating.collectAsStateWithLifecycle()
     val isSleeping by viewModel.isSleeping.collectAsStateWithLifecycle()
     val profilePhotoUri by viewModel.profilePhotoUri.collectAsStateWithLifecycle()
+    val googlePhotoUrl by viewModel.googlePhotoUrl.collectAsStateWithLifecycle()
     val petType by viewModel.petType.collectAsStateWithLifecycle()
 
     // Habit state
@@ -133,25 +134,29 @@ fun PetScreen(
             when (event) {
                 is PetEvent.Fed -> {
                     snackbarHostState.showSnackbar(
-                        "Yum! Your Choreboo loved that! \uD83D\uDE0B",
+                        message = "Yum! Your Choreboo loved that! \uD83D\uDE0B",
+                        actionLabel = "success",
                         duration = SnackbarDuration.Short,
                     )
                 }
                 is PetEvent.InsufficientPoints -> {
                     snackbarHostState.showSnackbar(
-                        "Not enough points to feed! Complete habits to earn more. \uD83D\uDCAA",
+                        message = "Not enough points to feed! Complete habits to earn more. \uD83D\uDCAA",
+                        actionLabel = "error",
                         duration = SnackbarDuration.Short,
                     )
                 }
                 is PetEvent.Sleeping -> {
                     snackbarHostState.showSnackbar(
-                        "Your Choreboo is now sleeping! \uD83D\uDE34 Stats are frozen for 24 hours.",
+                        message = "Your Choreboo is now sleeping! \uD83D\uDE34 Stats are frozen for 24 hours.",
+                        actionLabel = "info",
                         duration = SnackbarDuration.Short,
                     )
                 }
                 is PetEvent.AlreadySleeping -> {
                     snackbarHostState.showSnackbar(
-                        "Your Choreboo is already sleeping! Let them rest. \uD83D\uDCA4",
+                        message = "Your Choreboo is already sleeping! Let them rest. \uD83D\uDCA4",
+                        actionLabel = "info",
                         duration = SnackbarDuration.Short,
                     )
                 }
@@ -162,12 +167,14 @@ fun PetScreen(
                     }
                     snackbarHostState.showSnackbar(
                         message = "+${event.xpEarned} XP! \uD83D\uDD25 ${event.streak}-day streak!",
+                        actionLabel = "achievement",
                         duration = SnackbarDuration.Short,
                     )
                 }
                 is PetEvent.AlreadyComplete -> {
                     snackbarHostState.showSnackbar(
                         message = "Already completed for today! \u2705",
+                        actionLabel = "info",
                         duration = SnackbarDuration.Short,
                     )
                 }
@@ -200,7 +207,7 @@ fun PetScreen(
                     Row(verticalAlignment = Alignment.CenterVertically) {
                         ProfileAvatar(
                             profilePhotoUri = profilePhotoUri,
-                            googlePhotoUrl = viewModel.googlePhotoUrl,
+                            googlePhotoUrl = googlePhotoUrl,
                             size = 40.dp,
                         )
                         Spacer(modifier = Modifier.width(12.dp))
@@ -296,6 +303,20 @@ fun PetScreen(
                                 onThumbsUpComplete = { showThumbsUp = false },
                                 onTap = { isInteracting = true },
                                 modifier = Modifier.size(160.dp),
+                            )
+
+                            // Pet name — top center of animation box
+                            Text(
+                                text = stats.name,
+                                style = MaterialTheme.typography.titleMedium,
+                                fontWeight = FontWeight.Bold,
+                                color = MaterialTheme.colorScheme.onSurface,
+                                modifier = Modifier
+                                    .align(Alignment.TopCenter)
+                                    .padding(top = 10.dp)
+                                    .clip(RoundedCornerShape(50.dp))
+                                    .background(MaterialTheme.colorScheme.surfaceContainerHighest.copy(alpha = 0.8f))
+                                    .padding(horizontal = 14.dp, vertical = 6.dp),
                             )
 
                             // Mood pill at bottom — tappable to show stat overlay
@@ -1184,11 +1205,18 @@ private fun PetAnimation(
                 AnimationPhase.SLEEPING -> sleepingComposition
             }
 
-            LottieAnimation(
-                composition = currentComposition,
-                progress = { lottieAnimatable.progress },
-                modifier = modifier.clickable { onTap() },
-            )
+            if (currentComposition != null) {
+                LottieAnimation(
+                    composition = currentComposition,
+                    progress = { lottieAnimatable.progress },
+                    modifier = modifier.clickable { onTap() },
+                )
+            } else {
+                // Composition still parsing — show the pet's emoji so the space is never blank.
+                Box(modifier = modifier.clickable { onTap() }, contentAlignment = Alignment.Center) {
+                    Text(text = petType.emoji, fontSize = 64.sp)
+                }
+            }
         }
     } else {
         val sizeMultiplier = 64.sp

@@ -37,6 +37,9 @@ class AuthRepository @Inject constructor(
         get() = firebaseAuth.currentUser
 
     suspend fun signInWithEmail(email: String, password: String): AuthResult {
+        require(email.isNotBlank()) { "Email must not be blank" }
+        require(password.isNotBlank()) { "Password must not be blank" }
+
         return try {
             val result = firebaseAuth.signInWithEmailAndPassword(email, password).await()
             val user = result.user ?: return AuthResult.Error("Sign-in failed: no user returned.")
@@ -47,6 +50,9 @@ class AuthRepository @Inject constructor(
     }
 
     suspend fun signUpWithEmail(email: String, password: String): AuthResult {
+        require(email.isNotBlank()) { "Email must not be blank" }
+        require(password.isNotBlank()) { "Password must not be blank" }
+
         return try {
             val result = firebaseAuth.createUserWithEmailAndPassword(email, password).await()
             val user = result.user ?: return AuthResult.Error("Sign-up failed: no user returned.")
@@ -68,6 +74,8 @@ class AuthRepository @Inject constructor(
     }
 
     suspend fun sendPasswordReset(email: String): AuthResult {
+        require(email.isNotBlank()) { "Email must not be blank" }
+
         return try {
             firebaseAuth.sendPasswordResetEmail(email).await()
             AuthResult.ResetEmailSent
@@ -81,7 +89,7 @@ class AuthRepository @Inject constructor(
     }
 }
 
-private fun Exception.toFriendlyMessage(): String {
+internal fun Exception.toFriendlyMessage(): String {
     val raw = message ?: return "An unknown error occurred."
     return when {
         "INVALID_LOGIN_CREDENTIALS" in raw || "invalid-credential" in raw ->

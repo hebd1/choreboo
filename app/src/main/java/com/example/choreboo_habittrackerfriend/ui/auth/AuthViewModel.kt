@@ -6,6 +6,7 @@ import androidx.lifecycle.viewModelScope
 import com.example.choreboo_habittrackerfriend.data.datastore.UserPreferences
 import com.example.choreboo_habittrackerfriend.data.repository.AuthRepository
 import com.example.choreboo_habittrackerfriend.data.repository.AuthResult
+import com.example.choreboo_habittrackerfriend.data.repository.ChorebooRepository
 import com.example.choreboo_habittrackerfriend.data.repository.SyncManager
 import com.example.choreboo_habittrackerfriend.data.repository.UserRepository
 import com.google.android.gms.auth.api.signin.GoogleSignInAccount
@@ -38,6 +39,7 @@ data class AuthFormState(
 class AuthViewModel @Inject constructor(
     private val authRepository: AuthRepository,
     private val userRepository: UserRepository,
+    private val chorebooRepository: ChorebooRepository,
     private val syncManager: SyncManager,
     private val userPreferences: UserPreferences,
 ) : ViewModel() {
@@ -86,16 +88,12 @@ class AuthViewModel @Inject constructor(
             val result = authRepository.signInWithGoogle(account)
             _formState.update { it.copy(isLoading = false) }
 
-            // Auto-set profile photo from Google if no custom photo is already saved
-            if (result is AuthResult.Success) {
-                val photoUrl = account.photoUrl?.toString()
-                    ?: result.user.photoUrl?.toString()
-                if (photoUrl != null && userPreferences.profilePhotoUri.first() == null) {
-                    userPreferences.setProfilePhotoUri(photoUrl)
-                }
-            }
+            // Prefer the GoogleSignInAccount photo URL (highest quality); fall back to the
+            // FirebaseUser photo URL in case the account object doesn't carry it.
+            val googleAccountPhotoUrl = account.photoUrl?.toString()
+                ?: (result as? AuthResult.Success)?.user?.photoUrl?.toString()
 
-            handleResult(result)
+            handleResult(result, googleAccountPhotoUrl)
         }
     }
 
@@ -138,26 +136,45 @@ class AuthViewModel @Inject constructor(
         return valid
     }
 
-    private suspend fun handleResult(result: AuthResult) {
+    private suspend fun handleResult(result: AuthResult, googleAccountPhotoUrl: String? = null) {
         when (result) {
             is AuthResult.Success -> {
-                // Phase 1: Push local user to cloud
+                // Auto-save profile photo if none is stored yet.
+                // Priority: Google account photo URL > FirebaseUser photo URL (covers email users
+                // whose Firebase account was previously linked to Google).
+                val photoToSave = googleAccountPhotoUrl ?: result.user.photoUrl?.toString()
+                if (photoToSave != null && userPreferences.profilePhotoUri.first() == null) {
+                    userPreferences.setProfilePhotoUri(photoToSave)
+                }
+
+                // Phase 1: Pull cloud data into Room (force = true bypasses the cooldown).
+                // syncAll() primes the auth token first — syncCurrentUserToCloud() comes
+                // after so it can benefit from the token already being in the gRPC interceptor.
+                _formState.update { it.copy(isSyncing = true) }
+                val syncSucceeded = syncManager.syncAll(force = true)
+                _formState.update { it.copy(isSyncing = false) }
+
+                // Phase 2: Push local user record to cloud.
+                // Done after syncAll() so the token is already cached by the gRPC interceptor.
                 try {
                     userRepository.syncCurrentUserToCloud()
                 } catch (_: Exception) {
                     // Non-blocking: cloud user upsert failure shouldn't prevent login
                 }
 
-                // Phase 2: Pull cloud data into Room (force = true bypasses the cooldown)
-                _formState.update { it.copy(isSyncing = true) }
-                val syncSucceeded = syncManager.syncAll(force = true)
-                _formState.update { it.copy(isSyncing = false) }
-
                 if (!syncSucceeded) {
                     _events.emit(AuthEvent.ShowMessage("Signed in — couldn't sync cloud data"))
                 }
 
-                _events.emit(AuthEvent.AuthSuccess(result.user.uid))
+                // Phase 3: Detect whether this user has already completed onboarding.
+                // A non-null choreboo in Room (just synced from cloud) means they have.
+                // Restore the local DataStore flag so cold-start and post-login both agree.
+                val hasChoreboo = chorebooRepository.getChorebooSync() != null
+                if (hasChoreboo) {
+                    userPreferences.setOnboardingComplete(true)
+                }
+
+                _events.emit(AuthEvent.AuthSuccess(result.user.uid, onboardingComplete = hasChoreboo))
             }
             is AuthResult.Error -> _events.emit(AuthEvent.ShowError(result.message))
             is AuthResult.ResetEmailSent -> { /* Handled separately in sendPasswordReset() */ }
@@ -166,7 +183,7 @@ class AuthViewModel @Inject constructor(
 }
 
 sealed class AuthEvent {
-    data class AuthSuccess(val uid: String) : AuthEvent()
+    data class AuthSuccess(val uid: String, val onboardingComplete: Boolean) : AuthEvent()
     data class ShowError(val message: String) : AuthEvent()
     data class ShowMessage(val message: String) : AuthEvent()
 }

@@ -78,7 +78,7 @@ import com.google.android.gms.common.api.ApiException
 
 @Composable
 fun AuthScreen(
-    onAuthSuccess: () -> Unit,
+    onAuthSuccess: (onboardingComplete: Boolean) -> Unit,
     viewModel: AuthViewModel = hiltViewModel(),
 ) {
     val formState by viewModel.formState.collectAsState()
@@ -105,9 +105,9 @@ fun AuthScreen(
     LaunchedEffect(Unit) {
         viewModel.events.collect { event ->
             when (event) {
-                is AuthEvent.AuthSuccess -> onAuthSuccess()
-                is AuthEvent.ShowError -> snackbarHostState.showSnackbar(event.message)
-                is AuthEvent.ShowMessage -> snackbarHostState.showSnackbar(event.message)
+                is AuthEvent.AuthSuccess -> onAuthSuccess(event.onboardingComplete)
+                is AuthEvent.ShowError -> snackbarHostState.showSnackbar(message = event.message, actionLabel = "error")
+                is AuthEvent.ShowMessage -> snackbarHostState.showSnackbar(message = event.message, actionLabel = "info")
             }
         }
     }

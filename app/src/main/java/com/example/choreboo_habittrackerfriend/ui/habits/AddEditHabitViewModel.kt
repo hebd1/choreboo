@@ -76,12 +76,17 @@ class AddEditHabitViewModel @Inject constructor(
     val profilePhotoUri: StateFlow<String?> = userPreferences.profilePhotoUri
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), null)
 
-    val googlePhotoUrl: String?
-        get() = authRepository.currentFirebaseUser?.photoUrl?.toString()
+    val googlePhotoUrl: StateFlow<String?> = authRepository.currentUser
+        .map { it?.photoUrl?.toString() }
+        .stateIn(
+            viewModelScope,
+            SharingStarted.WhileSubscribed(5000),
+            authRepository.currentFirebaseUser?.photoUrl?.toString(),
+        )
 
     /** Current household the user belongs to — used for resolving householdId on save. */
     val currentHousehold: StateFlow<Household?> = householdRepository.currentHousehold
-        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), null)
+        .stateIn(viewModelScope, SharingStarted.Eagerly, null)
 
     /** Members of the user's household — used for the assignee picker. */
     val householdMembers: StateFlow<List<HouseholdMember>> = householdRepository.householdMembers
@@ -267,6 +272,7 @@ class AddEditHabitViewModel @Inject constructor(
                 createdAt = existingHabit?.createdAt ?: System.currentTimeMillis(),
                 isArchived = existingHabit?.isArchived ?: false,
                 assignedToUid = if (state.isHouseholdHabit) state.assignedToUid else null,
+                assignedToName = if (state.isHouseholdHabit) state.assignedToName else null,
             )
             val savedHabitId = habitRepository.upsertHabit(habit)
 
@@ -303,7 +309,7 @@ class AddEditHabitViewModel @Inject constructor(
         }
 
         // Low effort keywords
-        val lowEffort = listOf("water", "drink", "vitamin", "pill", "brush", "teeth", "skincare", "floss", "stretch")
+        val lowEffort = listOf("water", "drink", "vitamin", "pill", "brush", "teeth", "skincare", "floss")
         if (lowEffort.any { text.contains(it) }) {
             return 10
         }

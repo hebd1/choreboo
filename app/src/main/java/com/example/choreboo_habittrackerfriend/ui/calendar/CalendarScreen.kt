@@ -67,6 +67,7 @@ fun CalendarScreen(
     val selectedDateLogs by viewModel.selectedDateLogs.collectAsStateWithLifecycle()
     val totalPoints by viewModel.totalPoints.collectAsStateWithLifecycle()
     val profilePhotoUri by viewModel.profilePhotoUri.collectAsStateWithLifecycle()
+    val googlePhotoUrl by viewModel.googlePhotoUrl.collectAsStateWithLifecycle()
 
     val today = remember { LocalDate.now() }
 
@@ -85,7 +86,7 @@ fun CalendarScreen(
                     ) {
                         ProfileAvatar(
                             profilePhotoUri = profilePhotoUri,
-                            googlePhotoUrl = viewModel.googlePhotoUrl,
+                            googlePhotoUrl = googlePhotoUrl,
                             size = 40.dp,
                         )
                         Text(

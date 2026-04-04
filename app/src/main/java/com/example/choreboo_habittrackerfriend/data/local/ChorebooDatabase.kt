@@ -9,17 +9,20 @@ import com.example.choreboo_habittrackerfriend.data.local.converter.Converters
 import com.example.choreboo_habittrackerfriend.data.local.dao.HabitDao
 import com.example.choreboo_habittrackerfriend.data.local.dao.HabitLogDao
 import com.example.choreboo_habittrackerfriend.data.local.dao.ChorebooDao
+import com.example.choreboo_habittrackerfriend.data.local.dao.HouseholdMemberDao
 import com.example.choreboo_habittrackerfriend.data.local.entity.HabitEntity
 import com.example.choreboo_habittrackerfriend.data.local.entity.HabitLogEntity
 import com.example.choreboo_habittrackerfriend.data.local.entity.ChorebooEntity
+import com.example.choreboo_habittrackerfriend.data.local.entity.HouseholdMemberEntity
 
 @Database(
     entities = [
         HabitEntity::class,
         HabitLogEntity::class,
         ChorebooEntity::class,
+        HouseholdMemberEntity::class,
     ],
-    version = 10,
+    version = 12,
     exportSchema = true,
 )
 @TypeConverters(Converters::class)
@@ -27,6 +30,7 @@ abstract class ChorebooDatabase : RoomDatabase() {
     abstract fun habitDao(): HabitDao
     abstract fun habitLogDao(): HabitLogDao
     abstract fun chorebooDao(): ChorebooDao
+    abstract fun householdMemberDao(): HouseholdMemberDao
 
     companion object {
         @Volatile

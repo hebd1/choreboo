@@ -44,8 +44,9 @@ fun ChorebooNavGraph(
     ) {
         composable(Screen.Auth.route) {
             AuthScreen(
-                onAuthSuccess = {
-                    navController.navigate(Screen.Onboarding.route) {
+                onAuthSuccess = { onboardingComplete ->
+                    val destination = if (onboardingComplete) Screen.Pet.route else Screen.Onboarding.route
+                    navController.navigate(destination) {
                         popUpTo(Screen.Auth.route) { inclusive = true }
                     }
                 }

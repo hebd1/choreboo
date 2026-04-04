@@ -9,6 +9,7 @@ import com.example.choreboo_habittrackerfriend.data.local.ChorebooDatabase
 import com.example.choreboo_habittrackerfriend.data.local.dao.HabitDao
 import com.example.choreboo_habittrackerfriend.data.local.dao.HabitLogDao
 import com.example.choreboo_habittrackerfriend.data.local.dao.ChorebooDao
+import com.example.choreboo_habittrackerfriend.data.local.dao.HouseholdMemberDao
 import com.google.firebase.auth.FirebaseAuth
 
 import dagger.Module
@@ -36,6 +37,9 @@ object AppModule {
 
     @Provides
     fun provideChorebooDao(db: ChorebooDatabase): ChorebooDao = db.chorebooDao()
+
+    @Provides
+    fun provideHouseholdMemberDao(db: ChorebooDatabase): HouseholdMemberDao = db.householdMemberDao()
 
     @Provides
     @Singleton

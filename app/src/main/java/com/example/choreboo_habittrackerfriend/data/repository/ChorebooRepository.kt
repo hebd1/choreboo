@@ -47,6 +47,9 @@ class ChorebooRepository @Inject constructor(
     suspend fun getChorebooSync(): ChorebooStats? = chorebooDao.getChorebooSync()?.toDomain()
 
     suspend fun getOrCreateChoreboo(name: String = "Choreboo", petType: PetType = PetType.FOX): ChorebooEntity {
+        require(name.isNotBlank()) { "Choreboo name must not be blank" }
+        require(name.length <= 20) { "Choreboo name must be 20 characters or fewer, was ${name.length}" }
+
         val existing = chorebooDao.getChorebooSync()
         if (existing != null) return existing
 
@@ -134,6 +137,8 @@ class ChorebooRepository @Inject constructor(
     }
 
     suspend fun addXp(amount: Int): XpResult {
+        require(amount > 0) { "XP amount must be positive, was $amount" }
+
         val choreboo = chorebooDao.getChorebooSync() ?: return XpResult()
         val oldLevel = choreboo.level
         val oldStage = try { ChorebooStage.valueOf(choreboo.stage) } catch (_: Exception) { ChorebooStage.EGG }
@@ -250,6 +255,9 @@ class ChorebooRepository @Inject constructor(
     }
 
     suspend fun updateName(name: String) {
+        require(name.isNotBlank()) { "Choreboo name must not be blank" }
+        require(name.length <= 20) { "Choreboo name must be 20 characters or fewer, was ${name.length}" }
+
         val choreboo = chorebooDao.getChorebooSync() ?: return
         val updated = choreboo.copy(name = name)
         chorebooDao.updateChoreboo(updated)

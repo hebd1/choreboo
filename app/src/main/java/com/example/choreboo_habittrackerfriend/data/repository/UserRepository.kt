@@ -7,7 +7,9 @@ import com.example.choreboo_habittrackerfriend.dataconnect.execute
 import com.example.choreboo_habittrackerfriend.dataconnect.instance
 import com.example.choreboo_habittrackerfriend.domain.model.AppUser
 import com.google.firebase.auth.FirebaseAuth
+import com.google.firebase.auth.UserProfileChangeRequest
 import kotlinx.coroutines.flow.first
+import kotlinx.coroutines.tasks.await
 import javax.inject.Inject
 import javax.inject.Singleton
 
@@ -58,6 +60,28 @@ class UserRepository @Inject constructor(
     }
 
     /**
+     * Updates the user's display name in both Firebase Auth and the cloud User record.
+     * Throws on failure so callers can surface an error to the user.
+     */
+    suspend fun updateDisplayName(name: String) {
+        val trimmed = name.trim()
+        require(trimmed.isNotBlank()) { "Username must not be blank" }
+        require(trimmed.length <= 30) { "Username must be 30 characters or fewer" }
+
+        val user = firebaseAuth.currentUser
+            ?: throw IllegalStateException("No authenticated user")
+
+        val request = UserProfileChangeRequest.Builder()
+            .setDisplayName(trimmed)
+            .build()
+        user.updateProfile(request).await()
+        Log.d(TAG, "Updated Firebase Auth displayName to: $trimmed")
+
+        // Write-through: sync the updated profile (reads fresh from FirebaseAuth) to cloud
+        syncCurrentUserToCloud()
+    }
+
+    /**
      * Fetch current user's profile including household info from Data Connect.
      */
     suspend fun fetchCurrentUserFromCloud(): AppUser? {
@@ -92,6 +116,9 @@ class UserRepository @Inject constructor(
      * Failures are silent (matching write-through convention).
      */
     suspend fun syncPointsToCloud(totalPoints: Int, totalLifetimeXp: Int) {
+        require(totalPoints >= 0) { "totalPoints must be non-negative, was $totalPoints" }
+        require(totalLifetimeXp >= 0) { "totalLifetimeXp must be non-negative, was $totalLifetimeXp" }
+
         if (getCurrentUid() == null) return
         try {
             connector.updateUserPoints.execute(

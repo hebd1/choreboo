@@ -1,5 +1,6 @@
 package com.example.choreboo_habittrackerfriend.ui.settings
 
+import android.app.Activity
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.PickVisualMediaRequest
 import androidx.activity.result.contract.ActivityResultContracts
@@ -24,23 +25,30 @@ import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.AutoAwesome
 import androidx.compose.material.icons.filled.ContentCopy
+import androidx.compose.material.icons.filled.DeleteForever
 import androidx.compose.material.icons.filled.ExitToApp
 import androidx.compose.material.icons.filled.Groups
 import androidx.compose.material.icons.filled.Home
+import androidx.compose.material.icons.filled.Lock
 import androidx.compose.material.icons.filled.Palette
 import androidx.compose.material.icons.filled.Person
 import androidx.compose.material.icons.filled.PersonAdd
 import androidx.compose.material.icons.filled.PhotoCamera
 import androidx.compose.material.icons.filled.Clear
+import androidx.compose.material.icons.filled.Edit
 import androidx.compose.material.icons.filled.Stars
+import androidx.compose.material.icons.filled.Visibility
+import androidx.compose.material.icons.filled.VisibilityOff
 import androidx.compose.material.icons.filled.VolumeUp
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
+import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
+import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.OutlinedTextFieldDefaults
@@ -62,16 +70,25 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
+import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.input.ImeAction
+import androidx.compose.ui.text.input.KeyboardType
+import androidx.compose.ui.text.input.PasswordVisualTransformation
+import androidx.compose.ui.text.input.VisualTransformation
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.hilt.navigation.compose.hiltViewModel
 import com.example.choreboo_habittrackerfriend.ui.components.ProfileAvatar
+import com.google.android.gms.auth.api.signin.GoogleSignIn
+import com.google.android.gms.auth.api.signin.GoogleSignInOptions
+import com.google.android.gms.common.api.ApiException
 import kotlinx.coroutines.launch
 
 @OptIn(ExperimentalMaterial3Api::class)
@@ -81,19 +98,50 @@ fun SettingsScreen(
     onSignOut: () -> Unit = {},
     viewModel: SettingsViewModel = hiltViewModel(),
 ) {
+    val context = LocalContext.current
     val themeMode by viewModel.themeMode.collectAsState()
     val soundEnabled by viewModel.soundEnabled.collectAsState()
     val totalPoints by viewModel.totalPoints.collectAsState()
     val profilePhotoUri by viewModel.profilePhotoUri.collectAsState()
+    val googlePhotoUrl by viewModel.googlePhotoUrl.collectAsState()
+    val isResetting by viewModel.isResetting.collectAsState()
+    val currentDisplayName by viewModel.currentDisplayName.collectAsState()
+    val isUpdatingName by viewModel.isUpdatingName.collectAsState()
+    val isGoogleUser = viewModel.isGoogleUser
     val snackbarHostState = remember { SnackbarHostState() }
     val scope = rememberCoroutineScope()
     var showSignOutDialog by remember { mutableStateOf(false) }
+    var showResetDialog by remember { mutableStateOf(false) }
+    var resetPassword by remember { mutableStateOf("") }
+    var resetPasswordVisible by remember { mutableStateOf(false) }
     var showPhotoOptionsDialog by remember { mutableStateOf(false) }
     var showInviteDialog by remember { mutableStateOf(false) }
     var showJoinDialog by remember { mutableStateOf(false) }
     var showManageMembersDialog by remember { mutableStateOf(false) }
     var showLeaveHouseholdDialog by remember { mutableStateOf(false) }
     var showCreateHouseholdDialog by remember { mutableStateOf(false) }
+    var showEditNameDialog by remember { mutableStateOf(false) }
+    var editNameText by remember { mutableStateOf("") }
+
+    // Google sign-in launcher used for re-authentication before account reset
+    val googleReauthLauncher = rememberLauncherForActivityResult(
+        contract = ActivityResultContracts.StartActivityForResult(),
+    ) { result ->
+        if (result.resultCode == Activity.RESULT_OK) {
+            try {
+                val account = GoogleSignIn.getSignedInAccountFromIntent(result.data)
+                    .getResult(ApiException::class.java)
+                viewModel.resetAccount(googleAccount = account)
+            } catch (e: ApiException) {
+                scope.launch {
+                    snackbarHostState.showSnackbar(
+                        message = "Google sign-in failed. Please try again.",
+                        actionLabel = "error",
+                    )
+                }
+            }
+        }
+    }
 
     // Household state
     val currentHousehold by viewModel.currentHousehold.collectAsState()
@@ -104,14 +152,16 @@ fun SettingsScreen(
         viewModel.events.collect { event ->
             when (event) {
                 is SettingsEvent.SignedOut -> onSignOut()
+                is SettingsEvent.AccountReset -> onSignOut()
                 is SettingsEvent.ShowError -> {
                     scope.launch {
-                        snackbarHostState.showSnackbar(event.message)
+                        snackbarHostState.showSnackbar(message = event.message, actionLabel = "error")
                     }
                 }
                 is SettingsEvent.ShowSuccess -> {
+                    showEditNameDialog = false
                     scope.launch {
-                        snackbarHostState.showSnackbar(event.message)
+                        snackbarHostState.showSnackbar(message = event.message, actionLabel = "success")
                     }
                 }
             }
@@ -124,6 +174,67 @@ fun SettingsScreen(
         if (uri != null) {
             viewModel.onProfilePhotoPicked(uri)
         }
+    }
+
+    if (showEditNameDialog) {
+        AlertDialog(
+            onDismissRequest = { if (!isUpdatingName) showEditNameDialog = false },
+            title = { Text("Change Username") },
+            text = {
+                Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
+                    OutlinedTextField(
+                        value = editNameText,
+                        onValueChange = { if (it.length <= 30) editNameText = it },
+                        label = { Text("Username") },
+                        singleLine = true,
+                        enabled = !isUpdatingName,
+                        modifier = Modifier.fillMaxWidth(),
+                        colors = OutlinedTextFieldDefaults.colors(
+                            focusedBorderColor = MaterialTheme.colorScheme.primary,
+                        ),
+                    )
+                    if (editNameText.length >= 20) {
+                        Text(
+                            text = "${editNameText.length}/30",
+                            style = MaterialTheme.typography.labelSmall,
+                            color = if (editNameText.length == 30) {
+                                MaterialTheme.colorScheme.error
+                            } else {
+                                MaterialTheme.colorScheme.onSurfaceVariant
+                            },
+                        )
+                    }
+                }
+            },
+            confirmButton = {
+                Button(
+                    onClick = {
+                        viewModel.updateDisplayName(editNameText)
+                    },
+                    enabled = !isUpdatingName && editNameText.trim().isNotBlank(),
+                ) {
+                    if (isUpdatingName) {
+                        CircularProgressIndicator(
+                            modifier = Modifier.size(16.dp),
+                            strokeWidth = 2.dp,
+                            color = MaterialTheme.colorScheme.onPrimary,
+                        )
+                        Spacer(modifier = Modifier.width(8.dp))
+                        Text("Saving…")
+                    } else {
+                        Text("Save")
+                    }
+                }
+            },
+            dismissButton = {
+                TextButton(
+                    onClick = { showEditNameDialog = false },
+                    enabled = !isUpdatingName,
+                ) {
+                    Text("Cancel")
+                }
+            },
+        )
     }
 
     if (showSignOutDialog) {
@@ -151,6 +262,123 @@ fun SettingsScreen(
             },
             dismissButton = {
                 TextButton(onClick = { showSignOutDialog = false }) {
+                    Text("Cancel")
+                }
+            },
+        )
+    }
+
+    // Reset Account (Dev) confirmation dialog
+    if (showResetDialog) {
+        AlertDialog(
+            onDismissRequest = {
+                showResetDialog = false
+                resetPassword = ""
+                resetPasswordVisible = false
+            },
+            title = { Text("Reset Account?") },
+            text = {
+                Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                    Text(
+                        "This will permanently delete ALL your data:",
+                        style = MaterialTheme.typography.bodyMedium,
+                        fontWeight = FontWeight.SemiBold,
+                    )
+                    Text(
+                        "• All habits and habit logs\n" +
+                            "• Your Choreboo\n" +
+                            "• Household membership\n" +
+                            "• Your account (Firebase Auth user)",
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    )
+                    Text(
+                        "You will be able to re-register with the same email afterwards.",
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    )
+                    Spacer(modifier = Modifier.height(4.dp))
+                    if (isGoogleUser) {
+                        Text(
+                            "Your google account will be unlinked from app storage.",
+                            style = MaterialTheme.typography.bodySmall,
+                            fontWeight = FontWeight.SemiBold,
+                            color = MaterialTheme.colorScheme.error,
+                        )
+                    } else {
+                        OutlinedTextField(
+                            value = resetPassword,
+                            onValueChange = { resetPassword = it },
+                            label = { Text("Password") },
+                            placeholder = { Text("Enter your password to confirm") },
+                            leadingIcon = {
+                                Icon(
+                                    Icons.Default.Lock,
+                                    contentDescription = null,
+                                    modifier = Modifier.size(20.dp),
+                                )
+                            },
+                            trailingIcon = {
+                                IconButton(onClick = { resetPasswordVisible = !resetPasswordVisible }) {
+                                    Icon(
+                                        if (resetPasswordVisible) Icons.Default.VisibilityOff else Icons.Default.Visibility,
+                                        contentDescription = if (resetPasswordVisible) "Hide password" else "Show password",
+                                    )
+                                }
+                            },
+                            visualTransformation = if (resetPasswordVisible) VisualTransformation.None else PasswordVisualTransformation(),
+                            keyboardOptions = KeyboardOptions(
+                                keyboardType = KeyboardType.Password,
+                                imeAction = ImeAction.Done,
+                            ),
+                            singleLine = true,
+                            modifier = Modifier.fillMaxWidth(),
+                            colors = OutlinedTextFieldDefaults.colors(
+                                focusedBorderColor = MaterialTheme.colorScheme.error,
+                                focusedLabelColor = MaterialTheme.colorScheme.error,
+                            ),
+                        )
+                    }
+                }
+            },
+            confirmButton = {
+                Button(
+                    onClick = {
+                        showResetDialog = false
+                        if (isGoogleUser) {
+                            val gso = GoogleSignInOptions.Builder(GoogleSignInOptions.DEFAULT_SIGN_IN)
+                                .requestIdToken(context.getString(com.example.choreboo_habittrackerfriend.R.string.default_web_client_id))
+                                .requestEmail()
+                                .build()
+                            val client = GoogleSignIn.getClient(context, gso)
+                            googleReauthLauncher.launch(client.signInIntent)
+                        } else {
+                            val pwd = resetPassword
+                            resetPassword = ""
+                            resetPasswordVisible = false
+                            viewModel.resetAccount(password = pwd)
+                        }
+                    },
+                    enabled = isGoogleUser || resetPassword.isNotBlank(),
+                    colors = ButtonDefaults.buttonColors(
+                        containerColor = MaterialTheme.colorScheme.error,
+                    ),
+                ) {
+                    Icon(
+                        Icons.Default.DeleteForever,
+                        contentDescription = null,
+                        modifier = Modifier.size(18.dp),
+                    )
+                    Spacer(modifier = Modifier.width(6.dp))
+                    Text("Reset Everything")
+                }
+            },
+            dismissButton = {
+                TextButton(onClick = {
+                    showResetDialog = false
+                    resetPassword = ""
+                    resetPasswordVisible = false
+                }) {
                     Text("Cancel")
                 }
             },
@@ -215,16 +443,29 @@ fun SettingsScreen(
                     )
                     OutlinedTextField(
                         value = householdName,
-                        onValueChange = { householdName = it },
+                        onValueChange = { if (it.length <= 50) householdName = it },
                         placeholder = { Text("e.g. The Smith Family") },
                         singleLine = true,
                         shape = RoundedCornerShape(12.dp),
                         modifier = Modifier.fillMaxWidth(),
+                        trailingIcon = if (householdName.length > 35) {
+                            {
+                                Text(
+                                    text = "${householdName.length}/50",
+                                    style = MaterialTheme.typography.labelSmall,
+                                    color = if (householdName.length >= 50)
+                                        MaterialTheme.colorScheme.error
+                                    else
+                                        MaterialTheme.colorScheme.onSurfaceVariant,
+                                    modifier = Modifier.padding(end = 8.dp),
+                                )
+                            }
+                        } else null,
                         colors = OutlinedTextFieldDefaults.colors(
-                            unfocusedContainerColor = MaterialTheme.colorScheme.surfaceContainerHigh,
+                            unfocusedContainerColor = MaterialTheme.colorScheme.surfaceContainerLowest,
                             focusedContainerColor = MaterialTheme.colorScheme.surfaceContainerLowest,
-                            unfocusedBorderColor = Color.Transparent,
-                            focusedBorderColor = MaterialTheme.colorScheme.primary.copy(alpha = 0.4f),
+                            unfocusedBorderColor = MaterialTheme.colorScheme.outlineVariant,
+                            focusedBorderColor = MaterialTheme.colorScheme.primary,
                         ),
                     )
                 }
@@ -270,10 +511,10 @@ fun SettingsScreen(
                         shape = RoundedCornerShape(12.dp),
                         modifier = Modifier.fillMaxWidth(),
                         colors = OutlinedTextFieldDefaults.colors(
-                            unfocusedContainerColor = MaterialTheme.colorScheme.surfaceContainerHigh,
+                            unfocusedContainerColor = MaterialTheme.colorScheme.surfaceContainerLowest,
                             focusedContainerColor = MaterialTheme.colorScheme.surfaceContainerLowest,
-                            unfocusedBorderColor = Color.Transparent,
-                            focusedBorderColor = MaterialTheme.colorScheme.primary.copy(alpha = 0.4f),
+                            unfocusedBorderColor = MaterialTheme.colorScheme.outlineVariant,
+                            focusedBorderColor = MaterialTheme.colorScheme.primary,
                         ),
                     )
                 }
@@ -458,7 +699,7 @@ fun SettingsScreen(
                     ) {
                         ProfileAvatar(
                             profilePhotoUri = profilePhotoUri,
-                            googlePhotoUrl = viewModel.googlePhotoUrl,
+                            googlePhotoUrl = googlePhotoUrl,
                             size = 40.dp,
                         )
                         Text(
@@ -779,7 +1020,7 @@ fun SettingsScreen(
                     ) {
                         ProfileAvatar(
                             profilePhotoUri = profilePhotoUri,
-                            googlePhotoUrl = viewModel.googlePhotoUrl,
+                            googlePhotoUrl = googlePhotoUrl,
                             size = 48.dp,
                         )
                         Column(modifier = Modifier.weight(1f)) {
@@ -798,6 +1039,47 @@ fun SettingsScreen(
                         Icon(
                             Icons.Default.PhotoCamera,
                             contentDescription = null,
+                            tint = MaterialTheme.colorScheme.secondary,
+                            modifier = Modifier.size(20.dp),
+                        )
+                    }
+
+                    Spacer(modifier = Modifier.height(16.dp))
+
+                    // Username row
+                    Row(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .clip(RoundedCornerShape(12.dp))
+                            .background(MaterialTheme.colorScheme.surfaceContainerHighest)
+                            .clickable {
+                                editNameText = currentDisplayName
+                                showEditNameDialog = true
+                            }
+                            .padding(12.dp),
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.spacedBy(12.dp),
+                    ) {
+                        Column(modifier = Modifier.weight(1f)) {
+                            Text(
+                                "Username",
+                                style = MaterialTheme.typography.labelSmall,
+                                fontWeight = FontWeight.SemiBold,
+                                color = MaterialTheme.colorScheme.onSurface,
+                            )
+                            Text(
+                                currentDisplayName.ifBlank { "Tap to set username" },
+                                style = MaterialTheme.typography.bodySmall,
+                                color = if (currentDisplayName.isBlank()) {
+                                    MaterialTheme.colorScheme.onSurfaceVariant
+                                } else {
+                                    MaterialTheme.colorScheme.onSurface
+                                },
+                            )
+                        }
+                        Icon(
+                            Icons.Default.Edit,
+                            contentDescription = "Edit username",
                             tint = MaterialTheme.colorScheme.secondary,
                             modifier = Modifier.size(20.dp),
                         )
@@ -836,6 +1118,33 @@ fun SettingsScreen(
                         Icon(Icons.Default.ExitToApp, contentDescription = null, modifier = Modifier.size(18.dp))
                         Spacer(modifier = Modifier.width(8.dp))
                         Text("Sign Out")
+                    }
+
+                    Spacer(modifier = Modifier.height(8.dp))
+
+                    // Dev reset button
+                    Button(
+                        onClick = { showResetDialog = true },
+                        enabled = !isResetting,
+                        colors = ButtonDefaults.buttonColors(
+                            containerColor = MaterialTheme.colorScheme.errorContainer,
+                            contentColor = MaterialTheme.colorScheme.onErrorContainer,
+                        ),
+                        modifier = Modifier.fillMaxWidth(),
+                    ) {
+                        if (isResetting) {
+                            CircularProgressIndicator(
+                                modifier = Modifier.size(18.dp),
+                                strokeWidth = 2.dp,
+                                color = MaterialTheme.colorScheme.onErrorContainer,
+                            )
+                            Spacer(modifier = Modifier.width(8.dp))
+                            Text("Resetting...")
+                        } else {
+                            Icon(Icons.Default.DeleteForever, contentDescription = null, modifier = Modifier.size(18.dp))
+                            Spacer(modifier = Modifier.width(8.dp))
+                            Text("Reset Account (Dev)")
+                        }
                     }
                 }
             }

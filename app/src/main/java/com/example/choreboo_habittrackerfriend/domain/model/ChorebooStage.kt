@@ -8,7 +8,8 @@ enum class ChorebooStage(val xpThreshold: Int, val displayName: String) {
     LEGENDARY(15000, "Legendary");
     companion object {
         fun fromTotalXp(totalXp: Int): ChorebooStage {
-            return entries.reversed().first { totalXp >= it.xpThreshold }
+            val clamped = totalXp.coerceAtLeast(0)
+            return entries.reversed().first { clamped >= it.xpThreshold }
         }
     }
 }
