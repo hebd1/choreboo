@@ -1,10 +1,17 @@
 package com.example.choreboo_habittrackerfriend.ui.pet
 
+import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.Crossfade
 import androidx.compose.animation.animateColorAsState
+import androidx.compose.animation.core.FastOutSlowInEasing
 import androidx.compose.animation.core.tween
+import androidx.compose.animation.fadeIn
+import androidx.compose.animation.fadeOut
+import androidx.compose.animation.scaleIn
+import androidx.compose.animation.scaleOut
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -17,16 +24,22 @@ import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
-import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
-import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.Add
+import androidx.compose.material.icons.filled.Close
+import androidx.compose.material.icons.filled.ExpandMore
 import androidx.compose.material.icons.filled.Stars
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
+import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.ExperimentalMaterial3Api
+import androidx.compose.material3.FloatingActionButton
 import androidx.compose.material3.Icon
 import androidx.compose.material3.LinearProgressIndicator
 import androidx.compose.material3.MaterialTheme
@@ -34,15 +47,14 @@ import androidx.compose.material3.Scaffold
 import androidx.compose.material3.SnackbarDuration
 import androidx.compose.material3.SnackbarHost
 import androidx.compose.material3.SnackbarHostState
-import com.example.choreboo_habittrackerfriend.ui.components.StitchSnackbar
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.material3.TopAppBar
 import androidx.compose.material3.TopAppBarDefaults
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
-import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
+import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
@@ -51,11 +63,15 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.rotate
 import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.graphics.TransformOrigin
 import androidx.compose.ui.hapticfeedback.HapticFeedbackType
 import androidx.compose.ui.platform.LocalHapticFeedback
+import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import androidx.compose.ui.window.Dialog
+import androidx.compose.ui.window.DialogProperties
 import androidx.hilt.navigation.compose.hiltViewModel
 import com.airbnb.lottie.compose.LottieAnimation
 import com.airbnb.lottie.compose.LottieCompositionSpec
@@ -63,55 +79,95 @@ import com.airbnb.lottie.compose.LottieConstants
 import com.airbnb.lottie.compose.rememberLottieAnimatable
 import com.airbnb.lottie.compose.rememberLottieComposition
 import com.example.choreboo_habittrackerfriend.domain.model.ChorebooMood
+import com.example.choreboo_habittrackerfriend.domain.model.Habit
 import com.example.choreboo_habittrackerfriend.domain.model.PetType
+import com.example.choreboo_habittrackerfriend.ui.components.ProfileAvatar
+import com.example.choreboo_habittrackerfriend.ui.components.StitchSnackbar
+import com.example.choreboo_habittrackerfriend.ui.habits.components.HabitCard
 import com.example.choreboo_habittrackerfriend.ui.theme.PetMoodContentStart
 import com.example.choreboo_habittrackerfriend.ui.theme.PetMoodHappyStart
 import com.example.choreboo_habittrackerfriend.ui.theme.PetMoodHungryStart
 import com.example.choreboo_habittrackerfriend.ui.theme.PetMoodSadStart
 import com.example.choreboo_habittrackerfriend.ui.theme.PetMoodTiredStart
 import com.example.choreboo_habittrackerfriend.ui.theme.XpPurple
+import kotlinx.coroutines.launch
 
-private enum class AnimationPhase { MOOD, IDLE, EATING, INTERACTING, START_SLEEPING, SLEEPING }
+private enum class AnimationPhase { MOOD, IDLE, EATING, INTERACTING, THUMBS_UP, START_SLEEPING, SLEEPING }
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun PetScreen(
+    onAddHabit: () -> Unit = {},
+    onEditHabit: (Long) -> Unit = {},
     viewModel: PetViewModel = hiltViewModel(),
 ) {
-    val choreboo by viewModel.chorebooState.collectAsState()
-    val mood by viewModel.currentMood.collectAsState()
-    val totalPoints by viewModel.totalPoints.collectAsState()
-    val isEating by viewModel.isEating.collectAsState()
-    val isSleeping by viewModel.isSleeping.collectAsState()
+    // Choreboo state
+    val choreboo by viewModel.chorebooState.collectAsStateWithLifecycle()
+    val mood by viewModel.currentMood.collectAsStateWithLifecycle()
+    val totalPoints by viewModel.totalPoints.collectAsStateWithLifecycle()
+    val isEating by viewModel.isEating.collectAsStateWithLifecycle()
+    val isSleeping by viewModel.isSleeping.collectAsStateWithLifecycle()
+    val profilePhotoUri by viewModel.profilePhotoUri.collectAsStateWithLifecycle()
+    val petType by viewModel.petType.collectAsStateWithLifecycle()
+
+    // Habit state
+    val habits by viewModel.habits.collectAsStateWithLifecycle()
+    val isLoading by viewModel.isLoading.collectAsStateWithLifecycle()
+    val todayCompletions by viewModel.todayCompletions.collectAsStateWithLifecycle()
+    val streaks by viewModel.streaks.collectAsStateWithLifecycle()
+    val householdCompleterNames by viewModel.householdCompleterNames.collectAsStateWithLifecycle()
+
+    // Local UI state
     val snackbarHostState = remember { SnackbarHostState() }
     var showSleepDialog by remember { mutableStateOf(false) }
+    var showDetailedStats by remember { mutableStateOf(false) }
+    var showLevelUpDialog by remember { mutableStateOf<PetEvent.HabitCompleted?>(null) }
+    var habitToDelete by remember { mutableStateOf<Habit?>(null) }
     var isInteracting by remember { mutableStateOf(false) }
     var showStartSleepAnimation by remember { mutableStateOf(false) }
+    var showThumbsUp by remember { mutableStateOf(false) }
 
+    // Event collector
     LaunchedEffect(Unit) {
         viewModel.events.collect { event ->
             when (event) {
                 is PetEvent.Fed -> {
                     snackbarHostState.showSnackbar(
-                        "Yum! Your Choreboo loved that! 😋",
+                        "Yum! Your Choreboo loved that! \uD83D\uDE0B",
                         duration = SnackbarDuration.Short,
                     )
                 }
                 is PetEvent.InsufficientPoints -> {
                     snackbarHostState.showSnackbar(
-                        "Not enough points to feed! Complete habits to earn more. 💪",
+                        "Not enough points to feed! Complete habits to earn more. \uD83D\uDCAA",
                         duration = SnackbarDuration.Short,
                     )
                 }
                 is PetEvent.Sleeping -> {
                     snackbarHostState.showSnackbar(
-                        "Your Choreboo is now sleeping! 😴 Stats are frozen for 24 hours.",
+                        "Your Choreboo is now sleeping! \uD83D\uDE34 Stats are frozen for 24 hours.",
                         duration = SnackbarDuration.Short,
                     )
                 }
                 is PetEvent.AlreadySleeping -> {
                     snackbarHostState.showSnackbar(
-                        "Your Choreboo is already sleeping! Let them rest. 💤",
+                        "Your Choreboo is already sleeping! Let them rest. \uD83D\uDCA4",
+                        duration = SnackbarDuration.Short,
+                    )
+                }
+                is PetEvent.HabitCompleted -> {
+                    showThumbsUp = true
+                    if (event.leveledUp || event.evolved) {
+                        showLevelUpDialog = event
+                    }
+                    snackbarHostState.showSnackbar(
+                        message = "+${event.xpEarned} XP! \uD83D\uDD25 ${event.streak}-day streak!",
+                        duration = SnackbarDuration.Short,
+                    )
+                }
+                is PetEvent.AlreadyComplete -> {
+                    snackbarHostState.showSnackbar(
+                        message = "Already completed for today! \u2705",
                         duration = SnackbarDuration.Short,
                     )
                 }
@@ -131,16 +187,30 @@ fun PetScreen(
         label = "petBgStart",
     )
 
+    // Compute daily quest stats
+    val scheduledToday = remember(habits) { habits.filter { it.isScheduledForToday() } }
+    val completedToday = remember(scheduledToday, todayCompletions) {
+        scheduledToday.count { (todayCompletions[it.id] ?: 0) >= 1 }
+    }
+
     Scaffold(
         topBar = {
             TopAppBar(
                 title = {
-                    Text(
-                        "My Choreboo",
-                        style = MaterialTheme.typography.headlineMedium,
-                        fontWeight = FontWeight.ExtraBold,
-                        color = MaterialTheme.colorScheme.primary,
-                    )
+                    Row(verticalAlignment = Alignment.CenterVertically) {
+                        ProfileAvatar(
+                            profilePhotoUri = profilePhotoUri,
+                            googlePhotoUrl = viewModel.googlePhotoUrl,
+                            size = 40.dp,
+                        )
+                        Spacer(modifier = Modifier.width(12.dp))
+                        Text(
+                            "My Choreboo",
+                            style = MaterialTheme.typography.headlineMedium,
+                            fontWeight = FontWeight.ExtraBold,
+                            color = MaterialTheme.colorScheme.primary,
+                        )
+                    }
                 },
                 actions = {
                     Row(
@@ -168,6 +238,17 @@ fun PetScreen(
                 colors = TopAppBarDefaults.topAppBarColors(containerColor = Color.Transparent),
             )
         },
+        floatingActionButton = {
+            FloatingActionButton(
+                onClick = onAddHabit,
+                containerColor = MaterialTheme.colorScheme.secondary,
+                contentColor = MaterialTheme.colorScheme.onSecondary,
+                shape = RoundedCornerShape(16.dp),
+                modifier = Modifier.padding(bottom = 72.dp),
+            ) {
+                Icon(Icons.Default.Add, contentDescription = "Add Habit")
+            }
+        },
         snackbarHost = { },
     ) { padding ->
         if (choreboo == null) {
@@ -179,283 +260,214 @@ fun PetScreen(
 
         val stats = choreboo!!
 
-        // Main scrollable content
         Box(modifier = Modifier.fillMaxSize()) {
-            Column(
+            LazyColumn(
                 modifier = Modifier
                     .fillMaxSize()
                     .padding(padding)
-                    .verticalScroll(rememberScrollState()),
-                horizontalAlignment = Alignment.CenterHorizontally,
+                    .padding(horizontal = 16.dp),
+                verticalArrangement = Arrangement.spacedBy(12.dp),
             ) {
-                Spacer(modifier = Modifier.height(16.dp))
-                Box(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .padding(horizontal = 16.dp),
-                ) {
-                    Box(
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .height(220.dp)
-                            .clip(RoundedCornerShape(16.dp))
-                            .background(moodBgStart),
-                        contentAlignment = Alignment.Center,
-                    ) {
-                        // Lottie animation — only fox has real animations for now
-                        PetAnimation(
-                            petType = stats.petType,
-                            mood = mood,
-                            isEating = isEating,
-                            isInteracting = isInteracting,
-                            isSleeping = isSleeping,
-                            showStartSleepAnimation = showStartSleepAnimation,
-                            onEatingComplete = { viewModel.onEatingAnimationComplete() },
-                            onInteractComplete = { isInteracting = false },
-                            onStartSleepComplete = { showStartSleepAnimation = false },
-                            onTap = { isInteracting = true },
-                            modifier = Modifier.size(160.dp),
-                        )
-
-                        // Mood pill at bottom
+                // -------------------------------------------------------
+                // Pet animation box
+                // -------------------------------------------------------
+                item {
+                    Spacer(modifier = Modifier.height(20.dp))
+                    Box(modifier = Modifier.fillMaxWidth()) {
                         Box(
                             modifier = Modifier
-                                .align(Alignment.BottomCenter)
-                                .padding(bottom = 10.dp)
-                                .clip(RoundedCornerShape(50.dp))
-                                .background(MaterialTheme.colorScheme.surfaceContainerHighest.copy(alpha = 0.8f))
-                                .padding(horizontal = 14.dp, vertical = 6.dp),
-                        ) {
-                            Text(
-                                text = if (isSleeping) "😴 SLEEPING" else "${mood.emoji} ${mood.displayName.uppercase()}",
-                                style = MaterialTheme.typography.labelMedium,
-                                fontWeight = FontWeight.Bold,
-                                color = MaterialTheme.colorScheme.onSurface,
-                            )
-                        }
-                    }
-
-                    // Level badge — top-right
-                    Box(
-                        modifier = Modifier
-                            .align(Alignment.TopEnd)
-                            .offset(x = 6.dp, y = (-12).dp)
-                            .rotate(3f)
-                            .clip(RoundedCornerShape(10.dp))
-                            .background(MaterialTheme.colorScheme.secondaryContainer)
-                            .padding(horizontal = 12.dp, vertical = 8.dp),
-                    ) {
-                        Row(
-                            verticalAlignment = Alignment.CenterVertically,
-                            horizontalArrangement = Arrangement.spacedBy(4.dp),
-                        ) {
-                            Text("⭐", fontSize = 18.sp)
-                            Text(
-                                text = "Lv.${stats.level}",
-                                fontWeight = FontWeight.Black,
-                                style = MaterialTheme.typography.titleMedium,
-                                color = MaterialTheme.colorScheme.onSecondaryContainer,
-                            )
-                        }
-                    }
-                }
-
-                // Sleep confirmation dialog
-                if (showSleepDialog) {
-                    AlertDialog(
-                        onDismissRequest = { showSleepDialog = false },
-                        title = {
-                            Text("Put Choreboo to Sleep?", fontWeight = FontWeight.Bold)
-                        },
-                        text = {
-                            Text(
-                                "Your Choreboo will sleep for 24 hours. During this time, their stats will not decrease and they'll be fully rested! 😴\n\nAfter 24 hours, normal stat decay will resume.",
-                            )
-                        },
-                        confirmButton = {
-                            Button(
-                                onClick = {
-                                    showStartSleepAnimation = true
-                                    viewModel.sleepChoreboo()
-                                    showSleepDialog = false
-                                },
-                            ) {
-                                Text("Let Them Sleep")
-                            }
-                        },
-                        dismissButton = {
-                            TextButton(
-                                onClick = { showSleepDialog = false },
-                            ) {
-                                Text("Cancel")
-                            }
-                        },
-                    )
-                }
-
-                Spacer(modifier = Modifier.height(20.dp))
-
-                // Name & XP card
-                Card(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .padding(horizontal = 16.dp),
-                    shape = RoundedCornerShape(16.dp),
-                    colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceContainerLowest.copy(alpha = 0.8f)),
-                    elevation = CardDefaults.cardElevation(defaultElevation = 0.dp),
-                ) {
-                    Column(modifier = Modifier.padding(16.dp)) {
-                        Row(
-                            modifier = Modifier.fillMaxWidth(),
-                            horizontalArrangement = Arrangement.SpaceBetween,
-                            verticalAlignment = Alignment.Bottom,
-                        ) {
-                            Column {
-                                Text(
-                                    text = stats.name,
-                                    style = MaterialTheme.typography.headlineSmall,
-                                    fontWeight = FontWeight.ExtraBold,
-                                )
-                                Text(
-                                    text = "${stats.stage.displayName} ${stats.petType.emoji}",
-                                    style = MaterialTheme.typography.bodyMedium,
-                                    fontWeight = FontWeight.Medium,
-                                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                                )
-                            }
-                            Text(
-                                text = "Lv. ${stats.level}",
-                                style = MaterialTheme.typography.headlineMedium,
-                                fontWeight = FontWeight.Black,
-                                color = XpPurple,
-                            )
-                        }
-
-                        Spacer(modifier = Modifier.height(10.dp))
-
-                        Row(
-                            modifier = Modifier.fillMaxWidth(),
-                            horizontalArrangement = Arrangement.SpaceBetween,
-                        ) {
-                            Text(
-                                text = "XP PROGRESS",
-                                style = MaterialTheme.typography.labelSmall,
-                                fontWeight = FontWeight.Bold,
-                                color = XpPurple,
-                                letterSpacing = 1.sp,
-                            )
-                            Text(
-                                text = "${stats.xp} / ${stats.xpToNextLevel}",
-                                style = MaterialTheme.typography.labelSmall,
-                                fontWeight = FontWeight.Bold,
-                                color = XpPurple,
-                            )
-                        }
-                        Spacer(modifier = Modifier.height(6.dp))
-                        LinearProgressIndicator(
-                            progress = { stats.xpProgressFraction },
-                            modifier = Modifier
                                 .fillMaxWidth()
-                                .height(8.dp)
-                                .clip(RoundedCornerShape(5.dp)),
-                            color = XpPurple,
-                            trackColor = MaterialTheme.colorScheme.surfaceContainerHigh,
-                        )
+                                .height(220.dp)
+                                .clip(RoundedCornerShape(16.dp))
+                                .background(moodBgStart),
+                            contentAlignment = Alignment.Center,
+                        ) {
+                            PetAnimation(
+                                petType = stats.petType,
+                                mood = mood,
+                                isEating = isEating,
+                                isInteracting = isInteracting,
+                                isSleeping = isSleeping,
+                                showStartSleepAnimation = showStartSleepAnimation,
+                                showThumbsUp = showThumbsUp,
+                                onEatingComplete = { viewModel.onEatingAnimationComplete() },
+                                onInteractComplete = { isInteracting = false },
+                                onStartSleepComplete = { showStartSleepAnimation = false },
+                                onThumbsUpComplete = { showThumbsUp = false },
+                                onTap = { isInteracting = true },
+                                modifier = Modifier.size(160.dp),
+                            )
+
+                            // Mood pill at bottom — tappable to show stat overlay
+                            Box(
+                                modifier = Modifier
+                                    .align(Alignment.BottomCenter)
+                                    .padding(bottom = 10.dp)
+                                    .clip(RoundedCornerShape(50.dp))
+                                    .background(MaterialTheme.colorScheme.surfaceContainerHighest.copy(alpha = 0.8f))
+                                    .clickable { showDetailedStats = !showDetailedStats }
+                                    .padding(horizontal = 14.dp, vertical = 6.dp),
+                            ) {
+                                Row(
+                                    verticalAlignment = Alignment.CenterVertically,
+                                    horizontalArrangement = Arrangement.spacedBy(4.dp),
+                                ) {
+                                    Text(
+                                        text = if (isSleeping) "\uD83D\uDE34 SLEEPING" else "${mood.emoji} ${mood.displayName.uppercase()}",
+                                        style = MaterialTheme.typography.labelMedium,
+                                        fontWeight = FontWeight.Bold,
+                                        color = MaterialTheme.colorScheme.onSurface,
+                                    )
+                                    Icon(
+                                        imageVector = Icons.Default.ExpandMore,
+                                        contentDescription = "View stats",
+                                        tint = MaterialTheme.colorScheme.onSurface,
+                                        modifier = Modifier.size(14.dp),
+                                    )
+                                }
+                            }
+                        }
+
+                        // Level badge — top-right, outside the clipped box so it renders unclipped
+                        Box(
+                            modifier = Modifier
+                                .align(Alignment.TopEnd)
+                                .offset(x = 6.dp, y = (-12).dp)
+                                .rotate(3f)
+                                .clip(RoundedCornerShape(10.dp))
+                                .background(MaterialTheme.colorScheme.secondaryContainer)
+                                .padding(horizontal = 12.dp, vertical = 8.dp),
+                        ) {
+                            Row(
+                                verticalAlignment = Alignment.CenterVertically,
+                                horizontalArrangement = Arrangement.spacedBy(4.dp),
+                            ) {
+                                Text("\u2B50", fontSize = 18.sp)
+                                Text(
+                                    text = "Lv.${stats.level}",
+                                    fontWeight = FontWeight.Black,
+                                    style = MaterialTheme.typography.titleMedium,
+                                    color = MaterialTheme.colorScheme.onSecondaryContainer,
+                                )
+                            }
+                        }
                     }
                 }
 
-                Spacer(modifier = Modifier.height(12.dp))
-
-                // Stats bento grid — 2-col top (Hunger + Joy) + full-width Energy
-                Column(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .padding(horizontal = 16.dp),
-                    verticalArrangement = Arrangement.spacedBy(10.dp),
-                ) {
+                // -------------------------------------------------------
+                // Action row — Feed / Play / Sleep
+                // -------------------------------------------------------
+                item {
                     Row(
                         modifier = Modifier.fillMaxWidth(),
                         horizontalArrangement = Arrangement.spacedBy(10.dp),
                     ) {
-                        // Hunger card
-                        StatBentoCard(
+                        ActionButton(
                             modifier = Modifier.weight(1f),
-                            label = "HUNGER",
-                            emoji = "🍖",
-                            value = stats.hunger,
-                            statusText = when {
-                                stats.hunger >= 80 -> "Full"
-                                stats.hunger >= 50 -> "Peckish"
-                                stats.hunger >= 25 -> "Hungry"
-                                else -> "Starving!"
-                            },
-                            barColor = MaterialTheme.colorScheme.secondary,
+                            label = "Feed",
+                            emoji = "\uD83C\uDF56",
+                            onClick = { viewModel.feedChoreboo() },
+                            enabled = totalPoints >= 10 && !isSleeping,
+                            isPrimary = true,
                         )
-                        // Joy / Happiness card
-                        StatBentoCard(
+                        ActionButton(
                             modifier = Modifier.weight(1f),
-                            label = "JOY",
-                            emoji = "💕",
-                            value = stats.happiness,
-                            statusText = when {
-                                stats.happiness >= 80 -> "Happy"
-                                stats.happiness >= 50 -> "Content"
-                                stats.happiness >= 25 -> "Sad"
-                                else -> "Miserable!"
-                            },
-                            barColor = MaterialTheme.colorScheme.primary,
+                            label = "Play",
+                            emoji = "\uD83C\uDFAE",
+                            onClick = { isInteracting = true },
+                            enabled = !isSleeping,
+                            isPrimary = true,
+                        )
+                        ActionButton(
+                            modifier = Modifier.weight(1f),
+                            label = "Sleep",
+                            emoji = "\uD83D\uDE34",
+                            onClick = { showSleepDialog = true },
+                            enabled = !isSleeping,
+                            isPrimary = true,
                         )
                     }
-                    // Energy — full width with status label on right
-                    EnergyBentoCard(
-                        value = stats.energy,
-                        statusText = when {
-                            stats.energy >= 70 -> "Energized"
-                            stats.energy >= 40 -> "Recharging"
-                            stats.energy >= 15 -> "Needs Nap Soon"
-                            else -> "Exhausted!"
-                        },
-                    )
                 }
 
-                Spacer(modifier = Modifier.height(16.dp))
+                // -------------------------------------------------------
+                // Daily Quest section header + Habit list
+                // -------------------------------------------------------
+                if (isLoading) {
+                    item {
+                        Box(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .padding(vertical = 32.dp),
+                            contentAlignment = Alignment.Center,
+                        ) {
+                            CircularProgressIndicator()
+                        }
+                    }
+                } else if (habits.isEmpty()) {
+                    item {
+                        Box(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .padding(vertical = 48.dp),
+                            contentAlignment = Alignment.Center,
+                        ) {
+                            Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                                Text(text = "\uD83D\uDCCB", style = MaterialTheme.typography.displayLarge)
+                                Spacer(modifier = Modifier.height(16.dp))
+                                Text(
+                                    text = "No habits yet!",
+                                    style = MaterialTheme.typography.titleLarge,
+                                    fontWeight = FontWeight.SemiBold,
+                                )
+                                Spacer(modifier = Modifier.height(8.dp))
+                                Text(
+                                    text = "Tap + to create your first habit\nand start earning rewards for your Choreboo!",
+                                    style = MaterialTheme.typography.bodyMedium,
+                                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                    textAlign = TextAlign.Center,
+                                )
+                            }
+                        }
+                    }
+                } else {
+                    item {
+                        Row(
+                            modifier = Modifier.fillMaxWidth(),
+                            horizontalArrangement = Arrangement.SpaceBetween,
+                            verticalAlignment = Alignment.CenterVertically,
+                        ) {
+                            Text(
+                                text = "Daily Quest",
+                                style = MaterialTheme.typography.titleMedium,
+                                fontWeight = FontWeight.Bold,
+                                color = MaterialTheme.colorScheme.onSurface,
+                            )
+                            Text(
+                                text = "$completedToday of ${scheduledToday.size} Completed",
+                                style = MaterialTheme.typography.labelMedium,
+                                fontWeight = FontWeight.Medium,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                            )
+                        }
+                    }
 
-                // Action row — Feed / Play / Sleep equidistant between stats and nav bar
-                Row(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .padding(horizontal = 16.dp),
-                    horizontalArrangement = Arrangement.spacedBy(10.dp),
-                ) {
-                    ActionButton(
-                        modifier = Modifier.weight(1f),
-                        label = "Feed",
-                        emoji = "🍖",
-                        onClick = { viewModel.feedChoreboo() },
-                        enabled = totalPoints >= 10 && !isSleeping,
-                        isPrimary = true,
-                    )
-                    ActionButton(
-                        modifier = Modifier.weight(1f),
-                        label = "Play",
-                        emoji = "🎮",
-                        onClick = { isInteracting = true },
-                        enabled = !isSleeping,
-                        isPrimary = true,
-                    )
-                    ActionButton(
-                        modifier = Modifier.weight(1f),
-                        label = "Sleep",
-                        emoji = "😴",
-                        onClick = { showSleepDialog = true },
-                        enabled = !isSleeping,
-                        isPrimary = true,
-                    )
+                    items(habits, key = { it.id }) { habit ->
+                        HabitCard(
+                            habit = habit,
+                            completedToday = todayCompletions[habit.id] ?: 0,
+                            currentStreak = streaks[habit.id] ?: 0,
+                            isScheduledToday = habit.isScheduledForToday(),
+                            onComplete = { viewModel.completeHabit(habit.id) },
+                            onEdit = { onEditHabit(habit.id) },
+                            onDelete = { habitToDelete = habit },
+                            isOwnedByCurrentUser = habit.ownerUid == viewModel.currentUserUid,
+                            householdCompleterName = householdCompleterNames[habit.id],
+                        )
+                    }
                 }
 
-                // Bottom padding to clear the nav bar
-                Spacer(modifier = Modifier.height(96.dp))
-            }
+                item { Spacer(modifier = Modifier.height(80.dp)) }
+            } // end LazyColumn
 
             // Snackbar pinned above the nav bar
             Box(
@@ -468,13 +480,279 @@ fun PetScreen(
                     StitchSnackbar(data)
                 }
             }
+
+            // Stat detail floating overlay
+            AnimatedVisibility(
+                visible = showDetailedStats,
+                enter = fadeIn(animationSpec = tween(200)),
+                exit = fadeOut(animationSpec = tween(200)),
+            ) {
+                Box(
+                    modifier = Modifier
+                        .fillMaxSize()
+                        .background(Color.Black.copy(alpha = 0.45f))
+                        .clickable(
+                            indication = null,
+                            interactionSource = remember { MutableInteractionSource() },
+                        ) { showDetailedStats = false },
+                    contentAlignment = Alignment.Center,
+                ) {
+                    AnimatedVisibility(
+                        visible = showDetailedStats,
+                        enter = scaleIn(
+                            animationSpec = tween(300, easing = FastOutSlowInEasing),
+                            initialScale = 0.82f,
+                            transformOrigin = TransformOrigin(0.5f, 0.2f),
+                        ) + fadeIn(animationSpec = tween(300)),
+                        exit = scaleOut(
+                            animationSpec = tween(200, easing = FastOutSlowInEasing),
+                            targetScale = 0.82f,
+                            transformOrigin = TransformOrigin(0.5f, 0.2f),
+                        ) + fadeOut(animationSpec = tween(200)),
+                    ) {
+                        Card(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .padding(horizontal = 24.dp)
+                                .clickable(
+                                    indication = null,
+                                    interactionSource = remember { MutableInteractionSource() },
+                                ) { /* consume tap — prevent scrim dismissal */ },
+                            shape = RoundedCornerShape(24.dp),
+                            colors = CardDefaults.cardColors(
+                                containerColor = MaterialTheme.colorScheme.surface,
+                            ),
+                            elevation = CardDefaults.cardElevation(defaultElevation = 8.dp),
+                        ) {
+                            Column(
+                                modifier = Modifier.padding(20.dp),
+                                verticalArrangement = Arrangement.spacedBy(12.dp),
+                            ) {
+                                // Header row
+                                Row(
+                                    modifier = Modifier.fillMaxWidth(),
+                                    horizontalArrangement = Arrangement.SpaceBetween,
+                                    verticalAlignment = Alignment.CenterVertically,
+                                ) {
+                                    Row(
+                                        verticalAlignment = Alignment.CenterVertically,
+                                        horizontalArrangement = Arrangement.spacedBy(10.dp),
+                                    ) {
+                                        Text(
+                                            text = if (isSleeping) "\uD83D\uDE34" else mood.emoji,
+                                            fontSize = 28.sp,
+                                        )
+                                        Column {
+                                            Text(
+                                                text = if (isSleeping) "Sleeping" else mood.displayName,
+                                                style = MaterialTheme.typography.titleMedium,
+                                                fontWeight = FontWeight.Bold,
+                                                color = MaterialTheme.colorScheme.onSurface,
+                                            )
+                                            Text(
+                                                text = "${stats.name}'s stats",
+                                                style = MaterialTheme.typography.labelSmall,
+                                                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                            )
+                                        }
+                                    }
+                                    Box(
+                                        modifier = Modifier
+                                            .size(32.dp)
+                                            .clip(CircleShape)
+                                            .background(MaterialTheme.colorScheme.surfaceContainerHigh)
+                                            .clickable { showDetailedStats = false },
+                                        contentAlignment = Alignment.Center,
+                                    ) {
+                                        Icon(
+                                            imageVector = Icons.Default.Close,
+                                            contentDescription = "Close",
+                                            tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                                            modifier = Modifier.size(16.dp),
+                                        )
+                                    }
+                                }
+
+                                // Hunger + Joy row
+                                Row(
+                                    modifier = Modifier.fillMaxWidth(),
+                                    horizontalArrangement = Arrangement.spacedBy(10.dp),
+                                ) {
+                                    StatBentoCard(
+                                        modifier = Modifier.weight(1f),
+                                        label = "HUNGER",
+                                        emoji = "\uD83C\uDF56",
+                                        value = stats.hunger,
+                                        statusText = when {
+                                            stats.hunger >= 80 -> "Full"
+                                            stats.hunger >= 50 -> "Peckish"
+                                            stats.hunger >= 25 -> "Hungry"
+                                            else -> "Starving!"
+                                        },
+                                        barColor = MaterialTheme.colorScheme.secondary,
+                                    )
+                                    StatBentoCard(
+                                        modifier = Modifier.weight(1f),
+                                        label = "JOY",
+                                        emoji = "\uD83D\uDC95",
+                                        value = stats.happiness,
+                                        statusText = when {
+                                            stats.happiness >= 80 -> "Happy"
+                                            stats.happiness >= 50 -> "Content"
+                                            stats.happiness >= 25 -> "Sad"
+                                            else -> "Miserable!"
+                                        },
+                                        barColor = MaterialTheme.colorScheme.primary,
+                                    )
+                                }
+
+                                // Energy card
+                                EnergyBentoCard(
+                                    value = stats.energy,
+                                    statusText = when {
+                                        stats.energy >= 70 -> "Energized"
+                                        stats.energy >= 40 -> "Recharging"
+                                        stats.energy >= 15 -> "Needs Nap Soon"
+                                        else -> "Exhausted!"
+                                    },
+                                )
+
+                                // XP Progress card
+                                XpProgressCard(
+                                    xp = stats.xp,
+                                    xpToNextLevel = stats.xpToNextLevel,
+                                    xpProgressFraction = stats.xpProgressFraction,
+                                )
+                            }
+                        }
+                    }
+                }
+            }
+        }
+
+        // Sleep confirmation dialog
+        if (showSleepDialog) {
+            AlertDialog(
+                onDismissRequest = { showSleepDialog = false },
+                title = {
+                    Text("Put Choreboo to Sleep?", fontWeight = FontWeight.Bold)
+                },
+                text = {
+                    Text(
+                        "Your Choreboo will sleep for 24 hours. During this time, their stats will not decrease and they'll be fully rested! \uD83D\uDE34\n\nAfter 24 hours, normal stat decay will resume.",
+                    )
+                },
+                confirmButton = {
+                    Button(
+                        onClick = {
+                            showStartSleepAnimation = true
+                            viewModel.sleepChoreboo()
+                            showSleepDialog = false
+                        },
+                    ) {
+                        Text("Let Them Sleep")
+                    }
+                },
+                dismissButton = {
+                    TextButton(
+                        onClick = { showSleepDialog = false },
+                    ) {
+                        Text("Cancel")
+                    }
+                },
+            )
+        }
+
+        // Delete confirmation dialog
+        habitToDelete?.let { habit ->
+            AlertDialog(
+                onDismissRequest = { habitToDelete = null },
+                title = { Text("Delete Habit?", fontWeight = FontWeight.Bold) },
+                text = {
+                    Text("Are you sure you want to delete \"${habit.title}\"? This will also remove all completion history.")
+                },
+                confirmButton = {
+                    TextButton(
+                        onClick = {
+                            viewModel.deleteHabit(habit.id)
+                            habitToDelete = null
+                        },
+                    ) {
+                        Text("Delete", color = MaterialTheme.colorScheme.error)
+                    }
+                },
+                dismissButton = {
+                    TextButton(onClick = { habitToDelete = null }) {
+                        Text("Cancel")
+                    }
+                },
+            )
+        }
+
+        // Level-up celebration dialog
+        showLevelUpDialog?.let { event ->
+            LevelUpDialog(
+                event = event,
+                onDismiss = { showLevelUpDialog = null },
+            )
         }
     }
 }
 
-/**
- * Action button for Feed, Play, Sleep interactions.
- */
+// ---------------------------------------------------------------------------
+// XP Progress card (shown in expandable stats)
+// ---------------------------------------------------------------------------
+
+@Composable
+private fun XpProgressCard(
+    xp: Int,
+    xpToNextLevel: Int,
+    xpProgressFraction: Float,
+) {
+    Box(
+        modifier = Modifier
+            .fillMaxWidth()
+            .clip(RoundedCornerShape(16.dp))
+            .background(MaterialTheme.colorScheme.surfaceContainerLowest)
+            .padding(14.dp),
+    ) {
+        Column {
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.SpaceBetween,
+            ) {
+                Text(
+                    text = "XP PROGRESS",
+                    style = MaterialTheme.typography.labelSmall,
+                    fontWeight = FontWeight.Bold,
+                    color = XpPurple,
+                    letterSpacing = 1.sp,
+                )
+                Text(
+                    text = "$xp / $xpToNextLevel",
+                    style = MaterialTheme.typography.labelSmall,
+                    fontWeight = FontWeight.Bold,
+                    color = XpPurple,
+                )
+            }
+            Spacer(modifier = Modifier.height(8.dp))
+            LinearProgressIndicator(
+                progress = { xpProgressFraction },
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .height(8.dp)
+                    .clip(RoundedCornerShape(5.dp)),
+                color = XpPurple,
+                trackColor = MaterialTheme.colorScheme.surfaceContainerHigh,
+            )
+        }
+    }
+}
+
+// ---------------------------------------------------------------------------
+// Action button for Feed, Play, Sleep interactions
+// ---------------------------------------------------------------------------
+
 @Composable
 private fun ActionButton(
     label: String,
@@ -525,9 +803,10 @@ private fun ActionButton(
     }
 }
 
-/**
- * Small bento stat card for Hunger / Joy.
- */
+// ---------------------------------------------------------------------------
+// Small bento stat card for Hunger / Joy
+// ---------------------------------------------------------------------------
+
 @Composable
 private fun StatBentoCard(
     modifier: Modifier = Modifier,
@@ -535,7 +814,7 @@ private fun StatBentoCard(
     emoji: String,
     value: Int,
     statusText: String,
-    barColor: androidx.compose.ui.graphics.Color,
+    barColor: Color,
 ) {
     Box(
         modifier = modifier
@@ -600,9 +879,10 @@ private fun StatBentoCard(
     }
 }
 
-/**
- * Full-width energy bento card with gradient bar and status on right.
- */
+// ---------------------------------------------------------------------------
+// Full-width energy bento card
+// ---------------------------------------------------------------------------
+
 @Composable
 private fun EnergyBentoCard(
     value: Int,
@@ -631,7 +911,7 @@ private fun EnergyBentoCard(
                     verticalAlignment = Alignment.CenterVertically,
                     horizontalArrangement = Arrangement.spacedBy(6.dp),
                 ) {
-                    Text("⚡", fontSize = 20.sp)
+                    Text("\u26A1", fontSize = 20.sp)
                     Text(
                         text = "ENERGY LEVELS",
                         style = MaterialTheme.typography.labelSmall,
@@ -679,19 +959,74 @@ private fun EnergyBentoCard(
     }
 }
 
-/**
- * Renders the correct Lottie animation for the pet type and mood with phase-based state machine.
- * - FOX: cycles through MOOD → IDLE (×3) → MOOD, with EATING and INTERACTING as interrupts
- * - Other pets: falls back to emoji placeholder until animations are added
- *
- * Animation phases:
- * - MOOD: displays mood-specific animation (happy/hungry/sad) once
- * - IDLE: displays idle animation 3 times in a row
- * - EATING: displays eating animation once (triggered by feed)
- * - INTERACTING: displays interact animation once (triggered by play or tap)
- *
- * Transitions fade between phases with a 100ms crossfade.
- */
+// ---------------------------------------------------------------------------
+// Level-up celebration dialog
+// ---------------------------------------------------------------------------
+
+@Composable
+private fun LevelUpDialog(
+    event: PetEvent.HabitCompleted,
+    onDismiss: () -> Unit,
+) {
+    Dialog(
+        onDismissRequest = onDismiss,
+        properties = DialogProperties(usePlatformDefaultWidth = false),
+    ) {
+        Box(
+            modifier = Modifier
+                .fillMaxSize()
+                .padding(bottom = 100.dp)
+                .padding(horizontal = 24.dp),
+            contentAlignment = Alignment.BottomCenter,
+        ) {
+            Card(
+                shape = RoundedCornerShape(24.dp),
+                colors = CardDefaults.cardColors(
+                    containerColor = MaterialTheme.colorScheme.secondary,
+                    contentColor = MaterialTheme.colorScheme.onSecondary,
+                ),
+                elevation = CardDefaults.cardElevation(defaultElevation = 8.dp),
+            ) {
+                Column(
+                    modifier = Modifier.padding(24.dp),
+                    horizontalAlignment = Alignment.CenterHorizontally,
+                ) {
+                    Text(
+                        text = if (event.evolved) "\uD83C\uDF89 Evolution! \uD83C\uDF89" else "\uD83C\uDF89 Level Up! \uD83C\uDF89",
+                        style = MaterialTheme.typography.titleLarge,
+                        fontWeight = FontWeight.Bold,
+                        color = MaterialTheme.colorScheme.onSecondary,
+                        textAlign = TextAlign.Center,
+                    )
+                    Spacer(modifier = Modifier.height(12.dp))
+                    Text(
+                        text = if (event.evolved)
+                            "Your Choreboo evolved to ${event.newStageName}! \uD83C\uDF1F\nNow Level ${event.newLevel}!"
+                        else
+                            "Your Choreboo reached Level ${event.newLevel}! \uD83C\uDF1F\nKeep completing habits to evolve!",
+                        style = MaterialTheme.typography.bodyLarge,
+                        color = MaterialTheme.colorScheme.onSecondary,
+                        textAlign = TextAlign.Center,
+                    )
+                    Spacer(modifier = Modifier.height(20.dp))
+                    TextButton(onClick = onDismiss) {
+                        Text(
+                            text = "Awesome! \uD83C\uDF8A",
+                            style = MaterialTheme.typography.labelLarge,
+                            fontWeight = FontWeight.Bold,
+                            color = MaterialTheme.colorScheme.onSecondary,
+                        )
+                    }
+                }
+            }
+        }
+    }
+}
+
+// ---------------------------------------------------------------------------
+// Pet Lottie animation state machine
+// ---------------------------------------------------------------------------
+
 @Composable
 private fun PetAnimation(
     petType: PetType,
@@ -700,17 +1035,18 @@ private fun PetAnimation(
     isInteracting: Boolean,
     isSleeping: Boolean,
     showStartSleepAnimation: Boolean,
+    showThumbsUp: Boolean,
     onEatingComplete: () -> Unit,
     onInteractComplete: () -> Unit,
     onStartSleepComplete: () -> Unit,
+    onThumbsUpComplete: () -> Unit,
     onTap: () -> Unit,
     modifier: Modifier = Modifier,
 ) {
     if (petType == PetType.FOX) {
-        // State for animation phase cycling
         var phase by remember { mutableStateOf(AnimationPhase.MOOD) }
 
-        // Preload all 6 compositions eagerly for instant switching
+        // Always-needed compositions — load eagerly so the first frame is instant.
         val happyComposition by rememberLottieComposition(
             LottieCompositionSpec.Asset("animations/fox/fox_happy_lottie.json"),
         )
@@ -723,11 +1059,17 @@ private fun PetAnimation(
         val idleComposition by rememberLottieComposition(
             LottieCompositionSpec.Asset("animations/fox/fox_idle_lottie.json"),
         )
+
+        // Triggered compositions — loaded eagerly for API compatibility, but only
+        // play when their corresponding phase is active.
         val eatingComposition by rememberLottieComposition(
             LottieCompositionSpec.Asset("animations/fox/fox_eating_lottie.json"),
         )
         val interactComposition by rememberLottieComposition(
             LottieCompositionSpec.Asset("animations/fox/fox_interact_lottie.json"),
+        )
+        val thumbsUpComposition by rememberLottieComposition(
+            LottieCompositionSpec.Asset("animations/fox/fox_thumbs_up_lottie.json"),
         )
         val startSleepComposition by rememberLottieComposition(
             LottieCompositionSpec.Asset("animations/fox/fox_start_sleep_lottie.json"),
@@ -736,10 +1078,8 @@ private fun PetAnimation(
             LottieCompositionSpec.Asset("animations/fox/fox_loop_sleeping_lottie.json"),
         )
 
-        // Lottie animatable for manual control over animation playback
         val lottieAnimatable = rememberLottieAnimatable()
 
-        // Handle external triggers: isEating or isInteracting (suppressed while sleeping)
         LaunchedEffect(isEating) {
             if (isEating && !isSleeping) {
                 phase = AnimationPhase.EATING
@@ -752,43 +1092,37 @@ private fun PetAnimation(
             }
         }
 
-        // Drive sleep phase transitions.
-        // On initial composition when already sleeping, showStartSleepAnimation is false
-        // (fresh remember state), so we skip straight to the looping SLEEPING phase.
+        LaunchedEffect(showThumbsUp) {
+            if (showThumbsUp && !isEating && !isSleeping) {
+                phase = AnimationPhase.THUMBS_UP
+            }
+        }
+
         LaunchedEffect(isSleeping) {
             if (isSleeping) {
                 phase = if (showStartSleepAnimation) AnimationPhase.START_SLEEPING else AnimationPhase.SLEEPING
             } else if (phase == AnimationPhase.SLEEPING || phase == AnimationPhase.START_SLEEPING) {
-                // Sleep expired — resume normal mood/idle cycle
                 phase = AnimationPhase.MOOD
             }
         }
 
-        // Resolve composition for the current phase outside LaunchedEffect so it can be a key.
-        // This is critical: compositions load asynchronously, so on first composition the
-        // LaunchedEffect fires while the composition is still null and skips the animation.
-        // By including the resolved composition as a key, the effect re-triggers the moment
-        // the asset finishes loading, ensuring the initial mood animation always plays.
         val currentPhaseComposition = when (phase) {
             AnimationPhase.MOOD -> when (mood) {
                 ChorebooMood.HAPPY,
                 ChorebooMood.CONTENT -> happyComposition
                 ChorebooMood.HUNGRY -> hungryComposition
-                else -> sadComposition // SAD, TIRED, IDLE
+                else -> sadComposition
             }
             AnimationPhase.IDLE -> idleComposition
             AnimationPhase.EATING -> eatingComposition
             AnimationPhase.INTERACTING -> interactComposition
+            AnimationPhase.THUMBS_UP -> thumbsUpComposition
             AnimationPhase.START_SLEEPING -> startSleepComposition
             AnimationPhase.SLEEPING -> sleepingComposition
         }
 
-        // State machine: advance phase when animation completes.
-        // Keyed on both phase and currentPhaseComposition so the effect re-runs when the
-        // Lottie asset finishes loading (null -> loaded), not just when phase changes.
         LaunchedEffect(phase, currentPhaseComposition) {
             if (currentPhaseComposition != null) {
-                // Play animation and wait for it to complete
                 lottieAnimatable.animate(
                     composition = currentPhaseComposition,
                     iterations = when (phase) {
@@ -796,14 +1130,12 @@ private fun PetAnimation(
                         AnimationPhase.IDLE -> 3
                         AnimationPhase.EATING -> 1
                         AnimationPhase.INTERACTING -> 1
+                        AnimationPhase.THUMBS_UP -> 1
                         AnimationPhase.START_SLEEPING -> 1
-                        // IterateForever keeps looping until the coroutine is cancelled
-                        // (which happens automatically when phase or isSleeping changes)
                         AnimationPhase.SLEEPING -> LottieConstants.IterateForever
                     },
                 )
 
-                // After animation completes, transition to next phase
                 when (phase) {
                     AnimationPhase.MOOD -> phase = AnimationPhase.IDLE
                     AnimationPhase.IDLE -> phase = AnimationPhase.MOOD
@@ -815,19 +1147,21 @@ private fun PetAnimation(
                         onInteractComplete()
                         phase = AnimationPhase.MOOD
                     }
+                    AnimationPhase.THUMBS_UP -> {
+                        onThumbsUpComplete()
+                        phase = AnimationPhase.MOOD
+                    }
                     AnimationPhase.START_SLEEPING -> {
                         onStartSleepComplete()
                         phase = AnimationPhase.SLEEPING
                     }
                     AnimationPhase.SLEEPING -> {
-                        // IterateForever never completes normally; defensive guard only
                         phase = if (isSleeping) AnimationPhase.SLEEPING else AnimationPhase.MOOD
                     }
                 }
             }
         }
 
-        // Render animation with crossfade between phases
         Crossfade(
             targetState = phase,
             animationSpec = tween(durationMillis = 100),
@@ -839,12 +1173,13 @@ private fun PetAnimation(
                         ChorebooMood.HAPPY,
                         ChorebooMood.CONTENT -> happyComposition
                         ChorebooMood.HUNGRY -> hungryComposition
-                        else -> sadComposition // SAD, TIRED, IDLE
+                        else -> sadComposition
                     }
                 }
                 AnimationPhase.IDLE -> idleComposition
                 AnimationPhase.EATING -> eatingComposition
                 AnimationPhase.INTERACTING -> interactComposition
+                AnimationPhase.THUMBS_UP -> thumbsUpComposition
                 AnimationPhase.START_SLEEPING -> startSleepComposition
                 AnimationPhase.SLEEPING -> sleepingComposition
             }
@@ -856,7 +1191,6 @@ private fun PetAnimation(
             )
         }
     } else {
-        // Placeholder emoji for panda/capybara/axolotl until their Lottie files are added
         val sizeMultiplier = 64.sp
         Box(modifier = modifier, contentAlignment = Alignment.Center) {
             Text(

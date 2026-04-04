@@ -5,7 +5,9 @@ import android.app.NotificationChannel
 import android.app.NotificationManager
 import android.os.Build
 import androidx.hilt.work.HiltWorkerFactory
+import androidx.lifecycle.ProcessLifecycleOwner
 import androidx.work.Configuration
+import com.example.choreboo_habittrackerfriend.di.AppLifecycleObserver
 import dagger.hilt.android.HiltAndroidApp
 import javax.inject.Inject
 
@@ -15,9 +17,13 @@ class ChorebooApplication : Application(), Configuration.Provider {
     @Inject
     lateinit var workerFactory: HiltWorkerFactory
 
+    @Inject
+    lateinit var appLifecycleObserver: AppLifecycleObserver
+
     override fun onCreate() {
         super.onCreate()
         createNotificationChannels()
+        ProcessLifecycleOwner.get().lifecycle.addObserver(appLifecycleObserver)
     }
 
     override val workManagerConfiguration: Configuration

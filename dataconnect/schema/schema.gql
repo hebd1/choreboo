@@ -14,6 +14,8 @@ type User @table {
   photoUrl: String
   household: Household @ref
   createdAt: Timestamp! @default(expr: "request.time")
+  totalPoints: Int! @default(value: 0)
+  totalLifetimeXp: Int! @default(value: 0)
 }
 
 # ---- Household ----
@@ -47,10 +49,12 @@ type Choreboo @table {
 # ---- Habit ----
 # Supports both personal and household habits.
 # ownerUid = creator's UID. householdId populated for shared habits.
+# assignedTo: optional single member the habit is assigned to (household habits only).
 type Habit @table {
   id: UUID! @default(expr: "uuidV4()")
   owner: User! @ref
   household: Household @ref
+  assignedTo: User @ref
   title: String!
   description: String
   iconName: String!

@@ -4,7 +4,6 @@ import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.example.choreboo_habittrackerfriend.data.local.dao.HabitLogWithName
 import com.example.choreboo_habittrackerfriend.data.datastore.UserPreferences
-import com.example.choreboo_habittrackerfriend.data.repository.BadgeRepository
 import com.example.choreboo_habittrackerfriend.data.repository.HabitRepository
 import com.example.choreboo_habittrackerfriend.data.repository.AuthRepository
 import dagger.hilt.android.lifecycle.HiltViewModel
@@ -27,7 +26,6 @@ class CalendarViewModel @Inject constructor(
     private val habitRepository: HabitRepository,
     private val userPreferences: UserPreferences,
     private val authRepository: AuthRepository,
-    private val badgeRepository: BadgeRepository,
 ) : ViewModel() {
 
     private val _selectedMonth = MutableStateFlow(YearMonth.now())
@@ -37,10 +35,6 @@ class CalendarViewModel @Inject constructor(
     val selectedDate: StateFlow<LocalDate?> = _selectedDate.asStateFlow()
 
     val totalPoints: StateFlow<Int> = userPreferences.totalPoints
-        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), 0)
-
-    /** Number of badges the user has earned — replaces milestones count. */
-    val earnedBadgeCount: StateFlow<Int> = badgeRepository.getEarnedBadgeCount()
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), 0)
 
     val profilePhotoUri: StateFlow<String?> = userPreferences.profilePhotoUri

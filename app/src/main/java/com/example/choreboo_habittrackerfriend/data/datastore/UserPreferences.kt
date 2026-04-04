@@ -69,6 +69,16 @@ class UserPreferences @Inject constructor(
          return success
      }
 
+    /** Directly set totalPoints — used for cloud-to-local sync (max wins). */
+    suspend fun setPoints(amount: Int) {
+        dataStore.edit { it[TOTAL_POINTS] = amount }
+    }
+
+    /** Directly set totalLifetimeXp — used for cloud-to-local sync (max wins). */
+    suspend fun setLifetimeXp(amount: Int) {
+        dataStore.edit { it[TOTAL_LIFETIME_XP] = amount }
+    }
+
      suspend fun setThemeMode(mode: String) {
         dataStore.edit { it[THEME_MODE] = mode }
     }

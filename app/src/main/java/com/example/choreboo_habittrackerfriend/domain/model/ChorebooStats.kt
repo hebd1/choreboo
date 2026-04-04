@@ -1,4 +1,8 @@
 package com.example.choreboo_habittrackerfriend.domain.model
+
+import androidx.compose.runtime.Stable
+
+@Stable
 data class ChorebooStats(
     val id: Long = 0,
     val name: String = "Choreboo",

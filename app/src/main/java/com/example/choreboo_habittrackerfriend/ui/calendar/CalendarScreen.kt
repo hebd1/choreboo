@@ -22,7 +22,6 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.KeyboardArrowLeft
 import androidx.compose.material.icons.automirrored.filled.KeyboardArrowRight
-import androidx.compose.material.icons.filled.EmojiEvents
 import androidx.compose.material.icons.filled.Stars
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
@@ -35,8 +34,9 @@ import androidx.compose.material3.Text
 import androidx.compose.material3.TopAppBar
 import androidx.compose.material3.TopAppBarDefaults
 import androidx.compose.runtime.Composable
-import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.remember
+import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -61,18 +61,18 @@ import java.util.Locale
 fun CalendarScreen(
     viewModel: CalendarViewModel = hiltViewModel(),
 ) {
-    val selectedMonth by viewModel.selectedMonth.collectAsState()
-    val selectedDate by viewModel.selectedDate.collectAsState()
-    val completions by viewModel.completionsForMonth.collectAsState()
-    val selectedDateLogs by viewModel.selectedDateLogs.collectAsState()
-    val totalPoints by viewModel.totalPoints.collectAsState()
-    val profilePhotoUri by viewModel.profilePhotoUri.collectAsState()
-    val earnedBadgeCount by viewModel.earnedBadgeCount.collectAsState()
+    val selectedMonth by viewModel.selectedMonth.collectAsStateWithLifecycle()
+    val selectedDate by viewModel.selectedDate.collectAsStateWithLifecycle()
+    val completions by viewModel.completionsForMonth.collectAsStateWithLifecycle()
+    val selectedDateLogs by viewModel.selectedDateLogs.collectAsStateWithLifecycle()
+    val totalPoints by viewModel.totalPoints.collectAsStateWithLifecycle()
+    val profilePhotoUri by viewModel.profilePhotoUri.collectAsStateWithLifecycle()
 
-    // Calculate monthly stats
+    val today = remember { LocalDate.now() }
+
+    // Calendar grid metrics
     val totalDaysWithAny = completions.values.count { it > 0 }
     val daysInMonth = selectedMonth.lengthOfMonth()
-    val completionRate = if (daysInMonth > 0) (totalDaysWithAny * 100 / daysInMonth) else 0
     val totalXp = selectedDateLogs.sumOf { it.xpEarned }
 
     Scaffold(
@@ -89,7 +89,7 @@ fun CalendarScreen(
                             size = 40.dp,
                         )
                         Text(
-                            "Calendar",
+                            "History",
                             style = MaterialTheme.typography.headlineMedium,
                             fontWeight = FontWeight.ExtraBold,
                             color = MaterialTheme.colorScheme.primary,
@@ -102,20 +102,20 @@ fun CalendarScreen(
                         modifier = Modifier
                             .padding(end = 16.dp)
                             .clip(RoundedCornerShape(50.dp))
-                            .background(MaterialTheme.colorScheme.surfaceContainerHigh)
-                            .padding(horizontal = 10.dp, vertical = 6.dp),
+                            .background(MaterialTheme.colorScheme.surfaceContainerHigh.copy(alpha = 0.85f))
+                            .padding(horizontal = 12.dp, vertical = 6.dp),
                     ) {
                         Icon(
                             Icons.Default.Stars,
                             contentDescription = "Points",
                             tint = MaterialTheme.colorScheme.secondaryContainer,
-                            modifier = Modifier.size(16.dp),
+                            modifier = Modifier.size(18.dp),
                         )
                         Spacer(modifier = Modifier.width(4.dp))
                         Text(
                             "$totalPoints",
                             fontWeight = FontWeight.Bold,
-                            style = MaterialTheme.typography.labelMedium,
+                            style = MaterialTheme.typography.labelLarge,
                         )
                     }
                 },
@@ -218,7 +218,7 @@ fun CalendarScreen(
                                         ) {
                                             if (dayNum in 1..daysInMonth) {
                                                 val date = selectedMonth.atDay(dayNum)
-                                                val isToday = date == LocalDate.now()
+                                                val isToday = date == today
                                                 val isSelected = date == selectedDate
                                                 val count = completions[date] ?: 0
 
@@ -302,90 +302,6 @@ fun CalendarScreen(
                 }
             }
 
-            // Monthly Mastery bento + badges card
-            item {
-                Row(
-                    modifier = Modifier.fillMaxWidth(),
-                    horizontalArrangement = Arrangement.spacedBy(12.dp),
-                ) {
-                    // Monthly Mastery — gradient from primary to primaryContainer (2/3 width)
-                    Box(
-                        modifier = Modifier
-                            .weight(2f)
-                            .height(140.dp)
-                            .clip(RoundedCornerShape(16.dp))
-                            .background(MaterialTheme.colorScheme.primary)
-                            .padding(20.dp),
-                    ) {
-                        Column(
-                            modifier = Modifier.fillMaxSize(),
-                            verticalArrangement = Arrangement.SpaceBetween,
-                        ) {
-                            Text(
-                                text = "MONTHLY MASTERY",
-                                style = MaterialTheme.typography.labelSmall,
-                                fontWeight = FontWeight.Bold,
-                                color = MaterialTheme.colorScheme.onPrimary.copy(alpha = 0.8f),
-                                letterSpacing = 1.sp,
-                            )
-                            Column {
-                                Text(
-                                    text = "$completionRate%",
-                                    style = MaterialTheme.typography.displaySmall,
-                                    fontWeight = FontWeight.ExtraBold,
-                                    color = MaterialTheme.colorScheme.onPrimary,
-                                )
-                                Text(
-                                    text = when {
-                                        completionRate >= 80 -> "You're a habit warrior!"
-                                        completionRate >= 50 -> "Great momentum, keep going!"
-                                        completionRate >= 20 -> "Every day counts — push forward!"
-                                        else -> "Your streak starts today!"
-                                    },
-                                    style = MaterialTheme.typography.bodySmall,
-                                    color = MaterialTheme.colorScheme.onPrimary.copy(alpha = 0.9f),
-                                )
-                            }
-                        }
-                    }
-
-                    // Badges card — surfaceContainerHigh
-                    Card(
-                        modifier = Modifier
-                            .weight(1f)
-                            .height(140.dp),
-                        shape = RoundedCornerShape(16.dp),
-                        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceContainerHigh),
-                    ) {
-                        Column(
-                            modifier = Modifier
-                                .fillMaxSize()
-                                .padding(16.dp),
-                            verticalArrangement = Arrangement.Center,
-                            horizontalAlignment = Alignment.CenterHorizontally,
-                        ) {
-                            Icon(
-                                Icons.Default.EmojiEvents,
-                                contentDescription = null,
-                                tint = MaterialTheme.colorScheme.secondary,
-                                modifier = Modifier.size(36.dp),
-                            )
-                            Spacer(modifier = Modifier.height(4.dp))
-                            Text(
-                                text = "$earnedBadgeCount",
-                                style = MaterialTheme.typography.headlineMedium,
-                                fontWeight = FontWeight.Bold,
-                            )
-                            Text(
-                                text = "Badges",
-                                style = MaterialTheme.typography.labelSmall,
-                                color = MaterialTheme.colorScheme.onSurfaceVariant,
-                            )
-                        }
-                    }
-                }
-            }
-
             // Selected date details
             if (selectedDate != null) {
                 item {
@@ -433,7 +349,7 @@ fun CalendarScreen(
                         }
                     }
                 } else {
-                    items(selectedDateLogs) { log ->
+                    items(selectedDateLogs, key = { it.id }) { log ->
                         Card(
                             modifier = Modifier.fillMaxWidth(),
                             shape = RoundedCornerShape(12.dp),

@@ -339,6 +339,7 @@ fun AuthScreen(
                                 com.example.choreboo_habittrackerfriend.R.string.default_web_client_id
                             ))
                             .requestEmail()
+                            .requestProfile()
                             .build()
                         val client = GoogleSignIn.getClient(context, gso)
                         googleSignInLauncher.launch(client.signInIntent)

@@ -6,12 +6,17 @@ import com.example.choreboo_habittrackerfriend.dataconnect.execute
 import com.example.choreboo_habittrackerfriend.dataconnect.instance
 import com.example.choreboo_habittrackerfriend.domain.model.ChorebooStage
 import com.example.choreboo_habittrackerfriend.domain.model.Household
+import com.example.choreboo_habittrackerfriend.domain.model.HouseholdHabitStatus
 import com.example.choreboo_habittrackerfriend.domain.model.HouseholdMember
 import com.example.choreboo_habittrackerfriend.domain.model.HouseholdPet
 import com.example.choreboo_habittrackerfriend.domain.model.PetType
+import kotlinx.coroutines.async
+import kotlinx.coroutines.coroutineScope
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.launch
+import java.time.LocalDate
 import javax.inject.Inject
 import javax.inject.Singleton
 
@@ -25,6 +30,7 @@ sealed class HouseholdResult {
 @Singleton
 class HouseholdRepository @Inject constructor(
     private val userRepository: UserRepository,
+    private val habitRepository: HabitRepository,
 ) {
     private val connector by lazy { ChorebooConnector.instance }
 
@@ -36,6 +42,9 @@ class HouseholdRepository @Inject constructor(
 
     private val _householdPets = MutableStateFlow<List<HouseholdPet>>(emptyList())
     val householdPets: Flow<List<HouseholdPet>> = _householdPets.asStateFlow()
+
+    private val _householdHabits = MutableStateFlow<List<HouseholdHabitStatus>>(emptyList())
+    val householdHabits: Flow<List<HouseholdHabitStatus>> = _householdHabits.asStateFlow()
 
     /**
      * Generate a random 6-character alphanumeric invite code.
@@ -89,6 +98,11 @@ class HouseholdRepository @Inject constructor(
         val uid = userRepository.getCurrentUid()
             ?: return HouseholdResult.Error("Not authenticated")
 
+        // Guard: prevent joining when already a member of another household
+        if (_currentHousehold.value != null) {
+            return HouseholdResult.Error("You are already in a household. Leave it first before joining another.")
+        }
+
         return try {
             // Look up the household by invite code
             val queryResult = connector.getHouseholdByInviteCode.execute(
@@ -125,9 +139,16 @@ class HouseholdRepository @Inject constructor(
 
     /**
      * Leave the current household.
+     * Converts the user's own household habits to personal and removes other members'
+     * synced habits from Room.
      */
     suspend fun leaveHousehold(): HouseholdResult {
+        val uid = userRepository.getCurrentUid()
+            ?: return HouseholdResult.Error("Not authenticated")
         return try {
+            // Clean up household habits before clearing cloud membership
+            habitRepository.convertHouseholdHabitsToPersonal(uid)
+
             // Set user's householdId to null
             connector.updateUserHousehold.execute {
                 this.householdId = null
@@ -210,12 +231,67 @@ class HouseholdRepository @Inject constructor(
     }
 
     /**
+     * Fetch household habits + today's completion status from Data Connect.
+     * Calls GetMyHouseholdHabits for the habit list, then GetHouseholdHabitLogsForDate
+     * to overlay who (if anyone) has completed each habit today.
+     */
+    suspend fun refreshHouseholdHabits() {
+        try {
+            val today = LocalDate.now().toString() // "YYYY-MM-DD"
+
+            // Run both network calls in parallel
+            val (habitNodes, logsByHabitId) = coroutineScope {
+                val habitsDeferred = async {
+                    val habitsResult = connector.getMyHouseholdHabits.execute()
+                    habitsResult.data.user?.household?.habits_on_household
+                }
+                val logsDeferred = async {
+                    val logsResult = connector.getHouseholdHabitLogsForDate.execute(date = today)
+                    buildMap<String, Pair<String, String>> {
+                        logsResult.data.user?.household?.habits_on_household?.forEach { habitNode ->
+                            habitNode.habitLogs_on_habit.firstOrNull()?.let { log ->
+                                put(
+                                    habitNode.id.toString(),
+                                    Pair(log.completedBy.id, log.completedBy.displayName),
+                                )
+                            }
+                        }
+                    }
+                }
+                Pair(habitsDeferred.await(), logsDeferred.await())
+            }
+
+            if (habitNodes == null) {
+                _householdHabits.value = emptyList()
+                return
+            }
+
+            _householdHabits.value = habitNodes.map { h ->
+                val completedBy = logsByHabitId[h.id.toString()]
+                HouseholdHabitStatus(
+                    habitId = h.id.toString(),
+                    title = h.title,
+                    iconName = h.iconName,
+                    ownerName = h.owner.displayName,
+                    ownerUid = h.owner.id,
+                    completedByUid = completedBy?.first,
+                    completedByName = completedBy?.second,
+                )
+            }
+            Log.d(TAG, "Refreshed ${_householdHabits.value.size} household habits")
+        } catch (e: Exception) {
+            Log.e(TAG, "Failed to refresh household habits", e)
+        }
+    }
+
+    /**
      * Clear in-memory household state — used for sign-out cleanup.
      */
     fun clearState() {
         _currentHousehold.value = null
         _householdMembers.value = emptyList()
         _householdPets.value = emptyList()
+        _householdHabits.value = emptyList()
     }
 
     /**
@@ -237,8 +313,12 @@ class HouseholdRepository @Inject constructor(
             } else {
                 _currentHousehold.value = null
             }
-            refreshHouseholdMembers()
-            refreshHouseholdPets()
+            // Members, pets, and habits are independent — run in parallel
+            coroutineScope {
+                launch { refreshHouseholdMembers() }
+                launch { refreshHouseholdPets() }
+                launch { refreshHouseholdHabits() }
+            }
         } catch (e: Exception) {
             Log.e(TAG, "Failed to refresh all household data", e)
         }

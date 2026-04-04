@@ -15,6 +15,21 @@ data class HouseholdMember(
     val email: String? = null,
 )
 
+/**
+ * Represents a household habit with its today-completion status.
+ * [completedByName] is non-null when someone in the household has already completed
+ * this habit today, showing who did it.
+ */
+data class HouseholdHabitStatus(
+    val habitId: String,
+    val title: String,
+    val iconName: String,
+    val ownerName: String,
+    val ownerUid: String,
+    val completedByName: String? = null,
+    val completedByUid: String? = null,
+)
+
 data class HouseholdPet(
     val chorebooId: String,
     val name: String,

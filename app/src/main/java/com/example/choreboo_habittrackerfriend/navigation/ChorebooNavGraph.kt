@@ -8,24 +8,24 @@ import androidx.navigation.compose.NavHost
 import androidx.navigation.compose.composable
 import androidx.navigation.navArgument
 import com.example.choreboo_habittrackerfriend.ui.auth.AuthScreen
-import com.example.choreboo_habittrackerfriend.ui.habits.HabitListScreen
 import com.example.choreboo_habittrackerfriend.ui.habits.AddEditHabitScreen
 import com.example.choreboo_habittrackerfriend.ui.pet.PetScreen
 import com.example.choreboo_habittrackerfriend.ui.calendar.CalendarScreen
 import com.example.choreboo_habittrackerfriend.ui.household.HouseholdScreen
 import com.example.choreboo_habittrackerfriend.ui.onboarding.OnboardingScreen
 import com.example.choreboo_habittrackerfriend.ui.settings.SettingsScreen
+import com.example.choreboo_habittrackerfriend.ui.stats.StatsScreen
 
 sealed class Screen(val route: String) {
     data object Auth : Screen("auth")
     data object Onboarding : Screen("onboarding")
-    data object HabitList : Screen("habits_list")
+    data object Pet : Screen("pet")
+    data object Stats : Screen("stats")
     data object AddEditHabit : Screen("add_edit_habit?habitId={habitId}") {
         fun createRoute(habitId: Long? = null): String {
             return if (habitId != null) "add_edit_habit?habitId=$habitId" else "add_edit_habit"
         }
     }
-    data object Pet : Screen("pet")
     data object Household : Screen("household")
     data object Calendar : Screen("calendar")
     data object Settings : Screen("settings")
@@ -55,18 +55,22 @@ fun ChorebooNavGraph(
         composable(Screen.Onboarding.route) {
             OnboardingScreen(
                 onComplete = {
-                    navController.navigate(Screen.HabitList.route) {
+                    navController.navigate(Screen.Pet.route) {
                         popUpTo(Screen.Onboarding.route) { inclusive = true }
                     }
                 }
             )
         }
 
-        composable(Screen.HabitList.route) {
-            HabitListScreen(
+        composable(Screen.Pet.route) {
+            PetScreen(
                 onAddHabit = { navController.navigate(Screen.AddEditHabit.createRoute()) },
                 onEditHabit = { id -> navController.navigate(Screen.AddEditHabit.createRoute(id)) },
             )
+        }
+
+        composable(Screen.Stats.route) {
+            StatsScreen()
         }
 
         composable(
@@ -81,10 +85,6 @@ fun ChorebooNavGraph(
             AddEditHabitScreen(
                 onNavigateBack = { navController.popBackStack() },
             )
-        }
-
-        composable(Screen.Pet.route) {
-            PetScreen()
         }
 
         composable(Screen.Household.route) {

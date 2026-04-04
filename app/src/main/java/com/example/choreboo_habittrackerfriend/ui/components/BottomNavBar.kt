@@ -20,7 +20,7 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.CalendarMonth
 import androidx.compose.material.icons.filled.EmojiEmotions
 import androidx.compose.material.icons.filled.Favorite
-import androidx.compose.material.icons.automirrored.filled.FormatListBulleted
+import androidx.compose.material.icons.filled.BarChart
 import androidx.compose.material.icons.filled.MoodBad
 import androidx.compose.material.icons.filled.NightsStay
 import androidx.compose.material.icons.filled.OtherHouses
@@ -55,22 +55,23 @@ fun BottomNavBar(
     petMood: ChorebooMood = ChorebooMood.IDLE,
     modifier: Modifier = Modifier,
 ) {
-    val petIcon = when (petMood) {
-        ChorebooMood.HAPPY -> Icons.Default.Favorite
-        ChorebooMood.CONTENT -> Icons.Default.EmojiEmotions
-        ChorebooMood.HUNGRY -> Icons.Default.Restaurant
-        ChorebooMood.TIRED -> Icons.Default.NightsStay
-        ChorebooMood.SAD -> Icons.Default.MoodBad
-        ChorebooMood.IDLE -> Icons.Default.Pets
+    val items = remember(petMood) {
+        val petIcon = when (petMood) {
+            ChorebooMood.HAPPY -> Icons.Default.Favorite
+            ChorebooMood.CONTENT -> Icons.Default.EmojiEmotions
+            ChorebooMood.HUNGRY -> Icons.Default.Restaurant
+            ChorebooMood.TIRED -> Icons.Default.NightsStay
+            ChorebooMood.SAD -> Icons.Default.MoodBad
+            ChorebooMood.IDLE -> Icons.Default.Pets
+        }
+        listOf(
+            BottomNavItem("Choreboo", petIcon, Screen.Pet.route),
+            BottomNavItem("Stats", Icons.Default.BarChart, Screen.Stats.route),
+            BottomNavItem("House", Icons.Default.OtherHouses, Screen.Household.route),
+            BottomNavItem("History", Icons.Default.CalendarMonth, Screen.Calendar.route),
+            BottomNavItem("Settings", Icons.Default.Settings, Screen.Settings.route),
+        )
     }
-
-    val items = listOf(
-        BottomNavItem("Habits", Icons.AutoMirrored.Filled.FormatListBulleted, Screen.HabitList.route),
-        BottomNavItem("Choreboo", petIcon, Screen.Pet.route),
-        BottomNavItem("House", Icons.Default.OtherHouses, Screen.Household.route),
-        BottomNavItem("Calendar", Icons.Default.CalendarMonth, Screen.Calendar.route),
-        BottomNavItem("Settings", Icons.Default.Settings, Screen.Settings.route),
-    )
 
     val navBackStackEntry by navController.currentBackStackEntryAsState()
     val currentRoute = navBackStackEntry?.destination?.route
@@ -98,7 +99,7 @@ fun BottomNavBar(
                     onClick = {
                         if (currentRoute != item.route) {
                             navController.navigate(item.route) {
-                                popUpTo(Screen.HabitList.route) { saveState = true }
+                                popUpTo(Screen.Pet.route) { saveState = true }
                                 launchSingleTop = true
                                 restoreState = true
                             }

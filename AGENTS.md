@@ -2,7 +2,7 @@
 
 ## Project
 
-Tamagotchi-style habit tracker Android app (Kotlin, Jetpack Compose, Material3). Users complete habits to earn XP and evolve a digital pet ("Choreboo"). Supports **households** — shared groups where members can see each other's pets and habits. Firebase Auth (email + Google sign-in) for identity; **Firebase Data Connect** (PostgreSQL) as cloud backend with **write-through sync** and **cloud-to-local sync on auth**. Room is the local cache; DataStore for preferences.
+Tamagotchi-style habit tracker Android app (Kotlin, Jetpack Compose, Material3). Users complete habits to earn XP and evolve a digital pet ("Choreboo"). Supports **households** — shared groups where members can see each other's pets and habits. Firebase Auth (email + Google sign-in) for identity; **Firebase Data Connect** (PostgreSQL) as cloud backend with **write-through sync** and **cloud-to-local sync on auth + app foreground**. Room is the local cache; DataStore for preferences.
 
 ## Architecture
 
@@ -24,9 +24,9 @@ Repositories also call the **Firebase Data Connect generated SDK** for cloud wri
 - **SDK generation**: `npx firebase-tools@latest dataconnect:sdk:generate` — a `dataconnectCompile` Exec task in root `build.gradle.kts` runs it. Generated SDK goes to `app/build/generated/sources/`.
 - **Auth**: Firebase Auth (email/password + Google sign-in). `AuthRepository` wraps `FirebaseAuth`. `AuthViewModel` orchestrates login/register flows.
 - **Write-through**: All Room mutations (habit CRUD, choreboo updates, habit log inserts) also fire the corresponding Data Connect mutation. Failures are **silent** — no user-facing error for write-through.
-- **Cloud-to-local sync**: Triggered **after auth only** (not on app resume or periodically). Order: habits → choreboo → habit logs (last 30 days). Conflict resolution: **cloud wins**.
+- **Cloud-to-local sync**: Triggered **after auth** (`force = true`, bypasses cooldown) and **on every app foreground** (`force = false`, 5-minute cooldown). `SyncManager` orchestrates all sync with a `Mutex` to prevent concurrent runs. `SyncManager.syncAll()` calls `getIdToken(false).await()` before any Data Connect calls to ensure the auth token is cached and available for the gRPC interceptor. Order: habits + choreboo + user points (parallel) → habit logs (sequential, needs habit remoteIds) → household habit logs (best-effort). Conflict resolution: **cloud wins**.
 - **Error visibility**: Only the post-auth sync shows errors (snackbar). Write-through failures are silent.
-- **Security**: All 14 queries and 15 mutations have `@auth(level: USER)` directives with auth-scoped filters. `connector.yaml` has `authMode: PUBLIC` (each operation has its own auth check). 4 household queries (`GetMyHousehold`, `GetMyHouseholdMembers`, `GetMyHouseholdChoreboos`, `GetMyHouseholdHabits`) are **inherently auth-scoped** — they traverse from `auth.uid` to the user's household, so no `householdId` parameter is needed and callers can only see their own household data.
+- **Security**: All 16 queries and 16 mutations have `@auth(level: USER)` directives with auth-scoped filters. `connector.yaml` has `authMode: PUBLIC` (each operation has its own auth check). 4 household queries (`GetMyHousehold`, `GetMyHouseholdMembers`, `GetMyHouseholdChoreboos`, `GetMyHouseholdHabits`) are **inherently auth-scoped** — they traverse from `auth.uid` to the user's household, so no `householdId` parameter is needed and callers can only see their own household data.
 
 ### Data Connect Schema (5 cloud tables)
 
@@ -34,10 +34,10 @@ Defined in `dataconnect/schema/schema.gql`:
 
 | Table | Key Fields |
 |-------|------------|
-| **User** | uid (String PK from Firebase Auth), displayName, email, photoUrl, household FK, createdAt |
+| **User** | uid (String PK from Firebase Auth), displayName, email, photoUrl, household FK, createdAt, totalPoints, totalLifetimeXp |
 | **Household** | UUID PK, name, inviteCode (unique), createdBy FK→User, createdAt |
 | **Choreboo** | UUID PK, owner FK→User (unique), name, stage, level, xp, hunger, happiness, energy, petType, lastInteractionAt, createdAt, sleepUntil |
-| **Habit** | UUID PK, owner FK→User, household FK→Household (nullable), title, description, iconName, customDays, difficulty, baseXp, reminderEnabled, reminderTime, isHouseholdHabit, isArchived, createdAt |
+| **Habit** | UUID PK, owner FK→User, household FK→Household (nullable), assignedTo FK→User (nullable), title, description, iconName, customDays, difficulty, baseXp, reminderEnabled, reminderTime, isHouseholdHabit, isArchived, createdAt |
 | **HabitLog** | UUID PK, habit FK→Habit, completedBy FK→User, completedAt, date, xpEarned, streakAtCompletion |
 
 ### Data Connect Files
@@ -45,8 +45,8 @@ Defined in `dataconnect/schema/schema.gql`:
 - `dataconnect/dataconnect.yaml` — project config
 - `dataconnect/schema/schema.gql` — 5 tables
 - `dataconnect/choreboo-connector/connector.yaml` — authMode: PUBLIC
-- `dataconnect/choreboo-connector/queries.gql` — 14 queries, all auth-scoped
-- `dataconnect/choreboo-connector/mutations.gql` — 15 mutations, all auth-scoped
+- `dataconnect/choreboo-connector/queries.gql` — 16 queries, all auth-scoped
+- `dataconnect/choreboo-connector/mutations.gql` — 16 mutations, all auth-scoped
 
 ## Data Flow Patterns
 
@@ -57,9 +57,9 @@ Defined in `dataconnect/schema/schema.gql`:
 - **XP/Level-up**: `ChorebooRepository.addXp()` returns `XpResult(levelsGained, newLevel, evolved, newStage)` so callers can trigger celebration UI.
 - **Habit completion**: `HabitRepository.completeHabit()` returns `CompletionResult(xpEarned, newStreak, alreadyComplete)` with targetCount enforcement.
 - **Streaks**: `HabitRepository.getStreaksForToday()` returns `Flow<Map<Long, Int>>` for StreakBadge display.
-- **Cloud-to-local sync**: `HabitRepository.syncHabitsFromCloud()`, `HabitRepository.syncHabitLogsFromCloud()`, `ChorebooRepository.syncFromCloud()`. Called from `AuthViewModel.syncCloudDataToLocal()`.
+- **Cloud-to-local sync**: `HabitRepository.syncHabitsFromCloud()`, `HabitRepository.syncHabitLogsFromCloud()`, `ChorebooRepository.syncFromCloud()`. Called from `SyncManager.syncAll()`.
 
-## Room Database (v9, 3 entities)
+## Room Database (v10, 3 entities)
 
 | Table | Columns | Indexes |
 |-------|---------|---------|
@@ -160,7 +160,7 @@ Defined in `dataconnect/schema/schema.gql`:
 - **Navigation**: `Screen` sealed class in `navigation/ChorebooNavGraph.kt`. Start destination is dynamic: Auth → Onboarding → HabitList. 5 bottom tabs (`habits_list`, `pet`, `household`, `calendar`, `settings`); bottom bar hidden on `auth`, `onboarding`, `add_edit_habit`.
 - **Destructive actions** (delete habit) require `AlertDialog` confirmation.
 - **Level-up celebrations** shown via `AlertDialog` when XP causes level/stage change.
-- **Cloud sync**: `remoteId` field on all 3 Room entities links local rows to Data Connect UUIDs. Write-through on every mutation; cloud-to-local on auth.
+- **Cloud sync**: `remoteId` field on all 3 Room entities links local rows to Data Connect UUIDs. Write-through on every mutation; cloud-to-local on auth + app foreground (via `SyncManager`).
 
 ## UI Rules
 
@@ -184,14 +184,14 @@ com.example.choreboo_habittrackerfriend/
 ├── navigation/                      # ChorebooNavGraph.kt, Screen sealed class (8 routes)
 ├── data/
 │   ├── local/
-│   │   ├── ChorebooDatabase.kt      # Room DB v9, 3 entities, fallbackToDestructiveMigration
+│   │   ├── ChorebooDatabase.kt      # Room DB v10, 3 entities, fallbackToDestructiveMigration
 │   │   ├── converter/
 │   │   │   └── Converters.kt        # Gson TypeConverter for List<String>
 │   │   ├── entity/                  # HabitEntity, HabitLogEntity, ChorebooEntity
 │   │   └── dao/                     # HabitDao, HabitLogDao, ChorebooDao
 │   ├── datastore/                   # UserPreferences (theme, onboarding, sound, totalPoints, totalLifetimeXp, profilePhotoUri, householdNotifications)
 │   └── repository/                  # HabitRepository, ChorebooRepository, AuthRepository, HouseholdRepository, UserRepository, BadgeRepository
-├── di/                              # AppModule (DB, DAOs, DataStore, UserPreferences, FirebaseAuth)
+├── di/                              # AppModule (DB, DAOs, DataStore, UserPreferences, FirebaseAuth), SyncManager, AppLifecycleObserver
 ├── domain/model/                    # Habit, ChorebooStats, ChorebooMood, ChorebooStage, PetType, Household, AppUser, Badge
 ├── ui/
 │   ├── theme/                       # Color.kt, Theme.kt, Type.kt
@@ -233,7 +233,7 @@ Additional context lives in `.github/copilot-instructions.md` (color palette hex
 
 ### Bugs (all resolved)
 
-All bugs B1–B15 have been fixed:
+All bugs B1–B17 have been fixed:
 - **B1**: Sign-out now clears Room tables, DataStore, and household state.
 - **B2**: `completeHabit()` saves cloud `remoteId` back to local log.
 - **B3**: `completeHabit()` sets `completedByUid` on local log entity.
@@ -248,20 +248,25 @@ All bugs B1–B15 have been fixed:
 - **B13**: `householdId` is now resolved from `HouseholdRepository.currentHousehold` when `isHouseholdHabit` is toggled on. Previously the toggle set a boolean flag but never associated the habit with the user's actual household.
 - **B14**: `HabitReminderScheduler.calculateNextMonthlyTrigger()` now sorts `normalizedDays` so the loop finds the nearest scheduled day, not an arbitrary one. Dead `validDaysThisMonth` variable and unused `ChronoUnit` import removed.
 - **B15**: `HabitRepository` now receives `FirebaseAuth` via Hilt constructor injection instead of calling `FirebaseAuth.getInstance()` directly in 3 places.
+- **B16**: `SyncManager.syncAll()` now calls `getIdToken(false).await()` before any Data Connect calls. Fixes `UNAUTHENTICATED` gRPC errors caused by a race condition where `FirebaseAuth.currentUser` is non-null but the Data Connect SDK's internal `IdTokenListener` hasn't received the token yet.
+- **B17**: `HabitRepository.syncHouseholdHabitLogsForToday()` now checks `hasHouseholdHabits()` via `HabitDao` and returns early if the user has none. Prevents `NOT_FOUND` errors from `GetHouseholdHabitLogsForDate` when the user has no household habits.
 
 ### Security Gaps (resolved)
 
 - **G20**: 4 household queries restructured to be inherently auth-scoped (traverse from `auth.uid`). No `householdId` parameter needed. `HouseholdRepository` updated to use new SDK query names and response shapes.
 
-### Sync Gaps
+### Sync Gaps (resolved)
+
+- **G11**: `SyncManager` singleton (with 5-minute cooldown + `Mutex`) orchestrates all sync. `AppLifecycleObserver` (`ProcessLifecycleOwner`) triggers `syncAll(force = false)` on every app foreground. Auth-triggered sync calls `syncAll(force = true)` to bypass cooldown. `AuthViewModel` now delegates to `SyncManager` instead of calling repositories directly.
+- **G12**: `syncHabitsFromCloud()` now uses `getAllMyHabits` (no `isArchived` filter) instead of `getMyHabits`, so archived habits are correctly propagated across devices.
+- **G13**: Deletion reconciliation added to `syncHabitsFromCloud()` and `syncHabitLogsFromCloud()`. After upserting cloud data, any local habit (with non-null `remoteId`, owned by current user) or local log (within the 30-day sync window, with non-null `remoteId`) not present in the cloud response is deleted from Room.
+- **G16**: `totalPoints` and `totalLifetimeXp` added to `User` cloud table and `AppUser` domain model. `completeHabit()` calls `userRepository.syncPointsToCloud()` as write-through. `SyncManager` calls `userRepository.syncPointsFromCloud()` (max-wins merge, pushes back if merged values differ) on every sync.
+
+### Remaining Sync Gaps
 
 | ID | Description |
 |----|-------------|
-| G11 | Sync only runs on auth, not on app resume or periodically |
-| G12 | Archived habits not filtered during sync — may overwrite local archive status |
-| G13 | No deletion reconciliation — deleted-on-cloud items reappear locally on re-sync |
 | G14 | 30-day habit log sync limit means older logs are never synced |
-| G16 | UserPreferences (totalPoints, totalLifetimeXp) never synced to cloud |
 
 ## Not Yet Implemented
 

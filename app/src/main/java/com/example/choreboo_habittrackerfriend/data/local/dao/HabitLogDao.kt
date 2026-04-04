@@ -68,9 +68,24 @@ interface HabitLogDao {
     @Query("UPDATE habit_logs SET remoteId = :remoteId WHERE id = :logId")
     suspend fun updateLogRemoteId(logId: Long, remoteId: String)
 
+    /** All habit logs that have been synced to cloud (non-null remoteId) — used for G13 reconciliation. */
+    @Query("SELECT * FROM habit_logs WHERE remoteId IS NOT NULL AND date >= :startDate AND date <= :endDate")
+    suspend fun getLogsWithRemoteIdInRange(startDate: String, endDate: String): List<HabitLogEntity>
+
+    /** Bulk-delete habit logs by local id — used for G13 reconciliation. */
+    @Query("DELETE FROM habit_logs WHERE id IN (:ids)")
+    suspend fun deleteLogsByIds(ids: List<Long>)
+
     /** Delete all habit logs — used for sign-out data cleanup. */
     @Query("DELETE FROM habit_logs")
     suspend fun deleteAllLogs()
+
+    /**
+     * Returns the completedByUid for the first log of the given habit on the given date,
+     * or null if no log exists. Used to display "Completed by [name]" for household habits.
+     */
+    @Query("SELECT completedByUid FROM habit_logs WHERE habitId = :habitId AND date = :date LIMIT 1")
+    suspend fun getCompletedByUidForDate(habitId: Long, date: String): String?
 }
 
 data class HabitStreak(

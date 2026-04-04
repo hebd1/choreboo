@@ -4,6 +4,7 @@ import android.os.Bundle
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
+import androidx.activity.viewModels
 import com.airbnb.lottie.LottieCompositionFactory
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.WindowInsets
@@ -11,6 +12,7 @@ import androidx.compose.foundation.layout.consumeWindowInsets
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.statusBars
+import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.Scaffold
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.collectAsState
@@ -19,70 +21,50 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.navigation.compose.currentBackStackEntryAsState
 import androidx.navigation.compose.rememberNavController
-import com.example.choreboo_habittrackerfriend.data.datastore.UserPreferences
-import com.example.choreboo_habittrackerfriend.data.repository.AuthRepository
-import com.example.choreboo_habittrackerfriend.data.repository.ChorebooRepository
 import com.example.choreboo_habittrackerfriend.domain.model.ChorebooMood
 import com.example.choreboo_habittrackerfriend.navigation.Screen
 import com.example.choreboo_habittrackerfriend.navigation.ChorebooNavGraph
 import com.example.choreboo_habittrackerfriend.ui.components.BottomNavBar
 import com.example.choreboo_habittrackerfriend.ui.theme.ChorebooHabitTrackerFriendTheme
 import dagger.hilt.android.AndroidEntryPoint
-import javax.inject.Inject
 
 @AndroidEntryPoint
 class MainActivity : ComponentActivity() {
 
-    @Inject
-    lateinit var userPreferences: UserPreferences
-
-    @Inject
-    lateinit var chorebooRepository: ChorebooRepository
-
-    @Inject
-    lateinit var authRepository: AuthRepository
+    private val viewModel: MainViewModel by viewModels()
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         enableEdgeToEdge()
 
-        // Preload fox Lottie compositions into LottieCompositionCache so they are
-        // instantly available when the user first navigates to the Pet tab.
-        listOf(
-            "animations/fox/fox_happy_lottie.json",
-            "animations/fox/fox_hungry_lottie.json",
-            "animations/fox/fox_sad_lottie.json",
-            "animations/fox/fox_idle_lottie.json",
-            "animations/fox/fox_eating_lottie.json",
-            "animations/fox/fox_interact_lottie.json",
-            "animations/fox/fox_start_sleep_lottie.json",
-            "animations/fox/fox_loop_sleeping_lottie.json",
-            "animations/fox/overscreen_fox_lottie.json",
-        ).forEach { path ->
-            LottieCompositionFactory.fromAsset(this, path)
-        }
+        // Preload only the idle animation — the most likely first frame the user will see.
+        // Other animations load on-demand in PetAnimation when the relevant phase triggers.
+        LottieCompositionFactory.fromAsset(this, "animations/fox/fox_idle_lottie.json")
 
         setContent {
-            val onboardingComplete by userPreferences.onboardingComplete.collectAsState(initial = null)
-            val themeMode by userPreferences.themeMode.collectAsState(initial = "system")
-            val petMood by chorebooRepository.getChoreboo()
-                .collectAsState(initial = null)
+            val onboardingComplete by viewModel.onboardingComplete.collectAsState()
+            val themeMode by viewModel.themeMode.collectAsState()
+            val petMood by viewModel.petMood.collectAsState()
 
             ChorebooHabitTrackerFriendTheme(
                 themeMode = themeMode,
             ) {
-                // Wait for DataStore to load
                 when (onboardingComplete) {
-                    null -> { /* Loading — blank screen briefly */ }
+                    null -> {
+                        // DataStore not yet loaded — show a brief spinner instead of blank screen
+                        Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
+                            CircularProgressIndicator()
+                        }
+                    }
                     else -> {
                         val startDestination = when {
-                            !authRepository.isAuthenticated -> Screen.Auth.route
+                            !viewModel.authRepository.isAuthenticated -> Screen.Auth.route
                             onboardingComplete == false -> Screen.Onboarding.route
-                            else -> Screen.HabitList.route
+                            else -> Screen.Pet.route
                         }
                         ChorebooApp(
                             startDestination = startDestination,
-                            petMood = petMood?.mood ?: ChorebooMood.IDLE,
+                            petMood = petMood,
                         )
                     }
                 }
@@ -102,8 +84,8 @@ fun ChorebooApp(
 
     // Routes that should show the bottom nav bar
     val bottomNavRoutes = listOf(
-        Screen.HabitList.route,
         Screen.Pet.route,
+        Screen.Stats.route,
         Screen.Household.route,
         Screen.Calendar.route,
         Screen.Settings.route,

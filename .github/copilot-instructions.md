@@ -43,14 +43,14 @@ A Tamagotchi-style habit tracker Android app where users complete daily habits t
   ├── navigation/                      # ChorebooNavGraph.kt, Screen sealed class (8 routes)
   ├── data/
   │   ├── local/
-  │   │   ├── ChorebooDatabase.kt      # Room DB v9, 3 entities, fallbackToDestructiveMigration
+  │   │   ├── ChorebooDatabase.kt      # Room DB v10, 3 entities, fallbackToDestructiveMigration
   │   │   ├── converter/
   │   │   │   └── Converters.kt        # Gson TypeConverter for List<String>
   │   │   ├── entity/                  # HabitEntity, HabitLogEntity, ChorebooEntity
   │   │   └── dao/                     # HabitDao, HabitLogDao, ChorebooDao
   │   ├── datastore/                   # UserPreferences (theme, onboarding, sound, totalPoints, totalLifetimeXp, profilePhotoUri, householdNotifications)
   │   └── repository/                  # HabitRepository, ChorebooRepository, AuthRepository, HouseholdRepository, UserRepository, BadgeRepository
-  ├── di/                              # AppModule (DB, DAOs, DataStore, UserPreferences, FirebaseAuth)
+  ├── di/                              # AppModule (DB, DAOs, DataStore, UserPreferences, FirebaseAuth), SyncManager, AppLifecycleObserver
   ├── domain/model/                    # Habit, ChorebooStats, ChorebooMood, ChorebooStage, PetType, Household, AppUser, Badge
   ├── ui/
   │   ├── theme/                       # Color.kt (Choreboo palette), Theme.kt (themeMode param), Type.kt
@@ -70,7 +70,7 @@ A Tamagotchi-style habit tracker Android app where users complete daily habits t
       └── BootReceiver.kt             # BOOT_COMPLETED receiver that triggers ReminderRescheduleWorker
   ```
 
-## Room Database Schema (v9, 3 entities)
+## Room Database Schema (v10, 3 entities)
 - **habits** – id, title, description, iconName, customDays, difficulty, baseXp, reminderEnabled, reminderTime, createdAt, isArchived, isHouseholdHabit, ownerUid, householdId, remoteId (`remoteId` indexed)
 - **habit_logs** – id, habitId (FK→habits CASCADE), completedAt, date (ISO string), xpEarned, streakAtCompletion, completedByUid, remoteId (`remoteId` indexed, UNIQUE(`habitId`, `date`))
 - **choreboos** – id, name, stage, level, xp, hunger, happiness, energy, petType, lastInteractionAt, createdAt, sleepUntil, ownerUid, remoteId (`remoteId` indexed)
@@ -86,8 +86,8 @@ A Tamagotchi-style habit tracker Android app where users complete daily habits t
 5 cloud tables in `dataconnect/schema/schema.gql`: User, Household, Choreboo, Habit, HabitLog.
 
 - **Write-through**: All Room mutations also fire the corresponding Data Connect mutation. Failures are silent.
-- **Cloud-to-local sync**: Triggered after auth only. Order: habits → choreboo → habit logs (last 30 days). Cloud wins on conflict.
-- **Security**: 14 queries + 15 mutations, all with `@auth(level: USER)` and auth-scoped filters. 4 household queries (`GetMyHousehold`, `GetMyHouseholdMembers`, `GetMyHouseholdChoreboos`, `GetMyHouseholdHabits`) are **inherently auth-scoped** — they traverse from `auth.uid` to the user's household, so no `householdId` parameter is needed.
+- **Cloud-to-local sync**: Triggered **after auth** (`force = true`, bypasses cooldown) and **on every app foreground** (`force = false`, 5-minute cooldown). `SyncManager` orchestrates all sync. Order: habits + choreboo + user points (parallel) → habit logs (sequential, needs habit remoteIds) → household habit logs (best-effort). Cloud wins on conflict.
+- **Security**: All 16 queries and 16 mutations have `@auth(level: USER)` directives with auth-scoped filters. 4 household queries (`GetMyHousehold`, `GetMyHouseholdMembers`, `GetMyHouseholdChoreboos`, `GetMyHouseholdHabits`) are **inherently auth-scoped** — they traverse from `auth.uid` to the user's household, so no `householdId` parameter is needed.
 - **SDK regen**: `npx firebase-tools@latest dataconnect:sdk:generate`
 
 ## Navigation
@@ -112,7 +112,7 @@ A Tamagotchi-style habit tracker Android app where users complete daily habits t
 ## Implemented Features
 - **Firebase Auth** — Email/password + Google sign-in, syncing overlay on auth screen
 - **Households** — Create/join via invite code, view household members' pets and habits
-- **Cloud sync** — Write-through on all mutations, cloud-to-local sync on auth (habits → choreboo → logs)
+- **Cloud sync** — Write-through on all mutations, cloud-to-local sync on auth + app foreground (via `SyncManager`)
 - **Habit completion** — XP earned (base + streak bonus), prevents over-completion via targetCount
 - **Streak tracking** — StreakBadge component, streaks displayed per habit from HabitLogDao
 - **Scheduling** — `Habit.isScheduledForToday()` disables completion button for CUSTOM habits on non-scheduled days
@@ -150,8 +150,8 @@ Emoji-based system using `EmojiIcon` data class. 15 preset emoji (e.g., "🥗", 
 - **`ChorebooRepository.addXp()`** returns `XpResult(levelsGained, newLevel, evolved, newStage)` for celebration UI
 - **`HabitRepository.completeHabit()`** returns `CompletionResult(xpEarned, newStreak, alreadyComplete)` with targetCount enforcement
 - **`HabitRepository.getStreaksForToday()`** returns `Flow<Map<Long, Int>>` for StreakBadge display
-- **Cloud-to-local sync**: `HabitRepository.syncHabitsFromCloud()`, `HabitRepository.syncHabitLogsFromCloud()`, `ChorebooRepository.syncFromCloud()`
-- **Auth orchestration**: `AuthViewModel.syncCloudDataToLocal()` runs sync after login/register
+- **Cloud-to-local sync**: `HabitRepository.syncHabitsFromCloud()`, `HabitRepository.syncHabitLogsFromCloud()`, `ChorebooRepository.syncFromCloud()`. Called from `SyncManager.syncAll()`.
+- **Auth orchestration**: `AuthViewModel` delegates to `SyncManager.syncAll(force = true)` after login/register
 
 ## When Generating Code
 - Always use the package `com.example.choreboo_habittrackerfriend`

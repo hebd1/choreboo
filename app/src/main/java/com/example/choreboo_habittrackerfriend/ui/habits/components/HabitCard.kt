@@ -40,6 +40,7 @@ import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -60,6 +61,13 @@ fun HabitCard(
     onComplete: () -> Unit,
     onEdit: () -> Unit,
     onDelete: () -> Unit,
+    /** True if this habit is owned by the current user (show edit/delete controls). */
+    isOwnedByCurrentUser: Boolean = true,
+    /**
+     * If non-null, a household member already completed this habit today.
+     * The card shows "Completed by [name]" instead of the generic "✓ Completed".
+     */
+    householdCompleterName: String? = null,
 ) {
     val isComplete = completedToday >= 1
     val emoji = getEmojiForIconName(habit.iconName)
@@ -178,7 +186,10 @@ fun HabitCard(
                     Spacer(modifier = Modifier.height(4.dp))
                     if (isComplete) {
                         Text(
-                            text = "✓ Completed",
+                            text = if (householdCompleterName != null)
+                                "✓ Completed by $householdCompleterName"
+                            else
+                                "✓ Completed",
                             style = MaterialTheme.typography.labelSmall,
                             fontWeight = FontWeight.Bold,
                             color = MaterialTheme.colorScheme.primary,
@@ -189,29 +200,30 @@ fun HabitCard(
                             horizontalArrangement = Arrangement.spacedBy(8.dp),
                         ) {
                             // Frequency label
-                            Text(
-                                text = run {
-                                    val days = habit.customDays
+                            val frequencyLabel = remember(habit.customDays, isScheduledToday) {
+                                val days = habit.customDays
 
-                                    // Check for monthly pattern (days starting with "D")
-                                    val monthlyDays = days.filter { it.startsWith("D") }
-                                    if (monthlyDays.isNotEmpty()) {
-                                        "Monthly"
-                                    } else {
-                                        // Handle weekly pattern
-                                        val allDays = setOf("MON", "TUE", "WED", "THU", "FRI", "SAT", "SUN")
-                                        val weekdays = setOf("MON", "TUE", "WED", "THU", "FRI")
-                                        val weekends = setOf("SAT", "SUN")
-                                        val daysUpper = days.map { it.uppercase() }.toSet()
-                                        when {
-                                            daysUpper == allDays -> "Daily"
-                                            daysUpper == weekdays -> "Weekdays"
-                                            daysUpper == weekends -> "Weekends"
-                                            !isScheduledToday -> "Not today"
-                                            else -> "Custom"
-                                        }
+                                // Check for monthly pattern (days starting with "D")
+                                val monthlyDays = days.filter { it.startsWith("D") }
+                                if (monthlyDays.isNotEmpty()) {
+                                    "Monthly"
+                                } else {
+                                    // Handle weekly pattern
+                                    val allDays = setOf("MON", "TUE", "WED", "THU", "FRI", "SAT", "SUN")
+                                    val weekdays = setOf("MON", "TUE", "WED", "THU", "FRI")
+                                    val weekends = setOf("SAT", "SUN")
+                                    val daysUpper = days.map { it.uppercase() }.toSet()
+                                    when {
+                                        daysUpper == allDays -> "Daily"
+                                        daysUpper == weekdays -> "Weekdays"
+                                        daysUpper == weekends -> "Weekends"
+                                        !isScheduledToday -> "Not today"
+                                        else -> "Custom"
                                     }
-                                },
+                                }
+                            }
+                            Text(
+                                text = frequencyLabel,
                                 style = MaterialTheme.typography.labelSmall,
                                 color = MaterialTheme.colorScheme.onSurfaceVariant,
                             )
@@ -243,27 +255,29 @@ fun HabitCard(
                 ) {
                     // Complete button — filled primary circle vs outlined
                     Row(verticalAlignment = Alignment.CenterVertically) {
-                        IconButton(
-                            onClick = onEdit,
-                            modifier = Modifier.size(32.dp),
-                        ) {
-                            Icon(
-                                Icons.Default.Edit,
-                                contentDescription = "Edit",
-                                modifier = Modifier.size(16.dp),
-                                tint = MaterialTheme.colorScheme.onSurfaceVariant,
-                            )
-                        }
-                        IconButton(
-                            onClick = onDelete,
-                            modifier = Modifier.size(32.dp),
-                        ) {
-                            Icon(
-                                Icons.Default.Delete,
-                                contentDescription = "Delete",
-                                modifier = Modifier.size(16.dp),
-                                tint = MaterialTheme.colorScheme.error.copy(alpha = 0.7f),
-                            )
+                        if (isOwnedByCurrentUser) {
+                            IconButton(
+                                onClick = onEdit,
+                                modifier = Modifier.size(32.dp),
+                            ) {
+                                Icon(
+                                    Icons.Default.Edit,
+                                    contentDescription = "Edit",
+                                    modifier = Modifier.size(16.dp),
+                                    tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                                )
+                            }
+                            IconButton(
+                                onClick = onDelete,
+                                modifier = Modifier.size(32.dp),
+                            ) {
+                                Icon(
+                                    Icons.Default.Delete,
+                                    contentDescription = "Delete",
+                                    modifier = Modifier.size(16.dp),
+                                    tint = MaterialTheme.colorScheme.error.copy(alpha = 0.7f),
+                                )
+                            }
                         }
                         // Completion circle button
                         Box(

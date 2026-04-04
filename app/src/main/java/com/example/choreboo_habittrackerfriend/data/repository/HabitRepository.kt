@@ -12,8 +12,13 @@ import com.example.choreboo_habittrackerfriend.dataconnect.execute
 import com.example.choreboo_habittrackerfriend.dataconnect.instance
 import com.example.choreboo_habittrackerfriend.domain.model.Habit
 import com.google.firebase.auth.FirebaseAuth
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.flow.Flow
+import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.map
+import kotlinx.coroutines.launch
 import java.time.DayOfWeek
 import java.time.LocalDate
 import java.time.LocalTime
@@ -36,10 +41,14 @@ class HabitRepository @Inject constructor(
     private val habitDao: HabitDao,
     private val habitLogDao: HabitLogDao,
     private val userPreferences: UserPreferences,
+    private val userRepository: UserRepository,
     private val firebaseAuth: FirebaseAuth,
 ) {
     private val connector by lazy { ChorebooConnector.instance }
     private val dateFormatter = DateTimeFormatter.ISO_LOCAL_DATE
+
+    /** Fire-and-forget scope for silent write-through calls. */
+    private val writeScope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
 
     fun getAllHabits(): Flow<List<Habit>> = habitDao.getAllHabits().map { entities ->
         entities.map { it.toDomain() }
@@ -68,6 +77,7 @@ class HabitRepository @Inject constructor(
                     description = habit.description
                     reminderTime = habit.reminderTime?.toString()
                     householdId = habit.householdId?.let { UUID.fromString(it) }
+                    assignedToId = habit.assignedToUid
                 }
                 Log.d(TAG, "Updated habit in cloud: $remoteUuid")
             } else {
@@ -84,6 +94,7 @@ class HabitRepository @Inject constructor(
                     description = habit.description
                     reminderTime = habit.reminderTime?.toString()
                     householdId = habit.householdId?.let { UUID.fromString(it) }
+                    assignedToId = habit.assignedToUid
                 }
                 // Store the remote ID back in Room
                 val remoteId = result.data.habit_insert.id.toString()
@@ -150,11 +161,46 @@ class HabitRepository @Inject constructor(
         val habitEntity = habitDao.getHabitByIdSync(habitId)
             ?: return CompletionResult(xpEarned = 0, newStreak = 0, alreadyComplete = true)
 
-        // Early return if already completed (avoids unnecessary work; the real
-        // enforcement is the UNIQUE(habitId, date) index on insertLog below).
+        // Early return if already completed locally.
         val todayCount = habitLogDao.getCompletionCountForDate(habitId, today)
         if (todayCount >= 1) {
             return CompletionResult(xpEarned = 0, newStreak = 0, alreadyComplete = true)
+        }
+
+        // For household habits: check cloud to see if anyone else already completed it today.
+        // This is an app-level pre-check (best-effort — network failure falls through to allow
+        // the completion, relying on local UNIQUE index as last-resort guard).
+        if (habitEntity.isHouseholdHabit && habitEntity.remoteId != null) {
+            try {
+                val cloudCheck = connector.getLogsForHabitAndDate.execute(
+                    habitId = UUID.fromString(habitEntity.remoteId),
+                    date = today,
+                )
+                val existingLogs = cloudCheck.data.habitLogs
+                if (existingLogs.isNotEmpty()) {
+                    // Someone else already completed this habit today — sync their log locally
+                    // so the UI can show "Completed by [name]" without a separate sync call.
+                    val firstLog = existingLogs.first()
+                    val remoteLogId = firstLog.id.toString()
+                    if (habitLogDao.getLogByRemoteId(remoteLogId) == null) {
+                        habitLogDao.insertLog(
+                            HabitLogEntity(
+                                habitId = habitId,
+                                completedAt = firstLog.completedAt.toDate().time,
+                                date = today,
+                                xpEarned = firstLog.xpEarned,
+                                streakAtCompletion = firstLog.streakAtCompletion,
+                                completedByUid = firstLog.completedBy?.id,
+                                remoteId = remoteLogId,
+                            ),
+                        )
+                    }
+                    return CompletionResult(xpEarned = 0, newStreak = 0, alreadyComplete = true)
+                }
+            } catch (e: Exception) {
+                Log.w(TAG, "Cloud pre-check for household habit failed — allowing local completion", e)
+                // Fall through: let local UNIQUE constraint handle duplicates
+            }
         }
 
         val streak = calculateStreak(habitId, today)
@@ -174,23 +220,36 @@ class HabitRepository @Inject constructor(
         if (localLogId == -1L) {
             return CompletionResult(xpEarned = 0, newStreak = 0, alreadyComplete = true)
         }
+
+        // Read current totals before updating so we can pass the new values to write-through
+        val prevPoints = userPreferences.totalPoints.first()
+        val prevLifetimeXp = userPreferences.totalLifetimeXp.first()
         userPreferences.addPoints(xpEarned)
         userPreferences.addLifetimeXp(xpEarned)
+        val newPoints = prevPoints + xpEarned
+        val newLifetimeXp = prevLifetimeXp + xpEarned
 
-        // Write-through: create log in Data Connect and save remoteId back
+        // Write-through: sync new point totals to cloud (fire-and-forget, silent on failure)
+        writeScope.launch {
+            userRepository.syncPointsToCloud(newPoints, newLifetimeXp)
+        }
+
+        // Write-through: create log in Data Connect and save remoteId back (fire-and-forget)
         habitEntity.remoteId?.let { remoteHabitId ->
-            try {
-                val result = connector.createHabitLog.execute(
-                    habitId = UUID.fromString(remoteHabitId),
-                    date = today,
-                    xpEarned = xpEarned,
-                    streakAtCompletion = streak + 1,
-                )
-                val remoteLogId = result.data.habitLog_insert.id.toString()
-                habitLogDao.updateLogRemoteId(localLogId, remoteLogId)
-                Log.d(TAG, "Created habit log in cloud for habit: $remoteHabitId (remoteLogId: $remoteLogId)")
-            } catch (e: Exception) {
-                Log.e(TAG, "Failed to sync habit log to cloud", e)
+            writeScope.launch {
+                try {
+                    val result = connector.createHabitLog.execute(
+                        habitId = UUID.fromString(remoteHabitId),
+                        date = today,
+                        xpEarned = xpEarned,
+                        streakAtCompletion = streak + 1,
+                    )
+                    val remoteLogId = result.data.habitLog_insert.id.toString()
+                    habitLogDao.updateLogRemoteId(localLogId, remoteLogId)
+                    Log.d(TAG, "Created habit log in cloud for habit: $remoteHabitId (remoteLogId: $remoteLogId)")
+                } catch (e: Exception) {
+                    Log.e(TAG, "Failed to sync habit log to cloud", e)
+                }
             }
         }
 
@@ -263,18 +322,67 @@ class HabitRepository @Inject constructor(
     }
 
     /**
+     * Called when the user leaves a household.
+     * - Deletes other members' synced household habits from Room.
+     * - Converts the user's own household habits to personal (clears isHouseholdHabit + householdId).
+     * Write-through updates each converted habit in Data Connect (silent on failure).
+     */
+    suspend fun convertHouseholdHabitsToPersonal(uid: String) {
+        // Remove other members' habits from Room
+        habitDao.deleteNonOwnedHouseholdHabits(uid)
+
+        // Convert own household habits to personal
+        val allHabits = habitDao.getAllHabitsSync()
+        val ownHouseholdHabits = allHabits.filter {
+            it.ownerUid == uid && it.isHouseholdHabit
+        }
+        for (entity in ownHouseholdHabits) {
+            val updated = entity.copy(isHouseholdHabit = false, householdId = null, assignedToUid = null)
+            habitDao.upsertHabit(updated)
+
+            // Write-through: update in Data Connect (silent on failure)
+            entity.remoteId?.let { remoteId ->
+                try {
+                    connector.updateHabit.execute(
+                        habitId = UUID.fromString(remoteId),
+                        title = entity.title,
+                        iconName = entity.iconName,
+                        customDays = entity.customDays,
+                        difficulty = entity.difficulty,
+                        baseXp = entity.baseXp,
+                        reminderEnabled = entity.reminderEnabled,
+                        isHouseholdHabit = false,
+                    ) {
+                        description = entity.description
+                        reminderTime = entity.reminderTime
+                        householdId = null
+                        assignedToId = null
+                    }
+                } catch (e: Exception) {
+                    Log.e(TAG, "Failed to convert household habit to personal in cloud: $remoteId", e)
+                }
+            }
+        }
+        Log.d(TAG, "Converted ${ownHouseholdHabits.size} household habits to personal for uid=$uid")
+    }
+
+    /**
      * Pull habits from Data Connect and merge into Room (cloud wins).
-     * Called once after successful authentication.
+     * Also syncs household habits owned by other members into Room so they appear
+     * in the habit list. Called once after successful authentication and on every sync.
      */
     suspend fun syncHabitsFromCloud() {
         val uid = firebaseAuth.currentUser?.uid ?: return
         try {
-            val result = connector.getMyHabits.execute()
+            // ---- 1. Personal habits (owned by current user) ----
+            val result = connector.getAllMyHabits.execute()
             val cloudHabits = result.data.habits
-            Log.d(TAG, "Fetched ${cloudHabits.size} habits from cloud")
+            Log.d(TAG, "Fetched ${cloudHabits.size} personal habits from cloud")
 
+            val cloudRemoteIds = mutableSetOf<String>()
             for (cloudHabit in cloudHabits) {
                 val remoteId = cloudHabit.id.toString()
+                cloudRemoteIds.add(remoteId)
                 val existing = habitDao.getHabitByRemoteId(remoteId)
 
                 val entity = HabitEntity(
@@ -292,14 +400,134 @@ class HabitRepository @Inject constructor(
                     isHouseholdHabit = cloudHabit.isHouseholdHabit,
                     ownerUid = uid,
                     householdId = cloudHabit.household?.id?.toString(),
+                    assignedToUid = cloudHabit.assignedTo?.id,
                     remoteId = remoteId,
                 )
                 habitDao.upsertHabit(entity)
             }
-            Log.d(TAG, "Synced ${cloudHabits.size} habits from cloud to Room")
+
+            // G13: Deletion reconciliation for personal habits.
+            val localSyncedHabits = habitDao.getHabitsWithRemoteId()
+            val orphanIds = localSyncedHabits
+                .filter { it.ownerUid == uid && it.remoteId !in cloudRemoteIds }
+                .map { it.id }
+            if (orphanIds.isNotEmpty()) {
+                habitDao.deleteByIds(orphanIds)
+                Log.d(TAG, "Deleted ${orphanIds.size} orphaned personal habits not present in cloud")
+            }
+
+            Log.d(TAG, "Synced ${cloudHabits.size} personal habits from cloud to Room")
         } catch (e: Exception) {
-            Log.e(TAG, "Failed to sync habits from cloud", e)
+            Log.e(TAG, "Failed to sync personal habits from cloud", e)
             throw e
+        }
+
+        // ---- 2. Household habits from other members (best-effort, silent on failure) ----
+        try {
+            val uid = firebaseAuth.currentUser?.uid ?: return
+            val hhResult = connector.getMyHouseholdHabits.execute()
+            val householdData = hhResult.data.user?.household
+            if (householdData == null) {
+                // User has no household — delete any stale other-member habits from Room
+                habitDao.deleteNonOwnedHouseholdHabits(uid)
+                return
+            }
+            val householdId = householdData.id.toString()
+            val cloudHouseholdHabits = householdData.habits_on_household
+                .filter { it.owner.id != uid } // skip own habits already synced above
+
+            val cloudHouseholdRemoteIds = mutableSetOf<String>()
+            for (cloudHabit in cloudHouseholdHabits) {
+                val remoteId = cloudHabit.id.toString()
+                cloudHouseholdRemoteIds.add(remoteId)
+                val existing = habitDao.getHabitByRemoteId(remoteId)
+
+                val entity = HabitEntity(
+                    id = existing?.id ?: 0,
+                    title = cloudHabit.title,
+                    description = cloudHabit.description,
+                    iconName = cloudHabit.iconName,
+                    customDays = cloudHabit.customDays,
+                    difficulty = cloudHabit.difficulty,
+                    baseXp = cloudHabit.baseXp,
+                    // Disable reminders for other members' habits — they can't complete via alarm
+                    reminderEnabled = false,
+                    reminderTime = null,
+                    createdAt = cloudHabit.createdAt.toDate().time,
+                    isArchived = cloudHabit.isArchived,
+                    isHouseholdHabit = true,
+                    ownerUid = cloudHabit.owner.id, // preserve original owner
+                    householdId = householdId,
+                    assignedToUid = cloudHabit.assignedTo?.id,
+                    remoteId = remoteId,
+                )
+                habitDao.upsertHabit(entity)
+            }
+
+            // Reconciliation: delete local other-member habits no longer in cloud
+            val localOtherHabits = habitDao.getOtherMembersHouseholdHabits(uid)
+            val staleIds = localOtherHabits
+                .filter { it.remoteId !in cloudHouseholdRemoteIds }
+                .map { it.id }
+            if (staleIds.isNotEmpty()) {
+                habitDao.deleteByIds(staleIds)
+                Log.d(TAG, "Deleted ${staleIds.size} stale other-member household habits")
+            }
+
+            Log.d(TAG, "Synced ${cloudHouseholdHabits.size} other-member household habits from cloud")
+        } catch (e: Exception) {
+            Log.e(TAG, "Failed to sync household habits from cloud (non-fatal)", e)
+            // Silent — household sync failure should not block the rest of the sync
+        }
+    }
+
+    /**
+     * Pull today's household habit logs for all household habits from Data Connect and merge
+     * into Room. This ensures the UI can display "Completed by [member name]" even for habits
+     * completed by another household member before the current user opens the app.
+     * Silent on failure — this is best-effort enrichment data.
+     */
+    suspend fun syncHouseholdHabitLogsForToday() {
+        val uid = firebaseAuth.currentUser?.uid ?: return
+        // Skip the network call entirely if the user has no household habits locally —
+        // they are not in a household or haven't synced one yet.
+        if (!habitDao.hasHouseholdHabits()) return
+        val today = LocalDate.now().format(dateFormatter)
+        try {
+            val result = connector.getHouseholdHabitLogsForDate.execute(date = today)
+            val habitsWithLogs = result.data.user?.household?.habits_on_household
+                ?: return
+
+            // Build remote habit UUID → local habit ID map
+            val allLocalHabits = habitDao.getAllHabitsSync()
+            val remoteToLocalId = allLocalHabits
+                .filter { it.remoteId != null }
+                .associate { it.remoteId!! to it.id }
+
+            for (habitEntry in habitsWithLogs) {
+                val remoteHabitId = habitEntry.id.toString()
+                val localHabitId = remoteToLocalId[remoteHabitId] ?: continue
+
+                for (log in habitEntry.habitLogs_on_habit) {
+                    val remoteLogId = log.id.toString()
+                    // Skip if already stored locally
+                    if (habitLogDao.getLogByRemoteId(remoteLogId) != null) continue
+
+                    val logEntity = HabitLogEntity(
+                        habitId = localHabitId,
+                        completedAt = log.completedAt.toDate().time,
+                        date = today,
+                        xpEarned = log.xpEarned,
+                        streakAtCompletion = log.streakAtCompletion,
+                        completedByUid = log.completedBy.id,
+                        remoteId = remoteLogId,
+                    )
+                    habitLogDao.insertLog(logEntity)
+                }
+            }
+            Log.d(TAG, "Synced household habit logs for today")
+        } catch (e: Exception) {
+            Log.e(TAG, "Failed to sync household habit logs for today (non-fatal)", e)
         }
     }
 
@@ -350,6 +578,18 @@ class HabitRepository @Inject constructor(
                 habitLogDao.insertLogs(logsToInsert)
             }
             Log.d(TAG, "Synced ${logsToInsert.size} new habit logs from cloud to Room")
+
+            // G13: Deletion reconciliation — remove local logs within the synced date range
+            // that no longer exist in cloud. Logs outside the 30-day window are untouched.
+            val cloudLogRemoteIds = cloudLogs.map { it.id.toString() }.toSet()
+            val localSyncedLogs = habitLogDao.getLogsWithRemoteIdInRange(startDate, endDate)
+            val orphanLogIds = localSyncedLogs
+                .filter { it.remoteId !in cloudLogRemoteIds }
+                .map { it.id }
+            if (orphanLogIds.isNotEmpty()) {
+                habitLogDao.deleteLogsByIds(orphanLogIds)
+                Log.d(TAG, "Deleted ${orphanLogIds.size} orphaned habit logs not present in cloud")
+            }
         } catch (e: Exception) {
             Log.e(TAG, "Failed to sync habit logs from cloud", e)
             throw e
@@ -378,6 +618,7 @@ private fun HabitEntity.toDomain() = Habit(
     isHouseholdHabit = isHouseholdHabit,
     ownerUid = ownerUid,
     householdId = householdId,
+    assignedToUid = assignedToUid,
     remoteId = remoteId,
 )
 
@@ -396,5 +637,6 @@ private fun Habit.toEntity() = HabitEntity(
     isHouseholdHabit = isHouseholdHabit,
     ownerUid = ownerUid,
     householdId = householdId,
+    assignedToUid = assignedToUid,
     remoteId = remoteId,
 )

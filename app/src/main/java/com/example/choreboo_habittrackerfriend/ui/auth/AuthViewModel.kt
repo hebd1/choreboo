@@ -3,10 +3,10 @@ package com.example.choreboo_habittrackerfriend.ui.auth
 import android.util.Log
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
+import com.example.choreboo_habittrackerfriend.data.datastore.UserPreferences
 import com.example.choreboo_habittrackerfriend.data.repository.AuthRepository
 import com.example.choreboo_habittrackerfriend.data.repository.AuthResult
-import com.example.choreboo_habittrackerfriend.data.repository.ChorebooRepository
-import com.example.choreboo_habittrackerfriend.data.repository.HabitRepository
+import com.example.choreboo_habittrackerfriend.data.repository.SyncManager
 import com.example.choreboo_habittrackerfriend.data.repository.UserRepository
 import com.google.android.gms.auth.api.signin.GoogleSignInAccount
 import dagger.hilt.android.lifecycle.HiltViewModel
@@ -16,6 +16,7 @@ import kotlinx.coroutines.flow.SharedFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asSharedFlow
 import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
 import javax.inject.Inject
@@ -37,8 +38,8 @@ data class AuthFormState(
 class AuthViewModel @Inject constructor(
     private val authRepository: AuthRepository,
     private val userRepository: UserRepository,
-    private val habitRepository: HabitRepository,
-    private val chorebooRepository: ChorebooRepository,
+    private val syncManager: SyncManager,
+    private val userPreferences: UserPreferences,
 ) : ViewModel() {
 
     private val _formState = MutableStateFlow(AuthFormState())
@@ -84,6 +85,16 @@ class AuthViewModel @Inject constructor(
             _formState.update { it.copy(isLoading = true) }
             val result = authRepository.signInWithGoogle(account)
             _formState.update { it.copy(isLoading = false) }
+
+            // Auto-set profile photo from Google if no custom photo is already saved
+            if (result is AuthResult.Success) {
+                val photoUrl = account.photoUrl?.toString()
+                    ?: result.user.photoUrl?.toString()
+                if (photoUrl != null && userPreferences.profilePhotoUri.first() == null) {
+                    userPreferences.setProfilePhotoUri(photoUrl)
+                }
+            }
+
             handleResult(result)
         }
     }
@@ -137,12 +148,12 @@ class AuthViewModel @Inject constructor(
                     // Non-blocking: cloud user upsert failure shouldn't prevent login
                 }
 
-                // Phase 2: Pull cloud data into Room
+                // Phase 2: Pull cloud data into Room (force = true bypasses the cooldown)
                 _formState.update { it.copy(isSyncing = true) }
-                val syncFailed = !syncCloudDataToLocal()
+                val syncSucceeded = syncManager.syncAll(force = true)
                 _formState.update { it.copy(isSyncing = false) }
 
-                if (syncFailed) {
+                if (!syncSucceeded) {
                     _events.emit(AuthEvent.ShowMessage("Signed in — couldn't sync cloud data"))
                 }
 
@@ -151,40 +162,6 @@ class AuthViewModel @Inject constructor(
             is AuthResult.Error -> _events.emit(AuthEvent.ShowError(result.message))
             is AuthResult.ResetEmailSent -> { /* Handled separately in sendPasswordReset() */ }
         }
-    }
-
-    /**
-     * Pull all cloud data into Room after auth.
-     * Returns true if sync succeeded (fully or partially), false if all failed.
-     */
-    private suspend fun syncCloudDataToLocal(): Boolean {
-        var anySuccess = false
-
-        // Sync habits first (logs depend on habit remote IDs being in Room)
-        try {
-            habitRepository.syncHabitsFromCloud()
-            anySuccess = true
-        } catch (e: Exception) {
-            Log.e(TAG, "Habit sync from cloud failed", e)
-        }
-
-        // Sync choreboo
-        try {
-            chorebooRepository.syncFromCloud()
-            anySuccess = true
-        } catch (e: Exception) {
-            Log.e(TAG, "Choreboo sync from cloud failed", e)
-        }
-
-        // Sync habit logs (depends on habits being synced first for ID mapping)
-        try {
-            habitRepository.syncHabitLogsFromCloud()
-            anySuccess = true
-        } catch (e: Exception) {
-            Log.e(TAG, "Habit log sync from cloud failed", e)
-        }
-
-        return anySuccess
     }
 }
 

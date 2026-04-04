@@ -11,9 +11,13 @@ import com.example.choreboo_habittrackerfriend.domain.model.ChorebooStage
 import com.example.choreboo_habittrackerfriend.domain.model.ChorebooStats
 import com.example.choreboo_habittrackerfriend.domain.model.PetType
 import com.google.firebase.Timestamp
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.map
+import kotlinx.coroutines.launch
 import java.util.Date
 import java.util.UUID
 import javax.inject.Inject
@@ -34,6 +38,9 @@ class ChorebooRepository @Inject constructor(
     private val chorebooDao: ChorebooDao,
 ) {
     private val connector by lazy { ChorebooConnector.instance }
+
+    /** Fire-and-forget scope for silent write-through calls. */
+    private val writeScope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
 
     fun getChoreboo(): Flow<ChorebooStats?> = chorebooDao.getChoreboo().map { it?.toDomain() }
 
@@ -118,11 +125,11 @@ class ChorebooRepository @Inject constructor(
         )
         chorebooDao.updateChoreboo(updated)
 
-        // Write-through: update stats in Data Connect
-        syncStatsToCloud(updated)
-        // Sync cleared sleep state to cloud
+        // Write-through: update stats in Data Connect (fire-and-forget)
+        writeScope.launch { syncStatsToCloud(updated) }
+        // Sync cleared sleep state to cloud (fire-and-forget)
         if (choreboo.sleepUntil > 0) {
-            syncSleepToCloud(updated)
+            writeScope.launch { syncSleepToCloud(updated) }
         }
     }
 
@@ -153,18 +160,20 @@ class ChorebooRepository @Inject constructor(
         )
         chorebooDao.updateChoreboo(updated)
 
-        // Write-through: update XP in Data Connect
+        // Write-through: update XP in Data Connect (fire-and-forget)
         updated.remoteId?.let { remoteId ->
-            try {
-                connector.updateChorebooXp.execute(
-                    chorebooId = UUID.fromString(remoteId),
-                    level = newLevel,
-                    xp = newXp,
-                    stage = newStage.name,
-                )
-                Log.d(TAG, "Synced XP to cloud: level=$newLevel, xp=$newXp")
-            } catch (e: Exception) {
-                Log.e(TAG, "Failed to sync XP to cloud", e)
+            writeScope.launch {
+                try {
+                    connector.updateChorebooXp.execute(
+                        chorebooId = UUID.fromString(remoteId),
+                        level = newLevel,
+                        xp = newXp,
+                        stage = newStage.name,
+                    )
+                    Log.d(TAG, "Synced XP to cloud: level=$newLevel, xp=$newXp")
+                } catch (e: Exception) {
+                    Log.e(TAG, "Failed to sync XP to cloud", e)
+                }
             }
         }
 
@@ -185,8 +194,8 @@ class ChorebooRepository @Inject constructor(
         )
         chorebooDao.updateChoreboo(updated)
 
-        // Write-through: update stats in Data Connect
-        syncStatsToCloud(updated)
+        // Write-through: update stats in Data Connect (fire-and-forget)
+        writeScope.launch { syncStatsToCloud(updated) }
     }
 
     /** Put pet to sleep for 24 hours -- freezes all stat decay during sleep. */
@@ -200,17 +209,19 @@ class ChorebooRepository @Inject constructor(
         )
         chorebooDao.updateChoreboo(updated)
 
-        // Write-through: update sleep in Data Connect
+        // Write-through: update sleep in Data Connect (fire-and-forget)
         updated.remoteId?.let { remoteId ->
-            try {
-                connector.updateChorebooSleep.execute(
-                    chorebooId = UUID.fromString(remoteId),
-                ) {
-                    sleepUntil = Timestamp(Date(sleepUntilTime))
+            writeScope.launch {
+                try {
+                    connector.updateChorebooSleep.execute(
+                        chorebooId = UUID.fromString(remoteId),
+                    ) {
+                        sleepUntil = Timestamp(Date(sleepUntilTime))
+                    }
+                    Log.d(TAG, "Synced sleep to cloud")
+                } catch (e: Exception) {
+                    Log.e(TAG, "Failed to sync sleep to cloud", e)
                 }
-                Log.d(TAG, "Synced sleep to cloud")
-            } catch (e: Exception) {
-                Log.e(TAG, "Failed to sync sleep to cloud", e)
             }
         }
     }
@@ -233,8 +244,8 @@ class ChorebooRepository @Inject constructor(
             )
             chorebooDao.updateChoreboo(updated)
 
-            // Write-through
-            syncStatsToCloud(updated)
+            // Write-through (fire-and-forget)
+            writeScope.launch { syncStatsToCloud(updated) }
         }
     }
 
@@ -243,26 +254,28 @@ class ChorebooRepository @Inject constructor(
         val updated = choreboo.copy(name = name)
         chorebooDao.updateChoreboo(updated)
 
-        // Write-through: full update to Data Connect
+        // Write-through: full update to Data Connect (fire-and-forget)
         updated.remoteId?.let { remoteId ->
-            try {
-                connector.updateChorebooFull.execute(
-                    chorebooId = UUID.fromString(remoteId),
-                    name = name,
-                    stage = updated.stage,
-                    level = updated.level,
-                    xp = updated.xp,
-                    hunger = updated.hunger,
-                    happiness = updated.happiness,
-                    energy = updated.energy,
-                    petType = updated.petType,
-                    lastInteractionAt = Timestamp(Date(updated.lastInteractionAt)),
-                ) {
-                    sleepUntil = if (updated.sleepUntil > 0) Timestamp(Date(updated.sleepUntil)) else null
+            writeScope.launch {
+                try {
+                    connector.updateChorebooFull.execute(
+                        chorebooId = UUID.fromString(remoteId),
+                        name = name,
+                        stage = updated.stage,
+                        level = updated.level,
+                        xp = updated.xp,
+                        hunger = updated.hunger,
+                        happiness = updated.happiness,
+                        energy = updated.energy,
+                        petType = updated.petType,
+                        lastInteractionAt = Timestamp(Date(updated.lastInteractionAt)),
+                    ) {
+                        sleepUntil = if (updated.sleepUntil > 0) Timestamp(Date(updated.sleepUntil)) else null
+                    }
+                    Log.d(TAG, "Synced name update to cloud")
+                } catch (e: Exception) {
+                    Log.e(TAG, "Failed to sync name update to cloud", e)
                 }
-                Log.d(TAG, "Synced name update to cloud")
-            } catch (e: Exception) {
-                Log.e(TAG, "Failed to sync name update to cloud", e)
             }
         }
     }

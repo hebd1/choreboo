@@ -26,6 +26,8 @@ import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
+import com.example.choreboo_habittrackerfriend.domain.model.Household
+import com.example.choreboo_habittrackerfriend.domain.model.HouseholdMember
 import java.time.LocalTime
 import javax.inject.Inject
 
@@ -42,6 +44,8 @@ data class HabitFormState(
     val suggestedXp: Int? = null,
     val isEditing: Boolean = false,
     val isHouseholdHabit: Boolean = false,
+    val assignedToUid: String? = null,
+    val assignedToName: String? = null,
 )
 
 enum class FrequencyMode {
@@ -75,6 +79,14 @@ class AddEditHabitViewModel @Inject constructor(
     val googlePhotoUrl: String?
         get() = authRepository.currentFirebaseUser?.photoUrl?.toString()
 
+    /** Current household the user belongs to — used for resolving householdId on save. */
+    val currentHousehold: StateFlow<Household?> = householdRepository.currentHousehold
+        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), null)
+
+    /** Members of the user's household — used for the assignee picker. */
+    val householdMembers: StateFlow<List<HouseholdMember>> = householdRepository.householdMembers
+        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), emptyList())
+
     init {
         if (habitId > 0) {
             viewModelScope.launch {
@@ -92,6 +104,8 @@ class AddEditHabitViewModel @Inject constructor(
                         reminderTime = habit.reminderTime ?: LocalTime.of(9, 0),
                         isEditing = true,
                         isHouseholdHabit = habit.isHouseholdHabit,
+                        assignedToUid = habit.assignedToUid,
+                        assignedToName = habit.assignedToName,
                     )
                 }
             }
@@ -123,7 +137,18 @@ class AddEditHabitViewModel @Inject constructor(
     }
 
     fun updateIsHouseholdHabit(isHousehold: Boolean) {
-        _formState.update { it.copy(isHouseholdHabit = isHousehold) }
+        _formState.update {
+            it.copy(
+                isHouseholdHabit = isHousehold,
+                // Clear assignee when household habit is turned off
+                assignedToUid = if (isHousehold) it.assignedToUid else null,
+                assignedToName = if (isHousehold) it.assignedToName else null,
+            )
+        }
+    }
+
+    fun updateAssignedTo(uid: String?, name: String?) {
+        _formState.update { it.copy(assignedToUid = uid, assignedToName = name) }
     }
 
     fun toggleCustomDay(day: String) {
@@ -212,10 +237,15 @@ class AddEditHabitViewModel @Inject constructor(
         }
 
         viewModelScope.launch {
+            // Validate: household habit requires the user to be in a household
+            if (state.isHouseholdHabit && existingHabit?.householdId == null && currentHousehold.value == null) {
+                _events.emit(AddEditHabitEvent.ValidationError("Join a household first to create shared habits"))
+                return@launch
+            }
+
             // Resolve householdId: keep existing value, or look up from current household
             val resolvedHouseholdId = if (state.isHouseholdHabit) {
-                existingHabit?.householdId
-                    ?: (householdRepository.currentHousehold as StateFlow).value?.id
+                existingHabit?.householdId ?: currentHousehold.value?.id
             } else {
                 null
             }
@@ -236,6 +266,7 @@ class AddEditHabitViewModel @Inject constructor(
                 householdId = resolvedHouseholdId,
                 createdAt = existingHabit?.createdAt ?: System.currentTimeMillis(),
                 isArchived = existingHabit?.isArchived ?: false,
+                assignedToUid = if (state.isHouseholdHabit) state.assignedToUid else null,
             )
             val savedHabitId = habitRepository.upsertHabit(habit)
 

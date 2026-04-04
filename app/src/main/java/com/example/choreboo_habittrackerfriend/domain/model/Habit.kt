@@ -1,8 +1,10 @@
 package com.example.choreboo_habittrackerfriend.domain.model
 
+import androidx.compose.runtime.Immutable
 import java.time.LocalDate
 import java.time.LocalTime
 
+@Immutable
 data class Habit(
     val id: Long = 0,
     val title: String,
@@ -18,6 +20,8 @@ data class Habit(
     val isHouseholdHabit: Boolean = false,
     val ownerUid: String? = null,
     val householdId: String? = null,
+    val assignedToUid: String? = null,
+    val assignedToName: String? = null,
     val remoteId: String? = null,
 ) {
     fun isScheduledForToday(): Boolean {

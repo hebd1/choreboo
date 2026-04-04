@@ -21,12 +21,13 @@ import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import coil3.compose.AsyncImage
 import com.example.choreboo_habittrackerfriend.domain.model.ChorebooStage
 import com.example.choreboo_habittrackerfriend.domain.model.HouseholdPet
 
@@ -39,6 +40,11 @@ private val stageEmoji = mapOf(
     ChorebooStage.LEGENDARY to "\uD83E\uDD85",
 )
 
+/**
+ * Compact card designed for a 2-column grid.
+ * Shows the pet emoji, level badge, owner avatar (photo or initial), owner name,
+ * and three mini stat bars (hunger / happiness / energy).
+ */
 @Composable
 fun HouseholdPetCard(
     pet: HouseholdPet,
@@ -51,109 +57,131 @@ fun HouseholdPetCard(
             containerColor = MaterialTheme.colorScheme.surfaceContainerLowest,
         ),
     ) {
-        Box {
-            // Watermark emoji at 20% opacity
-            Text(
-                text = stageEmoji[pet.stage] ?: "\uD83D\uDC3E",
-                fontSize = 80.sp,
-                modifier = Modifier
-                    .align(Alignment.CenterEnd)
-                    .padding(end = 8.dp)
-                    .alpha(0.2f),
-            )
-
-            Row(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .padding(16.dp),
-                verticalAlignment = Alignment.CenterVertically,
-            ) {
-                // Pet emoji avatar
+        Column(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(12.dp),
+            horizontalAlignment = Alignment.CenterHorizontally,
+        ) {
+            // ── Pet emoji + level badge ──────────────────────────────────
+            Box(contentAlignment = Alignment.BottomEnd) {
                 Box(
                     contentAlignment = Alignment.Center,
                     modifier = Modifier
-                        .size(56.dp)
+                        .size(64.dp)
                         .clip(CircleShape)
                         .background(MaterialTheme.colorScheme.primaryContainer),
                 ) {
                     Text(
                         text = stageEmoji[pet.stage] ?: "\uD83D\uDC3E",
-                        fontSize = 28.sp,
+                        fontSize = 32.sp,
                     )
                 }
-
-                Spacer(modifier = Modifier.width(12.dp))
-
-                Column(modifier = Modifier.weight(1f)) {
-                    Row(
-                        verticalAlignment = Alignment.CenterVertically,
-                        horizontalArrangement = Arrangement.spacedBy(8.dp),
-                    ) {
-                        Text(
-                            text = pet.name,
-                            style = MaterialTheme.typography.titleMedium,
-                            fontWeight = FontWeight.Bold,
-                            maxLines = 1,
-                            overflow = TextOverflow.Ellipsis,
-                        )
-                        // Level badge
-                        Box(
-                            contentAlignment = Alignment.Center,
-                            modifier = Modifier
-                                .clip(RoundedCornerShape(8.dp))
-                                .background(MaterialTheme.colorScheme.primary)
-                                .padding(horizontal = 6.dp, vertical = 2.dp),
-                        ) {
-                            Text(
-                                text = "Lv.${pet.level}",
-                                style = MaterialTheme.typography.labelSmall,
-                                color = MaterialTheme.colorScheme.onPrimary,
-                                fontWeight = FontWeight.Bold,
-                            )
-                        }
-                    }
-
+                // Level badge overlaid on bottom-end of the pet circle
+                Box(
+                    contentAlignment = Alignment.Center,
+                    modifier = Modifier
+                        .clip(RoundedCornerShape(6.dp))
+                        .background(MaterialTheme.colorScheme.primary)
+                        .padding(horizontal = 4.dp, vertical = 1.dp),
+                ) {
                     Text(
-                        text = pet.ownerName,
-                        style = MaterialTheme.typography.bodySmall,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        text = "Lv.${pet.level}",
+                        style = MaterialTheme.typography.labelSmall,
+                        color = MaterialTheme.colorScheme.onPrimary,
+                        fontWeight = FontWeight.Bold,
                     )
-
-                    Spacer(modifier = Modifier.height(8.dp))
-
-                    // Stat bars
-                    StatRow(label = "Hunger", value = pet.hunger)
-                    Spacer(modifier = Modifier.height(4.dp))
-                    StatRow(label = "Happy", value = pet.happiness)
-                    Spacer(modifier = Modifier.height(4.dp))
-                    StatRow(label = "Energy", value = pet.energy)
                 }
             }
+
+            Spacer(modifier = Modifier.height(8.dp))
+
+            // ── Pet name ────────────────────────────────────────────────
+            Text(
+                text = pet.name,
+                style = MaterialTheme.typography.titleSmall,
+                fontWeight = FontWeight.Bold,
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis,
+            )
+
+            Spacer(modifier = Modifier.height(4.dp))
+
+            // ── Owner row: photo/initial + display name ──────────────────
+            Row(
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.Center,
+            ) {
+                // Avatar: photo if available, otherwise coloured initial
+                if (!pet.ownerPhotoUrl.isNullOrBlank()) {
+                    AsyncImage(
+                        model = pet.ownerPhotoUrl,
+                        contentDescription = "Profile photo of ${pet.ownerName}",
+                        contentScale = ContentScale.Crop,
+                        modifier = Modifier
+                            .size(20.dp)
+                            .clip(CircleShape),
+                    )
+                } else {
+                    Box(
+                        contentAlignment = Alignment.Center,
+                        modifier = Modifier
+                            .size(20.dp)
+                            .clip(CircleShape)
+                            .background(MaterialTheme.colorScheme.secondaryContainer),
+                    ) {
+                        Text(
+                            text = pet.ownerName.firstOrNull()?.uppercase() ?: "?",
+                            style = MaterialTheme.typography.labelSmall,
+                            color = MaterialTheme.colorScheme.onSecondaryContainer,
+                            fontWeight = FontWeight.Bold,
+                        )
+                    }
+                }
+
+                Spacer(modifier = Modifier.width(4.dp))
+
+                Text(
+                    text = pet.ownerName,
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis,
+                )
+            }
+
+            Spacer(modifier = Modifier.height(10.dp))
+
+            // ── Mini stat bars ───────────────────────────────────────────
+            MiniStatBar(emoji = "\uD83C\uDF56", value = pet.hunger)
+            Spacer(modifier = Modifier.height(4.dp))
+            MiniStatBar(emoji = "\uD83D\uDE0A", value = pet.happiness)
+            Spacer(modifier = Modifier.height(4.dp))
+            MiniStatBar(emoji = "\u26A1", value = pet.energy)
         }
     }
 }
 
 @Composable
-private fun StatRow(
-    label: String,
+private fun MiniStatBar(
+    emoji: String,
     value: Int,
     modifier: Modifier = Modifier,
 ) {
     Row(
         modifier = modifier.fillMaxWidth(),
         verticalAlignment = Alignment.CenterVertically,
+        horizontalArrangement = Arrangement.spacedBy(4.dp),
     ) {
         Text(
-            text = label,
-            style = MaterialTheme.typography.labelSmall,
-            color = MaterialTheme.colorScheme.onSurfaceVariant,
-            modifier = Modifier.width(48.dp),
+            text = emoji,
+            fontSize = 12.sp,
         )
         LinearProgressIndicator(
             progress = { value / 100f },
             modifier = Modifier
                 .weight(1f)
-                .height(6.dp)
+                .height(5.dp)
                 .clip(RoundedCornerShape(3.dp)),
             color = when {
                 value < 20 -> MaterialTheme.colorScheme.error
@@ -161,12 +189,6 @@ private fun StatRow(
                 else -> MaterialTheme.colorScheme.primary
             },
             trackColor = MaterialTheme.colorScheme.surfaceContainerHighest,
-        )
-        Text(
-            text = "$value",
-            style = MaterialTheme.typography.labelSmall,
-            color = MaterialTheme.colorScheme.onSurfaceVariant,
-            modifier = Modifier.width(28.dp).padding(start = 4.dp),
         )
     }
 }

@@ -7,4 +7,6 @@ data class AppUser(
     val photoUrl: String? = null,
     val householdId: String? = null,
     val householdName: String? = null,
+    val totalPoints: Int = 0,
+    val totalLifetimeXp: Int = 0,
 )

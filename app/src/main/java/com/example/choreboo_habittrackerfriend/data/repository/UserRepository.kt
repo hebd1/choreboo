@@ -1,11 +1,13 @@
 package com.example.choreboo_habittrackerfriend.data.repository
 
 import android.util.Log
+import com.example.choreboo_habittrackerfriend.data.datastore.UserPreferences
 import com.example.choreboo_habittrackerfriend.dataconnect.ChorebooConnector
 import com.example.choreboo_habittrackerfriend.dataconnect.execute
 import com.example.choreboo_habittrackerfriend.dataconnect.instance
 import com.example.choreboo_habittrackerfriend.domain.model.AppUser
 import com.google.firebase.auth.FirebaseAuth
+import kotlinx.coroutines.flow.first
 import javax.inject.Inject
 import javax.inject.Singleton
 
@@ -14,6 +16,7 @@ private const val TAG = "UserRepository"
 @Singleton
 class UserRepository @Inject constructor(
     private val firebaseAuth: FirebaseAuth,
+    private val userPreferences: UserPreferences,
 ) {
     private val connector by lazy { ChorebooConnector.instance }
 
@@ -70,6 +73,8 @@ class UserRepository @Inject constructor(
                     photoUrl = cloudUser.photoUrl,
                     householdId = cloudUser.household?.id?.toString(),
                     householdName = cloudUser.household?.name,
+                    totalPoints = cloudUser.totalPoints,
+                    totalLifetimeXp = cloudUser.totalLifetimeXp,
                 )
             } else {
                 // User not in cloud yet, return local auth data
@@ -78,6 +83,64 @@ class UserRepository @Inject constructor(
         } catch (e: Exception) {
             Log.e(TAG, "Failed to fetch user from cloud", e)
             getCurrentAppUser()
+        }
+    }
+
+    /**
+     * Write-through: push current local totalPoints and totalLifetimeXp to the cloud.
+     * Called after habit completion so both devices stay in sync.
+     * Failures are silent (matching write-through convention).
+     */
+    suspend fun syncPointsToCloud(totalPoints: Int, totalLifetimeXp: Int) {
+        if (getCurrentUid() == null) return
+        try {
+            connector.updateUserPoints.execute(
+                totalPoints = totalPoints,
+                totalLifetimeXp = totalLifetimeXp,
+            )
+            Log.d(TAG, "Synced points to cloud: totalPoints=$totalPoints, totalLifetimeXp=$totalLifetimeXp")
+        } catch (e: Exception) {
+            Log.e(TAG, "Failed to sync points to cloud", e)
+        }
+    }
+
+    /**
+     * Cloud-to-local sync for point totals. Uses max-wins strategy so neither device loses
+     * progress. Called during the post-auth/resume sync flow.
+     * - totalLifetimeXp never decreases, so max is always correct.
+     * - totalPoints can decrease from feeding, but max prevents losing progress across devices.
+     */
+    suspend fun syncPointsFromCloud() {
+        if (getCurrentUid() == null) return
+        try {
+            val result = connector.getCurrentUser.execute()
+            val cloudUser = result.data.user ?: return
+
+            val cloudPoints = cloudUser.totalPoints
+            val cloudLifetimeXp = cloudUser.totalLifetimeXp
+
+            val localPoints = userPreferences.totalPoints.first()
+            val localLifetimeXp = userPreferences.totalLifetimeXp.first()
+
+            val mergedPoints = maxOf(localPoints, cloudPoints)
+            val mergedLifetimeXp = maxOf(localLifetimeXp, cloudLifetimeXp)
+
+            userPreferences.setPoints(mergedPoints)
+            userPreferences.setLifetimeXp(mergedLifetimeXp)
+
+            // Push merged values back to cloud if they differ from what the cloud had
+            if (mergedPoints != cloudPoints || mergedLifetimeXp != cloudLifetimeXp) {
+                syncPointsToCloud(mergedPoints, mergedLifetimeXp)
+            }
+
+            Log.d(
+                TAG,
+                "Synced points from cloud: local=($localPoints,$localLifetimeXp) " +
+                    "cloud=($cloudPoints,$cloudLifetimeXp) merged=($mergedPoints,$mergedLifetimeXp)",
+            )
+        } catch (e: Exception) {
+            Log.e(TAG, "Failed to sync points from cloud", e)
+            throw e
         }
     }
 }

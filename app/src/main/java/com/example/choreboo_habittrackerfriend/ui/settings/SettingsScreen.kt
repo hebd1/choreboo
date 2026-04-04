@@ -475,21 +475,20 @@ fun SettingsScreen(
                         modifier = Modifier
                             .padding(end = 16.dp)
                             .clip(RoundedCornerShape(50.dp))
-                            .background(MaterialTheme.colorScheme.surfaceContainerLowest)
-                            .padding(horizontal = 10.dp, vertical = 6.dp),
+                            .background(MaterialTheme.colorScheme.surfaceContainerHigh.copy(alpha = 0.85f))
+                            .padding(horizontal = 12.dp, vertical = 6.dp),
                     ) {
                         Icon(
                             Icons.Default.Stars,
                             contentDescription = "Points",
                             tint = MaterialTheme.colorScheme.secondaryContainer,
-                            modifier = Modifier.size(16.dp),
+                            modifier = Modifier.size(18.dp),
                         )
                         Spacer(modifier = Modifier.width(4.dp))
                         Text(
                             "$totalPoints",
                             fontWeight = FontWeight.Bold,
-                            style = MaterialTheme.typography.labelMedium,
-                            color = MaterialTheme.colorScheme.primary,
+                            style = MaterialTheme.typography.labelLarge,
                         )
                     }
                 },

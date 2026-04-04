@@ -37,6 +37,7 @@ import androidx.compose.material.icons.filled.AutoAwesome
 import androidx.compose.material.icons.filled.ChevronRight
 import androidx.compose.material.icons.filled.Groups
 import androidx.compose.material.icons.filled.NotificationsNone
+import androidx.compose.material.icons.filled.PersonOutline
 import androidx.compose.material.icons.filled.Schedule
 import androidx.compose.material.icons.filled.TaskAlt
 import androidx.compose.material3.AlertDialog
@@ -78,7 +79,10 @@ import androidx.compose.ui.unit.sp
 import androidx.compose.ui.viewinterop.AndroidView
 import androidx.emoji2.emojipicker.EmojiPickerView
 import androidx.hilt.navigation.compose.hiltViewModel
+import coil3.compose.AsyncImage
+import com.example.choreboo_habittrackerfriend.domain.model.HouseholdMember
 import com.example.choreboo_habittrackerfriend.ui.components.ProfileAvatar
+import androidx.compose.ui.layout.ContentScale
 import java.time.LocalTime
 
 private data class EmojiIcon(val id: String, val emoji: String, val label: String)
@@ -111,6 +115,7 @@ fun AddEditHabitScreen(
 ) {
     val formState by viewModel.formState.collectAsState()
     val profilePhotoUri by viewModel.profilePhotoUri.collectAsState()
+    val householdMembers by viewModel.householdMembers.collectAsState()
     val snackbarHostState = remember { SnackbarHostState() }
     var showTimePicker by remember { mutableStateOf(false) }
     var showEmojiPicker by remember { mutableStateOf(false) }
@@ -480,6 +485,22 @@ fun AddEditHabitScreen(
                 }
 
                 Spacer(modifier = Modifier.height(28.dp))
+
+                // Assignee picker — shown when Household Habit is on
+                AnimatedVisibility(
+                    visible = formState.isHouseholdHabit,
+                    enter = expandVertically(),
+                    exit = shrinkVertically(),
+                ) {
+                    Column {
+                        AssigneePicker(
+                            members = householdMembers,
+                            selectedUid = formState.assignedToUid,
+                            onSelect = { uid, name -> viewModel.updateAssignedTo(uid, name) },
+                        )
+                        Spacer(modifier = Modifier.height(28.dp))
+                    }
+                }
 
                 // CTA buttons
                 Box(
@@ -1003,8 +1024,7 @@ private fun TimePickerDialog(
 }
 
 @Composable
-private fun EmojiPickerDialog(
-    onEmojiSelected: (String) -> Unit,
+private fun EmojiPickerDialog(    onEmojiSelected: (String) -> Unit,
     onDismiss: () -> Unit,
 ) {
     val context = LocalContext.current
@@ -1041,4 +1061,156 @@ private fun EmojiPickerDialog(
             }
         },
     )
+}
+
+/**
+ * Assignee picker card shown when a habit is marked as a Household Habit.
+ * Displays all household members as selectable chips. Selecting "Anyone" clears the assignee.
+ */
+@Composable
+private fun AssigneePicker(
+    members: List<HouseholdMember>,
+    selectedUid: String?,
+    onSelect: (uid: String?, name: String?) -> Unit,
+) {
+    Box(
+        modifier = Modifier
+            .fillMaxWidth()
+            .clip(RoundedCornerShape(16.dp))
+            .background(MaterialTheme.colorScheme.surfaceContainerLow)
+            .padding(16.dp),
+    ) {
+        Column {
+            Row(
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.spacedBy(8.dp),
+            ) {
+                Icon(
+                    imageVector = Icons.Default.PersonOutline,
+                    contentDescription = null,
+                    tint = MaterialTheme.colorScheme.secondary,
+                    modifier = Modifier.size(20.dp),
+                )
+                Text(
+                    text = "ASSIGN TO",
+                    style = MaterialTheme.typography.labelSmall,
+                    fontWeight = FontWeight.Bold,
+                    color = MaterialTheme.colorScheme.outline,
+                    letterSpacing = 1.sp,
+                )
+            }
+            Spacer(modifier = Modifier.height(4.dp))
+            Text(
+                text = "Who is responsible for this habit? Leave as Anyone for all members.",
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+            )
+            Spacer(modifier = Modifier.height(12.dp))
+
+            // "Anyone" chip
+            val anyoneSelected = selectedUid == null
+            AssigneeChip(
+                label = "Anyone",
+                emoji = "👥",
+                isSelected = anyoneSelected,
+                onClick = { onSelect(null, null) },
+            )
+
+            if (members.isNotEmpty()) {
+                Spacer(modifier = Modifier.height(8.dp))
+                members.forEach { member ->
+                    val isSelected = member.uid == selectedUid
+                    AssigneeChip(
+                        label = member.displayName,
+                        emoji = null,
+                        photoUrl = member.photoUrl,
+                        isSelected = isSelected,
+                        onClick = { onSelect(member.uid, member.displayName) },
+                    )
+                    Spacer(modifier = Modifier.height(6.dp))
+                }
+            }
+        }
+    }
+}
+
+@Composable
+private fun AssigneeChip(
+    label: String,
+    emoji: String?,
+    isSelected: Boolean,
+    onClick: () -> Unit,
+    photoUrl: String? = null,
+) {
+    Row(
+        modifier = Modifier
+            .fillMaxWidth()
+            .clip(RoundedCornerShape(12.dp))
+            .background(
+                if (isSelected) MaterialTheme.colorScheme.primaryContainer
+                else MaterialTheme.colorScheme.surfaceContainerHighest,
+            )
+            .then(
+                if (isSelected) Modifier.border(
+                    1.5.dp,
+                    MaterialTheme.colorScheme.primary,
+                    RoundedCornerShape(12.dp),
+                ) else Modifier,
+            )
+            .clickable { onClick() }
+            .padding(horizontal = 12.dp, vertical = 10.dp),
+        verticalAlignment = Alignment.CenterVertically,
+        horizontalArrangement = Arrangement.spacedBy(10.dp),
+    ) {
+        // Avatar: photo > initial circle > emoji
+        Box(
+            modifier = Modifier
+                .size(32.dp)
+                .clip(CircleShape)
+                .background(
+                    if (isSelected) MaterialTheme.colorScheme.primary.copy(alpha = 0.2f)
+                    else MaterialTheme.colorScheme.surfaceContainerHigh,
+                ),
+            contentAlignment = Alignment.Center,
+        ) {
+            if (emoji != null) {
+                Text(text = emoji, fontSize = 16.sp)
+            } else if (photoUrl != null) {
+                AsyncImage(
+                    model = photoUrl,
+                    contentDescription = label,
+                    modifier = Modifier
+                        .size(32.dp)
+                        .clip(CircleShape),
+                    contentScale = ContentScale.Crop,
+                )
+            } else {
+                Text(
+                    text = label.firstOrNull()?.uppercaseChar()?.toString() ?: "?",
+                    style = MaterialTheme.typography.labelMedium,
+                    fontWeight = FontWeight.Bold,
+                    color = if (isSelected) MaterialTheme.colorScheme.primary
+                    else MaterialTheme.colorScheme.onSurfaceVariant,
+                )
+            }
+        }
+
+        Text(
+            text = label,
+            style = MaterialTheme.typography.bodyMedium,
+            fontWeight = if (isSelected) FontWeight.SemiBold else FontWeight.Normal,
+            color = if (isSelected) MaterialTheme.colorScheme.onPrimaryContainer
+            else MaterialTheme.colorScheme.onSurface,
+            modifier = Modifier.weight(1f),
+        )
+
+        if (isSelected) {
+            Text(
+                text = "✓",
+                style = MaterialTheme.typography.labelMedium,
+                fontWeight = FontWeight.Bold,
+                color = MaterialTheme.colorScheme.primary,
+            )
+        }
+    }
 }

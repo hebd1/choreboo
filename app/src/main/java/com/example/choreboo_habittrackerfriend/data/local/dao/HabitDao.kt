@@ -38,7 +38,34 @@ interface HabitDao {
     @Query("SELECT COUNT(*) FROM habits")
     fun getTotalHabitCount(): Flow<Int>
 
+    /** All habits that have been synced to cloud (non-null remoteId) — used for G13 reconciliation. */
+    @Query("SELECT * FROM habits WHERE remoteId IS NOT NULL")
+    suspend fun getHabitsWithRemoteId(): List<HabitEntity>
+
+    /** Bulk-delete habits by local id — used for G13 reconciliation. */
+    @Query("DELETE FROM habits WHERE id IN (:ids)")
+    suspend fun deleteByIds(ids: List<Long>)
+
     /** Delete all habits — used for sign-out data cleanup. */
     @Query("DELETE FROM habits")
     suspend fun deleteAllHabits()
+
+    /**
+     * Delete all household habits not owned by the given UID.
+     * Used when a user leaves a household — other members' synced habits are removed from Room.
+     */
+    @Query("DELETE FROM habits WHERE ownerUid != :ownerUid AND isHouseholdHabit = 1")
+    suspend fun deleteNonOwnedHouseholdHabits(ownerUid: String)
+
+    /**
+     * Return all household habits that were synced from other household members
+     * (have a remoteId and are not owned by [ownerUid]).
+     * Used for reconciliation after household habit sync.
+     */
+    @Query("SELECT * FROM habits WHERE remoteId IS NOT NULL AND ownerUid != :ownerUid AND isHouseholdHabit = 1")
+    suspend fun getOtherMembersHouseholdHabits(ownerUid: String): List<HabitEntity>
+
+    /** Returns true if the user has any household habits (owned or synced from others). */
+    @Query("SELECT COUNT(*) > 0 FROM habits WHERE isHouseholdHabit = 1 AND householdId IS NOT NULL")
+    suspend fun hasHouseholdHabits(): Boolean
 }

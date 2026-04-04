@@ -16,6 +16,8 @@ query GetCurrentUser @auth(level: USER) {
       inviteCode
     }
     createdAt
+    totalPoints
+    totalLifetimeXp
   }
 }
 
@@ -149,14 +151,50 @@ query GetMyHabits @auth(level: USER) {
       id
       name
     }
+    assignedTo {
+      id
+      displayName
+    }
+  }
+}
+
+# Returns ALL habits for the current user including archived ones — used for cloud-to-local sync
+# so that archive status can propagate across devices (G12 fix).
+query GetAllMyHabits @auth(level: USER) {
+  habits(
+    where: { ownerId: { eq_expr: "auth.uid" } }
+  ) {
+    id
+    title
+    description
+    iconName
+    customDays
+    difficulty
+    baseXp
+    reminderEnabled
+    reminderTime
+    isHouseholdHabit
+    isArchived
+    createdAt
+    household {
+      id
+      name
+    }
+    assignedTo {
+      id
+      displayName
+    }
   }
 }
 
 # Inherently scoped: traverses from the authenticated user to their household's habits.
 # Uses the auto-generated reverse relation `habits_on_household`.
+# Returns full habit fields (including reminder and archive) so household habits can be
+# synced into Room identically to personal habits.
 query GetMyHouseholdHabits @auth(level: USER) {
   user(key: { id_expr: "auth.uid" }) {
     household {
+      id
       habits_on_household(where: { isHouseholdHabit: { eq: true }, isArchived: { eq: false } }) {
         id
         title
@@ -165,11 +203,41 @@ query GetMyHouseholdHabits @auth(level: USER) {
         customDays
         difficulty
         baseXp
+        reminderEnabled
+        reminderTime
         isHouseholdHabit
+        isArchived
         createdAt
         owner {
           id
           displayName
+        }
+        assignedTo {
+          id
+          displayName
+        }
+      }
+    }
+  }
+}
+
+# Returns all habit logs for today across the authenticated user's household.
+# Traversal: auth.uid → User → Household → Habit (household habits) → HabitLog (for date).
+# Used to display "Completed by [name]" on household habits and enforce the one-user-per-day rule.
+query GetHouseholdHabitLogsForDate($date: String!) @auth(level: USER) {
+  user(key: { id_expr: "auth.uid" }) {
+    household {
+      habits_on_household(where: { isHouseholdHabit: { eq: true }, isArchived: { eq: false } }) {
+        id
+        habitLogs_on_habit(where: { date: { eq: $date } }) {
+          id
+          completedAt
+          xpEarned
+          streakAtCompletion
+          completedBy {
+            id
+            displayName
+          }
         }
       }
     }
