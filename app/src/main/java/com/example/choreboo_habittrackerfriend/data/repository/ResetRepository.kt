@@ -8,10 +8,12 @@ import com.example.choreboo_habittrackerfriend.dataconnect.instance
 import com.google.firebase.auth.AuthCredential
 import com.google.firebase.auth.FirebaseAuth
 import kotlinx.coroutines.tasks.await
+import kotlinx.coroutines.withTimeoutOrNull
 import javax.inject.Inject
 import javax.inject.Singleton
 
 private const val TAG = "ResetRepository"
+private const val CLOUD_TIMEOUT_MS = 5000L
 
 sealed class ResetResult {
     data object Success : ResetResult()
@@ -48,7 +50,8 @@ class ResetRepository @Inject constructor(
 
         // Step 1: Delete all habit logs (references Habit + User)
         try {
-            connector.deleteAllMyHabitLogs.execute()
+            withTimeoutOrNull(CLOUD_TIMEOUT_MS) { connector.deleteAllMyHabitLogs.execute() }
+                ?: Log.w(TAG, "deleteAllMyHabitLogs timed out")
             Log.d(TAG, "Deleted all habit logs")
         } catch (e: Exception) {
             Log.w(TAG, "Failed to delete habit logs (continuing)", e)
@@ -56,7 +59,8 @@ class ResetRepository @Inject constructor(
 
         // Step 2: Delete all habits (references User + Household)
         try {
-            connector.deleteAllMyHabits.execute()
+            withTimeoutOrNull(CLOUD_TIMEOUT_MS) { connector.deleteAllMyHabits.execute() }
+                ?: Log.w(TAG, "deleteAllMyHabits timed out")
             Log.d(TAG, "Deleted all habits")
         } catch (e: Exception) {
             Log.w(TAG, "Failed to delete habits (continuing)", e)
@@ -64,7 +68,8 @@ class ResetRepository @Inject constructor(
 
         // Step 3: Delete the Choreboo (references User)
         try {
-            connector.deleteMyChoreboo.execute()
+            withTimeoutOrNull(CLOUD_TIMEOUT_MS) { connector.deleteMyChoreboo.execute() }
+                ?: Log.w(TAG, "deleteMyChoreboo timed out")
             Log.d(TAG, "Deleted Choreboo")
         } catch (e: Exception) {
             Log.w(TAG, "Failed to delete Choreboo (continuing)", e)
@@ -77,13 +82,23 @@ class ResetRepository @Inject constructor(
         // user actually has a household (the in-memory state is only populated when the
         // HouseholdScreen is visited).
         try {
-            val cloudHousehold = connector.getMyHousehold.execute().data.user?.household
-            connector.updateUserHousehold.execute { householdId = null }
+            val householdResult = withTimeoutOrNull(CLOUD_TIMEOUT_MS) {
+                connector.getMyHousehold.execute()
+            }
+            if (householdResult == null) {
+                Log.w(TAG, "getMyHousehold timed out during reset")
+            }
+            val cloudHousehold = householdResult?.data?.user?.household
+            withTimeoutOrNull(CLOUD_TIMEOUT_MS) {
+                connector.updateUserHousehold.execute { householdId = null }
+            } ?: Log.w(TAG, "updateUserHousehold timed out")
             Log.d(TAG, "Nulled out household FK")
             if (cloudHousehold != null && cloudHousehold.createdBy.id == uid) {
-                connector.deleteHousehold.execute(
-                    householdId = cloudHousehold.id,
-                )
+                withTimeoutOrNull(CLOUD_TIMEOUT_MS) {
+                    connector.deleteHousehold.execute(
+                        householdId = cloudHousehold.id,
+                    )
+                } ?: Log.w(TAG, "deleteHousehold timed out")
                 Log.d(TAG, "Deleted household ${cloudHousehold.id}")
             }
         } catch (e: Exception) {
@@ -92,7 +107,8 @@ class ResetRepository @Inject constructor(
 
         // Step 5: Delete the User record (must be last — all dependent rows gone now)
         try {
-            connector.deleteMyUser.execute()
+            withTimeoutOrNull(CLOUD_TIMEOUT_MS) { connector.deleteMyUser.execute() }
+                ?: Log.w(TAG, "deleteMyUser timed out")
             Log.d(TAG, "Deleted User record from Data Connect")
         } catch (e: Exception) {
             Log.w(TAG, "Failed to delete User record (continuing)", e)

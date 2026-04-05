@@ -258,13 +258,13 @@ class CalendarViewModelTest {
 
     @Test
     fun `selectedDateLogs returns logs for selected date`() = runTest {
-        val testDate = LocalDate.of(2026, 4, 5)
+        val testDate = LocalDate.of(2026, 1, 15)
         val logsForDate = listOf(
             HabitLogWithName(
                 id = 1,
                 habitId = 1,
                 completedAt = 1000L,
-                date = "2026-04-05",
+                date = "2026-01-15",
                 xpEarned = 10,
                 streakAtCompletion = 3,
                 habitTitle = "Exercise",
@@ -272,7 +272,7 @@ class CalendarViewModelTest {
             ),
         )
 
-        every { habitRepository.getLogsWithNamesForDate("2026-04-05") } returns flowOf(logsForDate)
+        every { habitRepository.getLogsWithNamesForDate("2026-01-15") } returns flowOf(logsForDate)
 
         val vm = createViewModel()
         vm.selectDate(testDate)

@@ -1,6 +1,8 @@
 package com.example.choreboo_habittrackerfriend.data.repository
 
 import com.example.choreboo_habittrackerfriend.data.local.dao.HouseholdMemberDao
+import com.example.choreboo_habittrackerfriend.data.local.dao.HouseholdDao
+import com.example.choreboo_habittrackerfriend.data.local.dao.HouseholdHabitStatusDao
 import io.mockk.mockk
 import kotlinx.coroutines.test.runTest
 import org.junit.Before
@@ -20,6 +22,8 @@ class HouseholdRepositoryValidationTest {
     fun setUp() {
         repo = HouseholdRepository(
             householdMemberDao = mockk(relaxed = true),
+            householdDao = mockk(relaxed = true),
+            householdHabitStatusDao = mockk(relaxed = true),
             userRepository = mockk(relaxed = true),
             habitRepository = mockk(relaxed = true),
         )

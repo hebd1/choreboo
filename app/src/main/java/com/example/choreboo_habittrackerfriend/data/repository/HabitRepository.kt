@@ -21,6 +21,7 @@ import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.withTimeoutOrNull
 import java.time.DayOfWeek
 import java.time.LocalDate
 import java.time.LocalTime
@@ -31,6 +32,7 @@ import javax.inject.Inject
 import javax.inject.Singleton
 
 private const val TAG = "HabitRepository"
+private const val CLOUD_TIMEOUT_MS = 5000L
 
 data class CompletionResult(
     val xpEarned: Int,
@@ -490,7 +492,11 @@ class HabitRepository @Inject constructor(
         val uid = firebaseAuth.currentUser?.uid ?: return
         try {
             // ---- 1. Personal habits (owned by current user) ----
-            val result = connector.getAllMyHabits.execute()
+            val result = withTimeoutOrNull(CLOUD_TIMEOUT_MS) { connector.getAllMyHabits.execute() }
+            if (result == null) {
+                Log.w(TAG, "syncHabitsFromCloud: personal habits timed out")
+                return
+            }
             val cloudHabits = result.data.habits
             Log.d(TAG, "Fetched ${cloudHabits.size} personal habits from cloud")
 
@@ -564,7 +570,11 @@ class HabitRepository @Inject constructor(
         // Reminders are only enabled for assigned habits — unassigned household habits don't trigger notifications on any device.
         try {
             val uid = firebaseAuth.currentUser?.uid ?: return
-            val hhResult = connector.getMyHouseholdHabits.execute()
+            val hhResult = withTimeoutOrNull(CLOUD_TIMEOUT_MS) { connector.getMyHouseholdHabits.execute() }
+            if (hhResult == null) {
+                Log.w(TAG, "syncHabitsFromCloud: household habits timed out")
+                return
+            }
             val householdData = hhResult.data.user?.household
             if (householdData == null) {
                 // User has no household — delete any stale other-member habits from Room

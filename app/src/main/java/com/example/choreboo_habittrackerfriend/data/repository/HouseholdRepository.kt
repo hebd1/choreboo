@@ -21,11 +21,13 @@ import kotlinx.coroutines.coroutineScope
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.withTimeoutOrNull
 import java.time.LocalDate
 import javax.inject.Inject
 import javax.inject.Singleton
 
 private const val TAG = "HouseholdRepository"
+private const val CLOUD_TIMEOUT_MS = 5000L
 
 sealed class HouseholdResult {
     data class Success(val household: Household) : HouseholdResult()
@@ -206,25 +208,30 @@ class HouseholdRepository @Inject constructor(
      */
     suspend fun refreshHouseholdMembers() {
         try {
-            val result = connector.getMyHouseholdMembers.execute()
+            val result = withTimeoutOrNull(CLOUD_TIMEOUT_MS) { connector.getMyHouseholdMembers.execute() }
+            if (result == null) {
+                Log.w(TAG, "refreshHouseholdMembers: timed out")
+                return
+            }
             val members = result.data.user?.household?.users_on_household
             if (members != null) {
                 val entities = members.map { user ->
-                    // For members without a choreboo, create a placeholder entity
+                    // GetMyHouseholdMembers returns identity fields only (no pet data).
+                    // Upsert preserves any existing pet data written by refreshHouseholdPets().
                     HouseholdMemberEntity(
                         uid = user.id,
                         displayName = user.displayName,
                         photoUrl = user.photoUrl,
                         email = user.email,
-                        chorebooId = user.choreboo_on_owner?.id?.toString() ?: "",
-                        chorebooName = user.choreboo_on_owner?.name ?: "",
-                        chorebooStage = user.choreboo_on_owner?.stage ?: "EGG",
-                        chorebooLevel = user.choreboo_on_owner?.level ?: 1,
-                        chorebooXp = user.choreboo_on_owner?.xp ?: 0,
-                        chorebooHunger = user.choreboo_on_owner?.hunger ?: 100,
-                        chorebooHappiness = user.choreboo_on_owner?.happiness ?: 100,
-                        chorebooEnergy = user.choreboo_on_owner?.energy ?: 100,
-                        chorebooPetType = user.choreboo_on_owner?.petType ?: "FOX",
+                        chorebooId = "",
+                        chorebooName = "",
+                        chorebooStage = "EGG",
+                        chorebooLevel = 1,
+                        chorebooXp = 0,
+                        chorebooHunger = 100,
+                        chorebooHappiness = 100,
+                        chorebooEnergy = 100,
+                        chorebooPetType = "FOX",
                         lastSyncedAt = System.currentTimeMillis(),
                     )
                 }
@@ -253,7 +260,11 @@ class HouseholdRepository @Inject constructor(
      */
     suspend fun refreshHouseholdPets() {
         try {
-            val result = connector.getMyHouseholdChoreboos.execute()
+            val result = withTimeoutOrNull(CLOUD_TIMEOUT_MS) { connector.getMyHouseholdChoreboos.execute() }
+            if (result == null) {
+                Log.w(TAG, "refreshHouseholdPets: timed out")
+                return
+            }
             val users = result.data.user?.household?.users_on_household
             if (users != null) {
                 val entities = users.mapNotNull { user ->
@@ -262,7 +273,7 @@ class HouseholdRepository @Inject constructor(
                         uid = user.id,
                         displayName = user.displayName,
                         photoUrl = user.photoUrl,
-                        email = user.email,
+                        email = null,
                         chorebooId = pet.id.toString(),
                         chorebooName = pet.name,
                         chorebooStage = pet.stage,
@@ -304,11 +315,19 @@ class HouseholdRepository @Inject constructor(
             // Run both network calls in parallel
             val (habitNodes, logsByHabitId) = coroutineScope {
                 val habitsDeferred = async {
-                    val habitsResult = connector.getMyHouseholdHabits.execute()
+                    val habitsResult = withTimeoutOrNull(CLOUD_TIMEOUT_MS) { connector.getMyHouseholdHabits.execute() }
+                    if (habitsResult == null) {
+                        Log.w(TAG, "refreshHouseholdHabits: habits timed out")
+                        return@async null
+                    }
                     habitsResult.data.user?.household?.habits_on_household
                 }
                 val logsDeferred = async {
-                    val logsResult = connector.getHouseholdHabitLogsForDate.execute(date = today)
+                    val logsResult = withTimeoutOrNull(CLOUD_TIMEOUT_MS) { connector.getHouseholdHabitLogsForDate.execute(date = today) }
+                    if (logsResult == null) {
+                        Log.w(TAG, "refreshHouseholdHabits: logs timed out")
+                        return@async emptyMap<String, Pair<String, String>>()
+                    }
                     buildMap<String, Pair<String, String>> {
                         logsResult.data.user?.household?.habits_on_household?.forEach { habitNode ->
                             habitNode.habitLogs_on_habit.firstOrNull()?.let { log ->
@@ -367,7 +386,11 @@ class HouseholdRepository @Inject constructor(
      */
     suspend fun refreshAll() {
         try {
-            val result = connector.getMyHousehold.execute()
+            val result = withTimeoutOrNull(CLOUD_TIMEOUT_MS) { connector.getMyHousehold.execute() }
+            if (result == null) {
+                Log.w(TAG, "refreshAll: timed out")
+                return
+            }
             val h = result.data.user?.household
             if (h != null) {
                 val household = HouseholdEntity(

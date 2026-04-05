@@ -12,11 +12,13 @@ import com.google.firebase.auth.UserProfileChangeRequest
 import com.google.firebase.storage.FirebaseStorage
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.tasks.await
+import kotlinx.coroutines.withTimeoutOrNull
 import java.io.File
 import javax.inject.Inject
 import javax.inject.Singleton
 
 private const val TAG = "UserRepository"
+private const val CLOUD_TIMEOUT_MS = 5000L
 
 @Singleton
 class UserRepository @Inject constructor(
@@ -91,7 +93,11 @@ class UserRepository @Inject constructor(
     suspend fun fetchCurrentUserFromCloud(): AppUser? {
         val uid = getCurrentUid() ?: return null
         return try {
-            val result = connector.getCurrentUser.execute()
+            val result = withTimeoutOrNull(CLOUD_TIMEOUT_MS) { connector.getCurrentUser.execute() }
+            if (result == null) {
+                Log.w(TAG, "fetchCurrentUserFromCloud timed out")
+                return getCurrentAppUser()
+            }
             val cloudUser = result.data.user
             if (cloudUser != null) {
                 AppUser(
@@ -144,7 +150,11 @@ class UserRepository @Inject constructor(
     suspend fun syncPointsFromCloud() {
         if (getCurrentUid() == null) return
         try {
-            val result = connector.getCurrentUser.execute()
+            val result = withTimeoutOrNull(CLOUD_TIMEOUT_MS) { connector.getCurrentUser.execute() }
+            if (result == null) {
+                Log.w(TAG, "syncPointsFromCloud timed out")
+                return
+            }
             val cloudUser = result.data.user ?: return
 
             val cloudPoints = cloudUser.totalPoints

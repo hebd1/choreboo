@@ -26,9 +26,10 @@ import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
+import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.PullToRefreshBox
+import androidx.compose.material3.pulltorefresh.PullToRefreshBox
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
@@ -53,6 +54,7 @@ import com.example.choreboo_habittrackerfriend.domain.model.HouseholdPet
 import com.example.choreboo_habittrackerfriend.ui.household.components.HouseholdHabitCard
 import com.example.choreboo_habittrackerfriend.ui.household.components.HouseholdPetCard
 
+@OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun HouseholdScreen(
     onNavigateToSettings: () -> Unit = {},
@@ -85,62 +87,63 @@ fun HouseholdScreen(
                 .padding(horizontal = 16.dp)
                 .padding(top = 16.dp, bottom = 96.dp),
         ) {
-        // Header
-        Text(
-            text = household?.name ?: "Household",
-            style = MaterialTheme.typography.headlineMedium,
-            fontWeight = FontWeight.ExtraBold,
-            color = MaterialTheme.colorScheme.primary,
-        )
+            // Header
+            Text(
+                text = household?.name ?: "Household",
+                style = MaterialTheme.typography.headlineMedium,
+                fontWeight = FontWeight.ExtraBold,
+                color = MaterialTheme.colorScheme.primary,
+            )
 
-        Spacer(modifier = Modifier.height(16.dp))
+            Spacer(modifier = Modifier.height(16.dp))
 
-        if (household == null) {
-            EmptyHouseholdState(onInvite = onNavigateToSettings)
-        } else {
-            LazyColumn(
-                verticalArrangement = Arrangement.spacedBy(0.dp),
-                contentPadding = PaddingValues(bottom = 8.dp),
-            ) {
-                // ── Pet grid (up to 5) ───────────────────────────────────
-                if (pets.isEmpty()) {
-                    item {
-                        QuietHouseholdState()
-                        Spacer(modifier = Modifier.height(16.dp))
-                    }
-                } else {
-                    // Cap at 5 pets. Display as a 2-column grid using chunked rows.
-                    val displayPets = pets.take(5)
-                    val rows = displayPets.chunked(2)
-                    items(rows, key = { row -> "pet_row_${row[0].chorebooId}" }) { row ->
-                        PetGridRow(
-                            row = row,
-                            onPetClick = { viewModel.selectPet(it) },
-                        )
-                        Spacer(modifier = Modifier.height(12.dp))
-                    }
-                }
-
-                // ── Household chores section ─────────────────────────────
-                if (habits.isNotEmpty()) {
-                    item(key = "chores_header") {
-                        Spacer(modifier = Modifier.height(4.dp))
-                        Text(
-                            text = "Household Chores",
-                            style = MaterialTheme.typography.titleMedium,
-                            fontWeight = FontWeight.Bold,
-                            color = MaterialTheme.colorScheme.onSurface,
-                        )
-                        Spacer(modifier = Modifier.height(8.dp))
+            if (household == null) {
+                EmptyHouseholdState(onInvite = onNavigateToSettings)
+            } else {
+                LazyColumn(
+                    verticalArrangement = Arrangement.spacedBy(0.dp),
+                    contentPadding = PaddingValues(bottom = 8.dp),
+                ) {
+                    // ── Pet grid (up to 5) ───────────────────────────────────
+                    if (pets.isEmpty()) {
+                        item {
+                            QuietHouseholdState()
+                            Spacer(modifier = Modifier.height(16.dp))
+                        }
+                    } else {
+                        // Cap at 5 pets. Display as a 2-column grid using chunked rows.
+                        val displayPets = pets.take(5)
+                        val rows = displayPets.chunked(2)
+                        items(rows, key = { row -> "pet_row_${row[0].chorebooId}" }) { row ->
+                            PetGridRow(
+                                row = row,
+                                onPetClick = { viewModel.selectPet(it) },
+                            )
+                            Spacer(modifier = Modifier.height(12.dp))
+                        }
                     }
 
-                    items(habits, key = { habit -> "habit_${habit.habitId}" }) { habit ->
-                        HouseholdHabitCard(habit = habit)
-                        Spacer(modifier = Modifier.height(8.dp))
+                    // ── Household chores section ─────────────────────────────
+                    if (habits.isNotEmpty()) {
+                        item(key = "chores_header") {
+                            Spacer(modifier = Modifier.height(4.dp))
+                            Text(
+                                text = "Household Chores",
+                                style = MaterialTheme.typography.titleMedium,
+                                fontWeight = FontWeight.Bold,
+                                color = MaterialTheme.colorScheme.onSurface,
+                            )
+                            Spacer(modifier = Modifier.height(8.dp))
+                        }
+
+                        items(habits, key = { habit -> "habit_${habit.habitId}" }) { habit ->
+                            HouseholdHabitCard(habit = habit)
+                            Spacer(modifier = Modifier.height(8.dp))
+                        }
                     }
                 }
             }
-        }
+        } // end Column
     } // end PullToRefreshBox
 }
 

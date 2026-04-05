@@ -18,6 +18,7 @@ import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.withTimeoutOrNull
 import java.util.Date
 import java.util.UUID
 import javax.inject.Inject
@@ -25,6 +26,7 @@ import javax.inject.Singleton
 import kotlin.math.max
 
 private const val TAG = "ChorebooRepository"
+private const val CLOUD_TIMEOUT_MS = 5000L
 
 data class XpResult(
     val levelsGained: Int = 0,
@@ -332,7 +334,11 @@ class ChorebooRepository @Inject constructor(
      */
     suspend fun syncFromCloud() {
         try {
-            val result = connector.getMyChoreboo.execute()
+            val result = withTimeoutOrNull(CLOUD_TIMEOUT_MS) { connector.getMyChoreboo.execute() }
+            if (result == null) {
+                Log.w(TAG, "syncFromCloud: timed out")
+                return
+            }
             val cloudPet = result.data.choreboos.firstOrNull()
             if (cloudPet == null) {
                 Log.d(TAG, "No choreboo found in cloud — skipping sync")
