@@ -1,6 +1,7 @@
 package com.example.choreboo_habittrackerfriend.data.repository
 
 import android.util.Log
+import dagger.hilt.android.qualifiers.ApplicationContext
 import com.example.choreboo_habittrackerfriend.data.local.dao.HabitDao
 import com.example.choreboo_habittrackerfriend.data.local.dao.HabitLogDao
 import com.example.choreboo_habittrackerfriend.data.local.entity.HabitEntity
@@ -11,6 +12,7 @@ import com.example.choreboo_habittrackerfriend.dataconnect.ChorebooConnector
 import com.example.choreboo_habittrackerfriend.dataconnect.execute
 import com.example.choreboo_habittrackerfriend.dataconnect.instance
 import com.example.choreboo_habittrackerfriend.domain.model.Habit
+import com.example.choreboo_habittrackerfriend.worker.HabitReminderScheduler
 import com.google.firebase.auth.FirebaseAuth
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
@@ -43,6 +45,7 @@ class HabitRepository @Inject constructor(
     private val userPreferences: UserPreferences,
     private val userRepository: UserRepository,
     private val firebaseAuth: FirebaseAuth,
+    @ApplicationContext private val context: android.content.Context,
 ) {
     private val connector by lazy { ChorebooConnector.instance }
     private val dateFormatter = DateTimeFormatter.ISO_LOCAL_DATE
@@ -393,6 +396,27 @@ class HabitRepository @Inject constructor(
     }
 
     /**
+     * Cancel all pending AlarmManager reminder alarms. Called on sign-out to prevent stale
+     * alarms from firing after the user switches accounts.
+     */
+    /**
+     * Cancel all pending AlarmManager alarms for this device.
+     * Called during sign-out to prevent stale notifications from firing after the user switches accounts.
+     * This prevents a stale habit from a previous account being linked to the newly-signed-in user's pet.
+     */
+    suspend fun cancelAllReminders() {
+        try {
+            val allHabits = habitDao.getAllHabitsSync()
+            for (habit in allHabits) {
+                HabitReminderScheduler.cancelReminder(context, habit.id)
+            }
+            Log.d(TAG, "Cancelled ${allHabits.size} pending reminder alarms")
+        } catch (e: Exception) {
+            Log.w(TAG, "Failed to cancel all reminders", e)
+        }
+    }
+
+    /**
      * Called when the user leaves a household.
      * - Deletes other members' synced household habits from Room.
      * - Converts the user's own household habits to personal (clears isHouseholdHabit + householdId).
@@ -442,6 +466,17 @@ class HabitRepository @Inject constructor(
      * Also syncs household habits owned by other members into Room so they appear
      * in the habit list. Called once after successful authentication and on every sync.
      */
+    /**
+     * Sync all habits from Firebase Data Connect to Room.
+     * Two phases:
+     * 1. Personal habits (owned by current user): Fetches from GetAllMyHabits, upserts to Room,
+     *    and schedules reminders if enabled.
+     * 2. Household habits from other members (if in a household): Fetches from GetMyHouseholdHabits,
+     *    filters out own habits (already synced in phase 1), and only enables reminders on habits
+     *    assigned to the current user. Also schedules reminders for assigned household habits.
+     * Cloud-to-local conflict resolution: Cloud wins (overwrites).
+     * G13 reconciliation: Deletes local habits with remoteId that aren't present in cloud response.
+     */
     suspend fun syncHabitsFromCloud() {
         val uid = firebaseAuth.currentUser?.uid ?: return
         try {
@@ -475,7 +510,28 @@ class HabitRepository @Inject constructor(
                     assignedToName = cloudHabit.assignedTo?.displayName,
                     remoteId = remoteId,
                 )
-                habitDao.upsertHabit(entity)
+             habitDao.upsertHabit(entity)
+
+                 // Schedule reminder immediately after syncing if enabled (fixes B17: new devices signing in for first time).
+                 // On new devices, synced personal habits have reminderEnabled=true but no AlarmManager alarms were registered.
+                 if (cloudHabit.reminderEnabled && cloudHabit.reminderTime != null && !cloudHabit.isArchived) {
+                    try {
+                        val parsedTime = try {
+                            LocalTime.parse(cloudHabit.reminderTime)
+                        } catch (_: Exception) {
+                            LocalTime.of(9, 0)
+                        }
+                        HabitReminderScheduler.scheduleReminder(
+                            context,
+                            entity.id,
+                            cloudHabit.title,
+                            parsedTime,
+                            cloudHabit.customDays.split(",").map { it.trim() }.filter { it.isNotEmpty() },
+                        )
+                    } catch (e: Exception) {
+                        Log.w(TAG, "Failed to schedule reminder for synced habit ${cloudHabit.title}", e)
+                    }
+                }
             }
 
             // G13: Deletion reconciliation for personal habits.
@@ -495,6 +551,8 @@ class HabitRepository @Inject constructor(
         }
 
         // ---- 2. Household habits from other members (best-effort, silent on failure) ----
+        // Syncs household habits visible to current user: habits assigned to them and unassigned habits (assignedToUid IS NULL).
+        // Reminders are only enabled for assigned habits — unassigned household habits don't trigger notifications on any device.
         try {
             val uid = firebaseAuth.currentUser?.uid ?: return
             val hhResult = connector.getMyHouseholdHabits.execute()
@@ -514,6 +572,11 @@ class HabitRepository @Inject constructor(
                 cloudHouseholdRemoteIds.add(remoteId)
                 val existing = habitDao.getHabitByRemoteId(remoteId)
 
+                // Enable reminders only if this habit is assigned to the current user
+                val isAssignedToCurrentUser = cloudHabit.assignedTo?.id == uid
+                val reminderEnabled = isAssignedToCurrentUser && cloudHabit.reminderEnabled
+                val reminderTime = if (isAssignedToCurrentUser) cloudHabit.reminderTime else null
+
                 val entity = HabitEntity(
                     id = existing?.id ?: 0,
                     title = cloudHabit.title,
@@ -522,9 +585,8 @@ class HabitRepository @Inject constructor(
                     customDays = cloudHabit.customDays,
                     difficulty = cloudHabit.difficulty,
                     baseXp = cloudHabit.baseXp,
-                    // Disable reminders for other members' habits — they can't complete via alarm
-                    reminderEnabled = false,
-                    reminderTime = null,
+                    reminderEnabled = reminderEnabled,
+                    reminderTime = reminderTime,
                     createdAt = cloudHabit.createdAt.toDate().time,
                     isArchived = cloudHabit.isArchived,
                     isHouseholdHabit = true,
@@ -534,7 +596,28 @@ class HabitRepository @Inject constructor(
                     assignedToName = cloudHabit.assignedTo?.displayName,
                     remoteId = remoteId,
                 )
-                habitDao.upsertHabit(entity)
+                 habitDao.upsertHabit(entity)
+
+                 // Schedule reminder for household habits assigned to current user (fixes B17: assignments on new devices).
+                 // User A assigns a habit to User B → User B signs in on a new device → reminder should fire for User B.
+                 if (isAssignedToCurrentUser && reminderEnabled && reminderTime != null && !cloudHabit.isArchived) {
+                    try {
+                        val parsedTime = try {
+                            LocalTime.parse(reminderTime)
+                        } catch (_: Exception) {
+                            LocalTime.of(9, 0)
+                        }
+                        HabitReminderScheduler.scheduleReminder(
+                            context,
+                            entity.id,
+                            cloudHabit.title,
+                            parsedTime,
+                            cloudHabit.customDays.split(",").map { it.trim() }.filter { it.isNotEmpty() },
+                        )
+                    } catch (e: Exception) {
+                        Log.w(TAG, "Failed to schedule reminder for assigned household habit ${cloudHabit.title}", e)
+                    }
+                }
             }
 
             // Reconciliation: delete local other-member habits no longer in cloud

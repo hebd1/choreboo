@@ -82,6 +82,7 @@ import com.example.choreboo_habittrackerfriend.domain.model.ChorebooMood
 import com.example.choreboo_habittrackerfriend.domain.model.Habit
 import com.example.choreboo_habittrackerfriend.domain.model.PetType
 import com.example.choreboo_habittrackerfriend.ui.components.ProfileAvatar
+import com.example.choreboo_habittrackerfriend.ui.components.ShimmerPlaceholder
 import com.example.choreboo_habittrackerfriend.ui.components.StitchSnackbar
 import com.example.choreboo_habittrackerfriend.ui.habits.components.HabitCard
 import com.example.choreboo_habittrackerfriend.ui.theme.PetMoodContentStart
@@ -211,12 +212,19 @@ fun PetScreen(
                             size = 40.dp,
                         )
                         Spacer(modifier = Modifier.width(12.dp))
-                        Text(
-                            "My Choreboo",
-                            style = MaterialTheme.typography.headlineMedium,
-                            fontWeight = FontWeight.ExtraBold,
-                            color = MaterialTheme.colorScheme.primary,
-                        )
+                        if (choreboo != null) {
+                            Text(
+                                choreboo!!.name,
+                                style = MaterialTheme.typography.headlineMedium,
+                                fontWeight = FontWeight.ExtraBold,
+                                color = MaterialTheme.colorScheme.primary,
+                            )
+                        } else {
+                            ShimmerPlaceholder(
+                                width = 120.dp,
+                                height = 32.dp,
+                            )
+                        }
                     }
                 },
                 actions = {
@@ -303,20 +311,6 @@ fun PetScreen(
                                 onThumbsUpComplete = { showThumbsUp = false },
                                 onTap = { isInteracting = true },
                                 modifier = Modifier.size(160.dp),
-                            )
-
-                            // Pet name — top center of animation box
-                            Text(
-                                text = stats.name,
-                                style = MaterialTheme.typography.titleMedium,
-                                fontWeight = FontWeight.Bold,
-                                color = MaterialTheme.colorScheme.onSurface,
-                                modifier = Modifier
-                                    .align(Alignment.TopCenter)
-                                    .padding(top = 10.dp)
-                                    .clip(RoundedCornerShape(50.dp))
-                                    .background(MaterialTheme.colorScheme.surfaceContainerHighest.copy(alpha = 0.8f))
-                                    .padding(horizontal = 14.dp, vertical = 6.dp),
                             )
 
                             // Mood pill at bottom — tappable to show stat overlay

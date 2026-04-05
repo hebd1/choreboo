@@ -116,43 +116,14 @@ fun HouseholdPetCard(
 
                 Spacer(modifier = Modifier.height(4.dp))
 
-                // ── Owner row: photo/initial + display name ───────────────
-                Row(
-                    verticalAlignment = Alignment.CenterVertically,
-                    horizontalArrangement = Arrangement.Center,
-                ) {
-                    var ownerPhotoFailed by remember { mutableStateOf(false) }
-
-                    if (!pet.ownerPhotoUrl.isNullOrBlank() && !ownerPhotoFailed) {
-                        AsyncImage(
-                            model = pet.ownerPhotoUrl,
-                            contentDescription = "Profile photo of ${pet.ownerName}",
-                            contentScale = ContentScale.Crop,
-                            modifier = Modifier
-                                .size(20.dp)
-                                .clip(CircleShape),
-                            onError = { ownerPhotoFailed = true },
-                        )
-                    } else {
-                        // Fallback: green AccountCircle icon
-                        Icon(
-                            imageVector = Icons.Default.AccountCircle,
-                            contentDescription = "Profile photo of ${pet.ownerName}",
-                            tint = MaterialTheme.colorScheme.primary,
-                            modifier = Modifier.size(20.dp),
-                        )
-                    }
-
-                    Spacer(modifier = Modifier.width(4.dp))
-
-                    Text(
-                        text = pet.ownerName,
-                        style = MaterialTheme.typography.bodySmall,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant,
-                        maxLines = 1,
-                        overflow = TextOverflow.Ellipsis,
-                    )
-                }
+                // ── Owner name ─────────────────────────────────────────────
+                Text(
+                    text = pet.ownerName,
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis,
+                )
 
                 Spacer(modifier = Modifier.height(10.dp))
 

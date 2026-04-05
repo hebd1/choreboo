@@ -148,6 +148,13 @@ class SettingsViewModel @Inject constructor(
 
      fun signOut() {
         viewModelScope.launch {
+            // Cancel all pending reminder alarms before clearing local data
+            try {
+                habitRepository.cancelAllReminders()
+            } catch (e: Exception) {
+                android.util.Log.w("SettingsViewModel", "Error cancelling reminders on sign-out", e)
+            }
+
             // Clear all local data before signing out
             try {
                 habitRepository.clearLocalData()

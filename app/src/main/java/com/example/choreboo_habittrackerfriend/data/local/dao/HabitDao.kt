@@ -14,8 +14,19 @@ interface HabitDao {
     fun getAllHabits(): Flow<List<HabitEntity>>
 
     /**
-     * Get habits for a specific user: personal habits they own, or household habits assigned to them.
+     * Get habits for a specific user: personal habits they own, household habits assigned to them,
+     * and unassigned household habits (visible to all household members).
      * Filters by isArchived = 0.
+     *
+     * Visibility rules (fixes B5 where creators lost visibility of assigned habits):
+     * - Personal habits: (isHouseholdHabit = 0 AND ownerUid = uid) — user sees habits they created
+     * - Assigned household habits: (isHouseholdHabit = 1 AND assignedToUid = uid) — user sees habits assigned to them
+     * - Unassigned household habits: (isHouseholdHabit = 1 AND assignedToUid IS NULL) — all household members see shared habits
+     *
+     * This ensures:
+     * 1. Household habit creators see habits they assigned to others (doesn't exclude via assignedTo)
+     * 2. Assignees see habits assigned to them
+     * 3. All household members see unassigned (shared) household habits
      */
     @Query(
         """
@@ -24,6 +35,7 @@ interface HabitDao {
         AND (
             (isHouseholdHabit = 0 AND ownerUid = :uid)
             OR (isHouseholdHabit = 1 AND assignedToUid = :uid)
+            OR (isHouseholdHabit = 1 AND assignedToUid IS NULL)
         )
         ORDER BY createdAt DESC
         """,

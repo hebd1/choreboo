@@ -1,5 +1,6 @@
 package com.example.choreboo_habittrackerfriend.data.repository
 
+import android.content.Context
 import com.example.choreboo_habittrackerfriend.data.datastore.UserPreferences
 import com.example.choreboo_habittrackerfriend.data.local.dao.HabitDao
 import com.example.choreboo_habittrackerfriend.data.local.dao.HabitLogDao
@@ -73,7 +74,8 @@ class HabitRepositoryTest {
         every { userPreferences.totalPoints } returns flowOf(0)
         every { userPreferences.totalLifetimeXp } returns flowOf(0)
 
-        repo = HabitRepository(habitDao, habitLogDao, userPreferences, userRepository, firebaseAuth)
+        val context = mockk<Context>(relaxed = true)
+        repo = HabitRepository(habitDao, habitLogDao, userPreferences, userRepository, firebaseAuth, context)
     }
 
     // ── upsertHabit validation ──────────────────────────────────────────
