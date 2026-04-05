@@ -3,8 +3,8 @@ package com.example.choreboo_habittrackerfriend.data.repository
 import com.example.choreboo_habittrackerfriend.data.datastore.UserPreferences
 import com.google.firebase.auth.FirebaseAuth
 import com.google.firebase.auth.FirebaseUser
+import com.google.firebase.storage.FirebaseStorage
 import io.mockk.coEvery
-import io.mockk.coVerify
 import io.mockk.every
 import io.mockk.mockk
 import kotlinx.coroutines.flow.flowOf
@@ -14,7 +14,8 @@ import org.junit.Before
 import org.junit.Test
 
 /**
- * Tests for [UserRepository]: validation guards and syncPointsFromCloud max-wins merge.
+ * Tests for [UserRepository]: validation guards, syncPointsFromCloud max-wins merge,
+ * and profile photo upload/delete.
  *
  * Uses MockK for all dependencies. The Data Connect connector is `lazy` and
  * tested indirectly through the syncPointsToCloud validation guard.
@@ -23,12 +24,14 @@ class UserRepositoryTest {
 
     private lateinit var firebaseAuth: FirebaseAuth
     private lateinit var userPreferences: UserPreferences
+    private lateinit var firebaseStorage: FirebaseStorage
     private lateinit var repo: UserRepository
 
     @Before
     fun setUp() {
         firebaseAuth = mockk()
         userPreferences = mockk(relaxed = true)
+        firebaseStorage = mockk()
 
         val user = mockk<FirebaseUser>()
         every { firebaseAuth.currentUser } returns user
@@ -36,8 +39,9 @@ class UserRepositoryTest {
         every { user.displayName } returns "Test User"
         every { user.email } returns "test@example.com"
         every { user.photoUrl } returns null
+        every { user.providerData } returns emptyList()
 
-        repo = UserRepository(firebaseAuth, userPreferences)
+        repo = UserRepository(firebaseAuth, userPreferences, firebaseStorage)
     }
 
     // ── syncPointsToCloud validation ────────────────────────────────────
@@ -98,5 +102,35 @@ class UserRepositoryTest {
 
         val user = repo.getCurrentAppUser()!!
         assertEquals("User", user.displayName)
+    }
+
+    // ── uploadProfilePhoto ──────────────────────────────────────────────
+
+    @Test
+    fun `uploadProfilePhoto throws when no authenticated user`() = runTest {
+        every { firebaseAuth.currentUser } returns null
+        val file = mockk<java.io.File>()
+
+        try {
+            repo.uploadProfilePhoto(file)
+            assert(false) { "Expected IllegalStateException" }
+        } catch (e: IllegalStateException) {
+            assertEquals("No authenticated user", e.message)
+        }
+    }
+
+    // ── deleteProfilePhoto ──────────────────────────────────────────────
+
+    @Test
+    fun `deleteProfilePhoto throws when no authenticated user`() = runTest {
+        every { firebaseAuth.currentUser } returns null
+        val file = mockk<java.io.File>()
+
+        try {
+            repo.deleteProfilePhoto(file)
+            assert(false) { "Expected IllegalStateException" }
+        } catch (e: IllegalStateException) {
+            assertEquals("No authenticated user", e.message)
+        }
     }
 }

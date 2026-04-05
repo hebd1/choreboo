@@ -64,24 +64,26 @@ class ChorebooRepository @Inject constructor(
         val id = chorebooDao.insertChoreboo(newChoreboo)
         val created = newChoreboo.copy(id = id)
 
-        // Write-through: insert into Data Connect
-        try {
-            val result = connector.insertChoreboo.execute(
-                name = name,
-                stage = ChorebooStage.EGG.name,
-                level = 1,
-                xp = 0,
-                hunger = 10,
-                happiness = 80,
-                energy = 80,
-                petType = petType.name,
-                lastInteractionAt = Timestamp(Date(created.lastInteractionAt)),
-            )
-            val remoteId = result.data.choreboo_insert.id.toString()
-            chorebooDao.updateChoreboo(created.copy(remoteId = remoteId))
-            Log.d(TAG, "Created choreboo in cloud: $remoteId")
-        } catch (e: Exception) {
-            Log.e(TAG, "Failed to sync new choreboo to cloud", e)
+        // Write-through: insert into Data Connect (fire-and-forget)
+        writeScope.launch {
+            try {
+                val result = connector.insertChoreboo.execute(
+                    name = name,
+                    stage = ChorebooStage.EGG.name,
+                    level = 1,
+                    xp = 0,
+                    hunger = 10,
+                    happiness = 80,
+                    energy = 80,
+                    petType = petType.name,
+                    lastInteractionAt = Timestamp(Date(created.lastInteractionAt)),
+                )
+                val remoteId = result.data.choreboo_insert.id.toString()
+                chorebooDao.updateChoreboo(created.copy(remoteId = remoteId))
+                Log.d(TAG, "Created choreboo in cloud: $remoteId")
+            } catch (e: Exception) {
+                Log.e(TAG, "Failed to sync new choreboo to cloud", e)
+            }
         }
 
         return created

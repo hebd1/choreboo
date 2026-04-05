@@ -83,6 +83,7 @@ firebase-bom = { group = "com.google.firebase", name = "firebase-bom", version.r
 firebase-analytics = { group = "com.google.firebase", name = "firebase-analytics" }
 firebase-auth = { group = "com.google.firebase", name = "firebase-auth" }
 firebase-dataconnect = { group = "com.google.firebase", name = "firebase-dataconnect" }
+firebase-storage = { group = "com.google.firebase", name = "firebase-storage" }
 play-services-auth = { group = "com.google.android.gms", name = "play-services-auth", version = "21.2.0" }
 # Kotlin Serialization (required by Data Connect)
 kotlinx-serialization-core = { group = "org.jetbrains.kotlinx", name = "kotlinx-serialization-core", version.ref = "kotlinxSerializationCore" }

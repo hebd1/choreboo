@@ -73,50 +73,52 @@ class HabitRepository @Inject constructor(
 
         val localId = habitDao.upsertHabit(habit.toEntity())
 
-        // Write-through to Data Connect
-        try {
-            if (habit.remoteId != null) {
-                // Update existing remote habit
-                val remoteUuid = UUID.fromString(habit.remoteId)
-                connector.updateHabit.execute(
-                    habitId = remoteUuid,
-                    title = habit.title,
-                    iconName = habit.iconName,
-                    customDays = habit.customDays.joinToString(","),
-                    difficulty = habit.difficulty,
-                    baseXp = habit.baseXp,
-                    reminderEnabled = habit.reminderEnabled,
-                    isHouseholdHabit = habit.isHouseholdHabit,
-                ) {
-                    description = habit.description
-                    reminderTime = habit.reminderTime?.toString()
-                    householdId = habit.householdId?.let { UUID.fromString(it) }
-                    assignedToId = habit.assignedToUid
+        // Write-through to Data Connect (fire-and-forget)
+        writeScope.launch {
+            try {
+                if (habit.remoteId != null) {
+                    // Update existing remote habit
+                    val remoteUuid = UUID.fromString(habit.remoteId)
+                    connector.updateHabit.execute(
+                        habitId = remoteUuid,
+                        title = habit.title,
+                        iconName = habit.iconName,
+                        customDays = habit.customDays.joinToString(","),
+                        difficulty = habit.difficulty,
+                        baseXp = habit.baseXp,
+                        reminderEnabled = habit.reminderEnabled,
+                        isHouseholdHabit = habit.isHouseholdHabit,
+                    ) {
+                        description = habit.description
+                        reminderTime = habit.reminderTime?.toString()
+                        householdId = habit.householdId?.let { UUID.fromString(it) }
+                        assignedToId = habit.assignedToUid
+                    }
+                    Log.d(TAG, "Updated habit in cloud: $remoteUuid")
+                } else {
+                    // Create new remote habit
+                    val result = connector.createHabit.execute(
+                        title = habit.title,
+                        iconName = habit.iconName,
+                        customDays = habit.customDays.joinToString(","),
+                        difficulty = habit.difficulty,
+                        baseXp = habit.baseXp,
+                        reminderEnabled = habit.reminderEnabled,
+                        isHouseholdHabit = habit.isHouseholdHabit,
+                    ) {
+                        description = habit.description
+                        reminderTime = habit.reminderTime?.toString()
+                        householdId = habit.householdId?.let { UUID.fromString(it) }
+                        assignedToId = habit.assignedToUid
+                    }
+                    // Store the remote ID back in Room
+                    val remoteId = result.data.habit_insert.id.toString()
+                    habitDao.upsertHabit(habit.toEntity().copy(id = localId, remoteId = remoteId))
+                    Log.d(TAG, "Created habit in cloud: $remoteId")
                 }
-                Log.d(TAG, "Updated habit in cloud: $remoteUuid")
-            } else {
-                // Create new remote habit
-                val result = connector.createHabit.execute(
-                    title = habit.title,
-                    iconName = habit.iconName,
-                    customDays = habit.customDays.joinToString(","),
-                    difficulty = habit.difficulty,
-                    baseXp = habit.baseXp,
-                    reminderEnabled = habit.reminderEnabled,
-                    isHouseholdHabit = habit.isHouseholdHabit,
-                ) {
-                    description = habit.description
-                    reminderTime = habit.reminderTime?.toString()
-                    householdId = habit.householdId?.let { UUID.fromString(it) }
-                    assignedToId = habit.assignedToUid
-                }
-                // Store the remote ID back in Room
-                val remoteId = result.data.habit_insert.id.toString()
-                habitDao.upsertHabit(habit.toEntity().copy(id = localId, remoteId = remoteId))
-                Log.d(TAG, "Created habit in cloud: $remoteId")
+            } catch (e: Exception) {
+                Log.e(TAG, "Failed to sync habit to cloud", e)
             }
-        } catch (e: Exception) {
-            Log.e(TAG, "Failed to sync habit to cloud", e)
         }
 
         return localId
@@ -127,15 +129,17 @@ class HabitRepository @Inject constructor(
         val entity = habitDao.getHabitByIdSync(id)
         habitDao.deleteHabitById(id)
 
-        // Write-through: delete from Data Connect
+        // Write-through: delete from Data Connect (fire-and-forget)
         entity?.remoteId?.let { remoteId ->
-            try {
-                connector.deleteHabit.execute(
-                    habitId = UUID.fromString(remoteId),
-                )
-                Log.d(TAG, "Deleted habit from cloud: $remoteId")
-            } catch (e: Exception) {
-                Log.e(TAG, "Failed to delete habit from cloud", e)
+            writeScope.launch {
+                try {
+                    connector.deleteHabit.execute(
+                        habitId = UUID.fromString(remoteId),
+                    )
+                    Log.d(TAG, "Deleted habit from cloud: $remoteId")
+                } catch (e: Exception) {
+                    Log.e(TAG, "Failed to delete habit from cloud", e)
+                }
             }
         }
     }
@@ -144,15 +148,17 @@ class HabitRepository @Inject constructor(
         val entity = habitDao.getHabitByIdSync(id)
         habitDao.archiveHabit(id)
 
-        // Write-through: archive in Data Connect
+        // Write-through: archive in Data Connect (fire-and-forget)
         entity?.remoteId?.let { remoteId ->
-            try {
-                connector.archiveHabit.execute(
-                    habitId = UUID.fromString(remoteId),
-                )
-                Log.d(TAG, "Archived habit in cloud: $remoteId")
-            } catch (e: Exception) {
-                Log.e(TAG, "Failed to archive habit in cloud", e)
+            writeScope.launch {
+                try {
+                    connector.archiveHabit.execute(
+                        habitId = UUID.fromString(remoteId),
+                    )
+                    Log.d(TAG, "Archived habit in cloud: $remoteId")
+                } catch (e: Exception) {
+                    Log.e(TAG, "Failed to archive habit in cloud", e)
+                }
             }
         }
     }
@@ -183,39 +189,40 @@ class HabitRepository @Inject constructor(
             return CompletionResult(xpEarned = 0, newStreak = 0, alreadyComplete = true)
         }
 
-        // For household habits: check cloud to see if anyone else already completed it today.
-        // This is an app-level pre-check (best-effort — network failure falls through to allow
-        // the completion, relying on local UNIQUE index as last-resort guard).
+        // For household habits: check cloud asynchronously to see if anyone else already completed it today.
+        // This is a best-effort pre-check (non-blocking). The local UNIQUE(habitId, date) constraint
+        // is the primary duplicate guard. If the cloud check finds a completion, we sync it locally.
         if (habitEntity.isHouseholdHabit && habitEntity.remoteId != null) {
-            try {
-                val cloudCheck = connector.getLogsForHabitAndDate.execute(
-                    habitId = UUID.fromString(habitEntity.remoteId),
-                    date = today,
-                )
-                val existingLogs = cloudCheck.data.habitLogs
-                if (existingLogs.isNotEmpty()) {
-                    // Someone else already completed this habit today — sync their log locally
-                    // so the UI can show "Completed by [name]" without a separate sync call.
-                    val firstLog = existingLogs.first()
-                    val remoteLogId = firstLog.id.toString()
-                    if (habitLogDao.getLogByRemoteId(remoteLogId) == null) {
-                        habitLogDao.insertLog(
-                            HabitLogEntity(
-                                habitId = habitId,
-                                completedAt = firstLog.completedAt.toDate().time,
-                                date = today,
-                                xpEarned = firstLog.xpEarned,
-                                streakAtCompletion = firstLog.streakAtCompletion,
-                                completedByUid = firstLog.completedBy?.id,
-                                remoteId = remoteLogId,
-                            ),
-                        )
+            writeScope.launch {
+                try {
+                    val cloudCheck = connector.getLogsForHabitAndDate.execute(
+                        habitId = UUID.fromString(habitEntity.remoteId),
+                        date = today,
+                    )
+                    val existingLogs = cloudCheck.data.habitLogs
+                    if (existingLogs.isNotEmpty()) {
+                        // Someone else already completed this habit today — sync their log locally
+                        // so the UI can show "Completed by [name]" without a separate sync call.
+                        val firstLog = existingLogs.first()
+                        val remoteLogId = firstLog.id.toString()
+                        if (habitLogDao.getLogByRemoteId(remoteLogId) == null) {
+                            habitLogDao.insertLog(
+                                HabitLogEntity(
+                                    habitId = habitId,
+                                    completedAt = firstLog.completedAt.toDate().time,
+                                    date = today,
+                                    xpEarned = firstLog.xpEarned,
+                                    streakAtCompletion = firstLog.streakAtCompletion,
+                                    completedByUid = firstLog.completedBy?.id,
+                                    remoteId = remoteLogId,
+                                ),
+                            )
+                        }
                     }
-                    return CompletionResult(xpEarned = 0, newStreak = 0, alreadyComplete = true)
+                } catch (e: Exception) {
+                    Log.w(TAG, "Cloud pre-check for household habit failed — continuing with local completion", e)
+                    // Fall through: let local completion proceed; UNIQUE constraint handles duplicates
                 }
-            } catch (e: Exception) {
-                Log.w(TAG, "Cloud pre-check for household habit failed — allowing local completion", e)
-                // Fall through: let local UNIQUE constraint handle duplicates
             }
         }
 
@@ -420,7 +427,7 @@ class HabitRepository @Inject constructor(
      * Called when the user leaves a household.
      * - Deletes other members' synced household habits from Room.
      * - Converts the user's own household habits to personal (clears isHouseholdHabit + householdId).
-     * Write-through updates each converted habit in Data Connect (silent on failure).
+     * Write-through updates each converted habit in Data Connect (fire-and-forget, silent on failure).
      */
     suspend fun convertHouseholdHabitsToPersonal(uid: String) {
         // Remove other members' habits from Room
@@ -435,26 +442,28 @@ class HabitRepository @Inject constructor(
             val updated = entity.copy(isHouseholdHabit = false, householdId = null, assignedToUid = null, assignedToName = null)
             habitDao.upsertHabit(updated)
 
-            // Write-through: update in Data Connect (silent on failure)
+            // Write-through: update in Data Connect (fire-and-forget, silent on failure)
             entity.remoteId?.let { remoteId ->
-                try {
-                    connector.updateHabit.execute(
-                        habitId = UUID.fromString(remoteId),
-                        title = entity.title,
-                        iconName = entity.iconName,
-                        customDays = entity.customDays,
-                        difficulty = entity.difficulty,
-                        baseXp = entity.baseXp,
-                        reminderEnabled = entity.reminderEnabled,
-                        isHouseholdHabit = false,
-                    ) {
-                        description = entity.description
-                        reminderTime = entity.reminderTime
-                        householdId = null
-                        assignedToId = null
+                writeScope.launch {
+                    try {
+                        connector.updateHabit.execute(
+                            habitId = UUID.fromString(remoteId),
+                            title = entity.title,
+                            iconName = entity.iconName,
+                            customDays = entity.customDays,
+                            difficulty = entity.difficulty,
+                            baseXp = entity.baseXp,
+                            reminderEnabled = entity.reminderEnabled,
+                            isHouseholdHabit = false,
+                        ) {
+                            description = entity.description
+                            reminderTime = entity.reminderTime
+                            householdId = null
+                            assignedToId = null
+                        }
+                    } catch (e: Exception) {
+                        Log.e(TAG, "Failed to convert household habit to personal in cloud: $remoteId", e)
                     }
-                } catch (e: Exception) {
-                    Log.e(TAG, "Failed to convert household habit to personal in cloud: $remoteId", e)
                 }
             }
         }

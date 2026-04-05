@@ -1,6 +1,7 @@
 package com.example.choreboo_habittrackerfriend.data.repository
 
 import android.util.Log
+import androidx.core.net.toUri
 import com.example.choreboo_habittrackerfriend.data.datastore.UserPreferences
 import com.example.choreboo_habittrackerfriend.dataconnect.ChorebooConnector
 import com.example.choreboo_habittrackerfriend.dataconnect.execute
@@ -8,8 +9,10 @@ import com.example.choreboo_habittrackerfriend.dataconnect.instance
 import com.example.choreboo_habittrackerfriend.domain.model.AppUser
 import com.google.firebase.auth.FirebaseAuth
 import com.google.firebase.auth.UserProfileChangeRequest
+import com.google.firebase.storage.FirebaseStorage
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.tasks.await
+import java.io.File
 import javax.inject.Inject
 import javax.inject.Singleton
 
@@ -19,6 +22,7 @@ private const val TAG = "UserRepository"
 class UserRepository @Inject constructor(
     private val firebaseAuth: FirebaseAuth,
     private val userPreferences: UserPreferences,
+    private val firebaseStorage: FirebaseStorage,
 ) {
     private val connector by lazy { ChorebooConnector.instance }
 
@@ -167,6 +171,103 @@ class UserRepository @Inject constructor(
             )
         } catch (e: Exception) {
             Log.e(TAG, "Failed to sync points from cloud", e)
+            throw e
+        }
+    }
+
+    /**
+     * Upload a profile photo to Firebase Storage and update FirebaseAuth + cloud User.
+     * - Uploads file to `profile_photos/{uid}.jpg`
+     * - Updates FirebaseAuth.photoUrl with the download URL
+     * - Saves download URL to DataStore `profilePhotoUri` for instant display
+     * - Calls syncCurrentUserToCloud() so the URL reaches the cloud and household members see it
+     *
+     * Throws on failure so callers can surface an error to the user.
+     */
+    suspend fun uploadProfilePhoto(photoFile: File) {
+        val user = firebaseAuth.currentUser
+            ?: throw IllegalStateException("No authenticated user")
+
+        try {
+            // Upload to Firebase Storage at profile_photos/{uid}.jpg
+            val storageRef = firebaseStorage.reference.child("profile_photos/${user.uid}.jpg")
+            val uploadTask = storageRef.putFile(photoFile.toUri())
+            uploadTask.await()
+            Log.d(TAG, "Uploaded profile photo to Storage for ${user.uid}")
+
+            // Get the download URL
+            val downloadUrl = storageRef.downloadUrl.await()
+            Log.d(TAG, "Got download URL for profile photo: $downloadUrl")
+
+            // Update FirebaseAuth.photoUrl with the Storage URL
+            val request = UserProfileChangeRequest.Builder()
+                .setPhotoUri(downloadUrl)
+                .build()
+            user.updateProfile(request).await()
+            Log.d(TAG, "Updated Firebase Auth photoUrl to: $downloadUrl")
+
+            // Save to DataStore for instant display (avoids waiting for cloud sync)
+            userPreferences.setProfilePhotoUri(downloadUrl.toString())
+            Log.d(TAG, "Saved profile photo URL to DataStore")
+
+            // Write-through: sync to cloud so other devices and household members see it
+            syncCurrentUserToCloud()
+        } catch (e: Exception) {
+            Log.e(TAG, "Failed to upload profile photo", e)
+            throw e
+        }
+    }
+
+    /**
+     * Delete the user's profile photo from Firebase Storage and restore to original state.
+     * - Deletes from Firebase Storage `profile_photos/{uid}.jpg`
+     * - Restores FirebaseAuth.photoUrl to the original Google photo (if Google sign-in)
+     *   or null for email/password users
+     * - Clears DataStore `profilePhotoUri`
+     * - Deletes the local file
+     * - Calls syncCurrentUserToCloud() so the change reaches the cloud
+     *
+     * Throws on failure so callers can surface an error to the user.
+     */
+    suspend fun deleteProfilePhoto(localPhotoFile: File) {
+        val user = firebaseAuth.currentUser
+            ?: throw IllegalStateException("No authenticated user")
+
+        try {
+            // Delete from Firebase Storage
+            val storageRef = firebaseStorage.reference.child("profile_photos/${user.uid}.jpg")
+            try {
+                storageRef.delete().await()
+                Log.d(TAG, "Deleted profile photo from Storage for ${user.uid}")
+            } catch (e: Exception) {
+                Log.w(TAG, "Failed to delete photo from Storage, continuing anyway", e)
+            }
+
+            // Restore FirebaseAuth.photoUrl to the original Google photo (if available)
+            val googlePhotoUrl = user.providerData
+                .firstOrNull { it.providerId == "google.com" }
+                ?.photoUrl
+
+            val request = UserProfileChangeRequest.Builder()
+                .setPhotoUri(googlePhotoUrl)
+                .build()
+            user.updateProfile(request).await()
+            Log.d(TAG, "Restored Firebase Auth photoUrl to: ${googlePhotoUrl ?: "null (email user)"}")
+
+            // Clear DataStore
+            userPreferences.setProfilePhotoUri("")
+            Log.d(TAG, "Cleared profile photo URI from DataStore")
+
+            // Delete local file
+            if (localPhotoFile.exists()) {
+                localPhotoFile.delete()
+                Log.d(TAG, "Deleted local photo file")
+            }
+
+            // Write-through: sync to cloud so other devices and household members see the change
+            syncCurrentUserToCloud()
+        } catch (e: Exception) {
+            Log.e(TAG, "Failed to delete profile photo", e)
             throw e
         }
     }

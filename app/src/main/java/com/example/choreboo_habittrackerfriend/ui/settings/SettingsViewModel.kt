@@ -96,6 +96,9 @@ class SettingsViewModel @Inject constructor(
     private val _isUpdatingName = MutableStateFlow(false)
     val isUpdatingName: StateFlow<Boolean> = _isUpdatingName.asStateFlow()
 
+    private val _isUploadingPhoto = MutableStateFlow(false)
+    val isUploadingPhoto: StateFlow<Boolean> = _isUploadingPhoto.asStateFlow()
+
     fun setThemeMode(mode: String) {
         viewModelScope.launch { userPreferences.setThemeMode(mode) }
     }
@@ -244,12 +247,32 @@ class SettingsViewModel @Inject constructor(
         viewModelScope.launch {
             try {
                 val internalPhotoFile = File(application.filesDir, "profile_photo.jpg")
+
+                // 1. Save locally for instant display
                 application.contentResolver.openInputStream(contentUri)?.use { input ->
                     internalPhotoFile.outputStream().use { output ->
                         input.copyTo(output)
                     }
                 }
+                // Set local path immediately so UI shows the photo right away
                 userPreferences.setProfilePhotoUri(internalPhotoFile.absolutePath)
+                _events.emit(SettingsEvent.ShowSuccess("Photo saved"))
+
+                // 2. Upload to Firebase Storage in background
+                _isUploadingPhoto.value = true
+                try {
+                    userRepository.uploadProfilePhoto(internalPhotoFile)
+                    _events.emit(SettingsEvent.ShowSuccess("Profile photo synced to cloud!"))
+                } catch (e: Exception) {
+                    _events.emit(
+                        SettingsEvent.ShowError(
+                            "Photo saved locally but failed to sync to cloud. " +
+                                "It will sync when you check your connection.",
+                        ),
+                    )
+                } finally {
+                    _isUploadingPhoto.value = false
+                }
             } catch (e: Exception) {
                 _events.emit(SettingsEvent.ShowError("Failed to save profile photo"))
             }
@@ -260,10 +283,25 @@ class SettingsViewModel @Inject constructor(
         viewModelScope.launch {
             try {
                 val internalPhotoFile = File(application.filesDir, "profile_photo.jpg")
-                if (internalPhotoFile.exists()) {
-                    internalPhotoFile.delete()
-                }
+
+                // Clear locally first for instant UI update
                 userPreferences.setProfilePhotoUri(null)
+
+                // Delete from cloud in background
+                _isUploadingPhoto.value = true
+                try {
+                    userRepository.deleteProfilePhoto(internalPhotoFile)
+                    _events.emit(SettingsEvent.ShowSuccess("Profile photo removed!"))
+                } catch (e: Exception) {
+                    _events.emit(
+                        SettingsEvent.ShowError(
+                            "Photo removed locally but failed to sync to cloud. " +
+                                "It will sync when you check your connection.",
+                        ),
+                    )
+                } finally {
+                    _isUploadingPhoto.value = false
+                }
             } catch (e: Exception) {
                 _events.emit(SettingsEvent.ShowError("Failed to clear profile photo"))
             }

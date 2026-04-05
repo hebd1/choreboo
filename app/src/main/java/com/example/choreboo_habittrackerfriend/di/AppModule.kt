@@ -10,7 +10,10 @@ import com.example.choreboo_habittrackerfriend.data.local.dao.HabitDao
 import com.example.choreboo_habittrackerfriend.data.local.dao.HabitLogDao
 import com.example.choreboo_habittrackerfriend.data.local.dao.ChorebooDao
 import com.example.choreboo_habittrackerfriend.data.local.dao.HouseholdMemberDao
+import com.example.choreboo_habittrackerfriend.data.local.dao.HouseholdDao
+import com.example.choreboo_habittrackerfriend.data.local.dao.HouseholdHabitStatusDao
 import com.google.firebase.auth.FirebaseAuth
+import com.google.firebase.storage.FirebaseStorage
 
 import dagger.Module
 import dagger.Provides
@@ -42,6 +45,12 @@ object AppModule {
     fun provideHouseholdMemberDao(db: ChorebooDatabase): HouseholdMemberDao = db.householdMemberDao()
 
     @Provides
+    fun provideHouseholdDao(db: ChorebooDatabase): HouseholdDao = db.householdDao()
+
+    @Provides
+    fun provideHouseholdHabitStatusDao(db: ChorebooDatabase): HouseholdHabitStatusDao = db.householdHabitStatusDao()
+
+    @Provides
     @Singleton
     fun provideDataStore(@ApplicationContext context: Context): DataStore<Preferences> {
         return context.dataStore
@@ -56,5 +65,10 @@ object AppModule {
     @Provides
     @Singleton
     fun provideFirebaseAuth(): FirebaseAuth = FirebaseAuth.getInstance()
+
+    @Provides
+    @Singleton
+    fun provideFirebaseStorage(): FirebaseStorage = FirebaseStorage.getInstance()
 }
+
 

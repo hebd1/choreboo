@@ -8,8 +8,9 @@ import androidx.room.PrimaryKey
  *
  * Caches all household members who have an active Choreboo. Members who have not yet
  * completed onboarding (no Choreboo created) are excluded. This table is a read-only
- * cloud cache: all writes are driven by [HouseholdRepository.refreshHouseholdPets] and
- * the table is cleared on sign-out or when the user leaves their household.
+ * cloud cache: all writes are driven by [HouseholdRepository.refreshHouseholdPets],
+ * [HouseholdRepository.refreshHouseholdMembers] and the table is cleared on sign-out or when
+ * the user leaves their household.
  *
  * [uid] is the Firebase Auth UID and serves as the primary key, making INSERT OR REPLACE
  * upserts idiomatic — a re-fetch always updates the row in-place rather than inserting
@@ -20,6 +21,7 @@ data class HouseholdMemberEntity(
     @PrimaryKey val uid: String,
     val displayName: String,
     val photoUrl: String? = null,
+    val email: String? = null,
     val chorebooId: String,
     val chorebooName: String,
     val chorebooStage: String = "EGG",
