@@ -16,6 +16,7 @@ import kotlinx.coroutines.flow.flatMapLatest
 import kotlinx.coroutines.flow.flowOf
 import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.stateIn
+import kotlinx.coroutines.launch
 import java.time.LocalDate
 import java.time.YearMonth
 import javax.inject.Inject
@@ -33,6 +34,10 @@ class CalendarViewModel @Inject constructor(
 
     private val _selectedDate = MutableStateFlow<LocalDate?>(LocalDate.now())
     val selectedDate: StateFlow<LocalDate?> = _selectedDate.asStateFlow()
+
+    /** True while a manual refresh is in progress */
+    private val _isRefreshing = MutableStateFlow(false)
+    val isRefreshing: StateFlow<Boolean> = _isRefreshing.asStateFlow()
 
     val totalPoints: StateFlow<Int> = userPreferences.totalPoints
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), 0)
@@ -89,6 +94,18 @@ class CalendarViewModel @Inject constructor(
 
     fun selectDate(date: LocalDate) {
         _selectedDate.value = if (_selectedDate.value == date) null else date
+    }
+
+    /** Manual refresh: no-op for now, but hooks are ready for pull-to-refresh. */
+    fun refreshData() {
+        viewModelScope.launch {
+            _isRefreshing.value = true
+            try {
+                // Refresh logic can be added here if needed (e.g., force sync)
+            } finally {
+                _isRefreshing.value = false
+            }
+        }
     }
 }
 

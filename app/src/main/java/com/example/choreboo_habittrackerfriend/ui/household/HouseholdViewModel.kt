@@ -70,6 +70,10 @@ class HouseholdViewModel @Inject constructor(
     private val _selectedPet = MutableStateFlow<HouseholdPet?>(null)
     val selectedPet: StateFlow<HouseholdPet?> = _selectedPet.asStateFlow()
 
+    /** True while a manual refresh is in progress */
+    private val _isRefreshing = MutableStateFlow(false)
+    val isRefreshing: StateFlow<Boolean> = _isRefreshing.asStateFlow()
+
     init {
         viewModelScope.launch {
             householdRepository.refreshAll()
@@ -78,7 +82,12 @@ class HouseholdViewModel @Inject constructor(
 
     fun refreshData() {
         viewModelScope.launch {
-            householdRepository.refreshAll()
+            _isRefreshing.value = true
+            try {
+                householdRepository.refreshAll()
+            } finally {
+                _isRefreshing.value = false
+            }
         }
     }
 

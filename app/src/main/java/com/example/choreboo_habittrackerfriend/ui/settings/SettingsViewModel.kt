@@ -99,6 +99,15 @@ class SettingsViewModel @Inject constructor(
     private val _isUploadingPhoto = MutableStateFlow(false)
     val isUploadingPhoto: StateFlow<Boolean> = _isUploadingPhoto.asStateFlow()
 
+    private val _isCreatingHousehold = MutableStateFlow(false)
+    val isCreatingHousehold: StateFlow<Boolean> = _isCreatingHousehold.asStateFlow()
+
+    private val _isJoiningHousehold = MutableStateFlow(false)
+    val isJoiningHousehold: StateFlow<Boolean> = _isJoiningHousehold.asStateFlow()
+
+    private val _isLeavingHousehold = MutableStateFlow(false)
+    val isLeavingHousehold: StateFlow<Boolean> = _isLeavingHousehold.asStateFlow()
+
     fun setThemeMode(mode: String) {
         viewModelScope.launch { userPreferences.setThemeMode(mode) }
     }
@@ -112,39 +121,54 @@ class SettingsViewModel @Inject constructor(
 
     fun createHousehold(name: String) {
         viewModelScope.launch {
-            when (val result = householdRepository.createHousehold(name)) {
-                is HouseholdResult.Success -> {
-                    _events.emit(SettingsEvent.ShowSuccess("Household \"${result.household.name}\" created!"))
+            _isCreatingHousehold.value = true
+            try {
+                when (val result = householdRepository.createHousehold(name)) {
+                    is HouseholdResult.Success -> {
+                        _events.emit(SettingsEvent.ShowSuccess("Household \"${result.household.name}\" created!"))
+                    }
+                    is HouseholdResult.Error -> {
+                        _events.emit(SettingsEvent.ShowError(result.message))
+                    }
                 }
-                is HouseholdResult.Error -> {
-                    _events.emit(SettingsEvent.ShowError(result.message))
-                }
+            } finally {
+                _isCreatingHousehold.value = false
             }
         }
     }
 
     fun joinHousehold(inviteCode: String) {
         viewModelScope.launch {
-            when (val result = householdRepository.joinHousehold(inviteCode)) {
-                is HouseholdResult.Success -> {
-                    _events.emit(SettingsEvent.ShowSuccess("Joined \"${result.household.name}\"!"))
+            _isJoiningHousehold.value = true
+            try {
+                when (val result = householdRepository.joinHousehold(inviteCode)) {
+                    is HouseholdResult.Success -> {
+                        _events.emit(SettingsEvent.ShowSuccess("Joined \"${result.household.name}\"!"))
+                    }
+                    is HouseholdResult.Error -> {
+                        _events.emit(SettingsEvent.ShowError(result.message))
+                    }
                 }
-                is HouseholdResult.Error -> {
-                    _events.emit(SettingsEvent.ShowError(result.message))
-                }
+            } finally {
+                _isJoiningHousehold.value = false
             }
         }
     }
 
     fun leaveHousehold() {
         viewModelScope.launch {
-            when (val result = householdRepository.leaveHousehold()) {
-                is HouseholdResult.Success -> {
-                    _events.emit(SettingsEvent.ShowSuccess("Left household."))
+            _isLeavingHousehold.value = true
+            try {
+                when (val result = householdRepository.leaveHousehold()) {
+                    is HouseholdResult.Success -> {
+                        _events.emit(SettingsEvent.ShowSuccess("Left household."))
+                    }
+                    is HouseholdResult.Error -> {
+                        _events.emit(SettingsEvent.ShowError(result.message))
+                    }
                 }
-                is HouseholdResult.Error -> {
-                    _events.emit(SettingsEvent.ShowError(result.message))
-                }
+            } finally {
+                _isLeavingHousehold.value = false
             }
         }
     }

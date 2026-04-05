@@ -21,14 +21,22 @@ class OnboardingViewModel @Inject constructor(
     private val _selectedPetType = MutableStateFlow(PetType.FOX)
     val selectedPetType: StateFlow<PetType> = _selectedPetType.asStateFlow()
 
+    private val _isHatching = MutableStateFlow(false)
+    val isHatching: StateFlow<Boolean> = _isHatching.asStateFlow()
+
     fun selectPetType(petType: PetType) {
         _selectedPetType.value = petType
     }
 
     fun completeOnboarding(chorebooName: String) {
         viewModelScope.launch {
-            chorebooRepository.getOrCreateChoreboo(chorebooName, _selectedPetType.value)
-            userPreferences.setOnboardingComplete(true)
+            _isHatching.value = true
+            try {
+                chorebooRepository.getOrCreateChoreboo(chorebooName, _selectedPetType.value)
+                userPreferences.setOnboardingComplete(true)
+            } finally {
+                _isHatching.value = false
+            }
         }
     }
 }

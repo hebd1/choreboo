@@ -63,6 +63,10 @@ class PetViewModel @Inject constructor(
     private val _isEating = MutableStateFlow(false)
     val isEating: StateFlow<Boolean> = _isEating.asStateFlow()
 
+    /** True while a manual refresh is in progress */
+    private val _isRefreshing = MutableStateFlow(false)
+    val isRefreshing: StateFlow<Boolean> = _isRefreshing.asStateFlow()
+
     // -----------------------------------------------------------------------
     // Habit state (absorbed from HabitListViewModel)
     // -----------------------------------------------------------------------
@@ -182,6 +186,18 @@ class PetViewModel @Inject constructor(
     /** Called by UI when the eating animation finishes. */
     fun onEatingAnimationComplete() {
         _isEating.value = false
+    }
+
+    /** Manual refresh: triggers cloud sync and stat decay. */
+    fun refreshData() {
+        viewModelScope.launch {
+            _isRefreshing.value = true
+            try {
+                chorebooRepository.applyStatDecay()
+            } finally {
+                _isRefreshing.value = false
+            }
+        }
     }
 
     // -----------------------------------------------------------------------

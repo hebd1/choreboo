@@ -70,6 +70,9 @@ class AddEditHabitViewModel @Inject constructor(
     private val _formState = MutableStateFlow(HabitFormState())
     val formState = _formState.asStateFlow()
 
+    private val _isSaving = MutableStateFlow(false)
+    val isSaving: StateFlow<Boolean> = _isSaving.asStateFlow()
+
     private val _events = MutableSharedFlow<AddEditHabitEvent>()
     val events = _events.asSharedFlow()
 
@@ -242,54 +245,59 @@ class AddEditHabitViewModel @Inject constructor(
         }
 
         viewModelScope.launch {
-            // Validate: household habit requires the user to be in a household
-            if (state.isHouseholdHabit && existingHabit?.householdId == null && currentHousehold.value == null) {
-                _events.emit(AddEditHabitEvent.ValidationError("Join a household first to create shared habits"))
-                return@launch
-            }
+            _isSaving.value = true
+            try {
+                // Validate: household habit requires the user to be in a household
+                if (state.isHouseholdHabit && existingHabit?.householdId == null && currentHousehold.value == null) {
+                    _events.emit(AddEditHabitEvent.ValidationError("Join a household first to create shared habits"))
+                    return@launch
+                }
 
-            // Resolve householdId: keep existing value, or look up from current household
-            val resolvedHouseholdId = if (state.isHouseholdHabit) {
-                existingHabit?.householdId ?: currentHousehold.value?.id
-            } else {
-                null
-            }
+                // Resolve householdId: keep existing value, or look up from current household
+                val resolvedHouseholdId = if (state.isHouseholdHabit) {
+                    existingHabit?.householdId ?: currentHousehold.value?.id
+                } else {
+                    null
+                }
 
-            val habit = Habit(
-                id = if (habitId > 0) habitId else 0,
-                title = state.title.trim(),
-                description = state.description.trim().ifBlank { null },
-                iconName = state.iconName,
-                customDays = state.customDays,
-                difficulty = state.difficulty,
-                baseXp = state.baseXp,
-                reminderEnabled = state.reminderEnabled,
-                reminderTime = if (state.reminderEnabled) state.reminderTime else null,
-                isHouseholdHabit = state.isHouseholdHabit,
-                remoteId = existingHabit?.remoteId,
-                ownerUid = existingHabit?.ownerUid,
-                householdId = resolvedHouseholdId,
-                createdAt = existingHabit?.createdAt ?: System.currentTimeMillis(),
-                isArchived = existingHabit?.isArchived ?: false,
-                assignedToUid = if (state.isHouseholdHabit) state.assignedToUid else null,
-                assignedToName = if (state.isHouseholdHabit) state.assignedToName else null,
-            )
-            val savedHabitId = habitRepository.upsertHabit(habit)
-
-            // Schedule or cancel reminder (use the returned ID for new habits)
-            if (state.reminderEnabled && state.reminderTime != null) {
-                HabitReminderScheduler.scheduleReminder(
-                    context,
-                    savedHabitId,
-                    state.title.trim(),
-                    state.reminderTime,
-                    state.customDays,
+                val habit = Habit(
+                    id = if (habitId > 0) habitId else 0,
+                    title = state.title.trim(),
+                    description = state.description.trim().ifBlank { null },
+                    iconName = state.iconName,
+                    customDays = state.customDays,
+                    difficulty = state.difficulty,
+                    baseXp = state.baseXp,
+                    reminderEnabled = state.reminderEnabled,
+                    reminderTime = if (state.reminderEnabled) state.reminderTime else null,
+                    isHouseholdHabit = state.isHouseholdHabit,
+                    remoteId = existingHabit?.remoteId,
+                    ownerUid = existingHabit?.ownerUid,
+                    householdId = resolvedHouseholdId,
+                    createdAt = existingHabit?.createdAt ?: System.currentTimeMillis(),
+                    isArchived = existingHabit?.isArchived ?: false,
+                    assignedToUid = if (state.isHouseholdHabit) state.assignedToUid else null,
+                    assignedToName = if (state.isHouseholdHabit) state.assignedToName else null,
                 )
-            } else {
-                HabitReminderScheduler.cancelReminder(context, savedHabitId)
-            }
+                val savedHabitId = habitRepository.upsertHabit(habit)
 
-            _events.emit(AddEditHabitEvent.Saved)
+                // Schedule or cancel reminder (use the returned ID for new habits)
+                if (state.reminderEnabled && state.reminderTime != null) {
+                    HabitReminderScheduler.scheduleReminder(
+                        context,
+                        savedHabitId,
+                        state.title.trim(),
+                        state.reminderTime,
+                        state.customDays,
+                    )
+                } else {
+                    HabitReminderScheduler.cancelReminder(context, savedHabitId)
+                }
+
+                _events.emit(AddEditHabitEvent.Saved)
+            } finally {
+                _isSaving.value = false
+            }
         }
     }
 
