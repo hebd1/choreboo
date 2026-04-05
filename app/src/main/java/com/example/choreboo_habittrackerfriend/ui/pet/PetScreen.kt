@@ -101,6 +101,8 @@ private enum class AnimationPhase { MOOD, IDLE, EATING, INTERACTING, THUMBS_UP, 
 fun PetScreen(
     onAddHabit: () -> Unit = {},
     onEditHabit: (Long) -> Unit = {},
+    habitJustCreated: Boolean = false,
+    onHabitCreatedConsumed: () -> Unit = {},
     viewModel: PetViewModel = hiltViewModel(),
 ) {
     // Choreboo state
@@ -182,6 +184,17 @@ fun PetScreen(
                     )
                 }
             }
+        }
+    }
+
+    // Habit creation success snackbar
+    LaunchedEffect(habitJustCreated) {
+        if (habitJustCreated) {
+            snackbarHostState.showSnackbar(
+                message = "Habit created! Keep it up! \uD83C\uDF1F",
+                duration = SnackbarDuration.Short,
+            )
+            onHabitCreatedConsumed()
         }
     }
 

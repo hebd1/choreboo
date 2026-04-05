@@ -1,7 +1,9 @@
 package com.example.choreboo_habittrackerfriend.navigation
 
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.getValue
 import androidx.compose.ui.Modifier
+import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.navigation.NavHostController
 import androidx.navigation.NavType
 import androidx.navigation.compose.NavHost
@@ -63,10 +65,16 @@ fun ChorebooNavGraph(
             )
         }
 
-        composable(Screen.Pet.route) {
+        composable(Screen.Pet.route) { backStackEntry ->
+            val habitCreated by backStackEntry.savedStateHandle
+                .getStateFlow("habitCreated", false)
+                .collectAsStateWithLifecycle()
+
             PetScreen(
                 onAddHabit = { navController.navigate(Screen.AddEditHabit.createRoute()) },
                 onEditHabit = { id -> navController.navigate(Screen.AddEditHabit.createRoute(id)) },
+                habitJustCreated = habitCreated,
+                onHabitCreatedConsumed = { backStackEntry.savedStateHandle["habitCreated"] = false },
             )
         }
 
@@ -85,6 +93,14 @@ fun ChorebooNavGraph(
         ) {
             AddEditHabitScreen(
                 onNavigateBack = { navController.popBackStack() },
+                onSavedBack = { isNew ->
+                    if (isNew) {
+                        navController.previousBackStackEntry
+                            ?.savedStateHandle
+                            ?.set("habitCreated", true)
+                    }
+                    navController.popBackStack()
+                },
             )
         }
 

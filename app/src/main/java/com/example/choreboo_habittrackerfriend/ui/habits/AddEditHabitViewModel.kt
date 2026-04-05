@@ -294,7 +294,7 @@ class AddEditHabitViewModel @Inject constructor(
                     HabitReminderScheduler.cancelReminder(context, savedHabitId)
                 }
 
-                _events.emit(AddEditHabitEvent.Saved)
+                _events.emit(AddEditHabitEvent.Saved(isNew = habitId == -1L))
             } finally {
                 _isSaving.value = false
             }
@@ -328,7 +328,7 @@ class AddEditHabitViewModel @Inject constructor(
 }
 
 sealed class AddEditHabitEvent {
-    data object Saved : AddEditHabitEvent()
+    data class Saved(val isNew: Boolean) : AddEditHabitEvent()
     data class ValidationError(val message: String) : AddEditHabitEvent()
 }
 

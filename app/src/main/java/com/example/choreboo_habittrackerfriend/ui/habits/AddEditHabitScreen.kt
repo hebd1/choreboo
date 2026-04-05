@@ -111,6 +111,7 @@ private val daysOfWeek = listOf("MON", "TUE", "WED", "THU", "FRI", "SAT", "SUN")
 @Composable
 fun AddEditHabitScreen(
     onNavigateBack: () -> Unit,
+    onSavedBack: (isNew: Boolean) -> Unit = { onNavigateBack() },
     viewModel: AddEditHabitViewModel = hiltViewModel(),
 ) {
     val formState by viewModel.formState.collectAsState()
@@ -124,7 +125,7 @@ fun AddEditHabitScreen(
     LaunchedEffect(Unit) {
         viewModel.events.collect { event ->
             when (event) {
-                is AddEditHabitEvent.Saved -> onNavigateBack()
+                is AddEditHabitEvent.Saved -> onSavedBack(event.isNew)
                 is AddEditHabitEvent.ValidationError -> {
                     snackbarHostState.showSnackbar(
                         message = event.message,

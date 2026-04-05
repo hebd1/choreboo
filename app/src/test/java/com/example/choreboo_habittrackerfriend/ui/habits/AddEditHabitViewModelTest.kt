@@ -408,9 +408,37 @@ class AddEditHabitViewModelTest {
             vm.saveHabit()
             val event = awaitItem()
             assertTrue(event is AddEditHabitEvent.Saved)
+            assertTrue((event as AddEditHabitEvent.Saved).isNew)
         }
 
         coVerify { habitRepository.upsertHabit(match { it.title == "Exercise" }) }
+    }
+
+    @Test
+    fun `saveHabit emits Saved with isNew=false when editing`() = runTest {
+        val existingHabit = Habit(
+            id = 42,
+            title = "Morning Run",
+            description = null,
+            iconName = "emoji_run",
+            customDays = listOf("MON", "WED", "FRI"),
+            difficulty = 2,
+            baseXp = 25,
+        )
+        every { habitRepository.getHabitById(42L) } returns flowOf(existingHabit)
+        coEvery { habitRepository.upsertHabit(any()) } returns 42L
+
+        val vm = createViewModel(habitId = 42L)
+        advanceUntilIdle()
+        vm.updateTitle("Updated Run")
+        advanceUntilIdle()
+
+        vm.events.test {
+            vm.saveHabit()
+            val event = awaitItem()
+            assertTrue(event is AddEditHabitEvent.Saved)
+            assertFalse((event as AddEditHabitEvent.Saved).isNew)
+        }
     }
 
     @Test
