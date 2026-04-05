@@ -29,6 +29,7 @@ import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.PullToRefreshBox
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
 import androidx.compose.material3.TopAppBar
@@ -66,6 +67,7 @@ fun CalendarScreen(
     val completions by viewModel.completionsForMonth.collectAsStateWithLifecycle()
     val selectedDateLogs by viewModel.selectedDateLogs.collectAsStateWithLifecycle()
     val totalPoints by viewModel.totalPoints.collectAsStateWithLifecycle()
+    val isRefreshing by viewModel.isRefreshing.collectAsStateWithLifecycle()
     val profilePhotoUri by viewModel.profilePhotoUri.collectAsStateWithLifecycle()
     val googlePhotoUrl by viewModel.googlePhotoUrl.collectAsStateWithLifecycle()
 
@@ -124,13 +126,18 @@ fun CalendarScreen(
             )
         },
     ) { padding ->
-        LazyColumn(
-            modifier = Modifier
-                .fillMaxSize()
-                .padding(padding)
-                .padding(horizontal = 16.dp),
-            verticalArrangement = Arrangement.spacedBy(16.dp),
+        PullToRefreshBox(
+            isRefreshing = isRefreshing,
+            onRefresh = { viewModel.refreshData() },
+            modifier = Modifier.fillMaxSize(),
         ) {
+            LazyColumn(
+                modifier = Modifier
+                    .fillMaxSize()
+                    .padding(padding)
+                    .padding(horizontal = 16.dp),
+                verticalArrangement = Arrangement.spacedBy(16.dp),
+            ) {
             // Calendar card
             item {
                 Spacer(modifier = Modifier.height(4.dp))
@@ -409,7 +416,8 @@ fun CalendarScreen(
             }
 
             item { Spacer(modifier = Modifier.height(80.dp)) }
-        }
+            } // end LazyColumn
+        } // end PullToRefreshBox
     }
 }
 

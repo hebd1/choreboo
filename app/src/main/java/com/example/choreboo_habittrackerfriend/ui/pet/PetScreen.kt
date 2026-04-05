@@ -43,6 +43,7 @@ import androidx.compose.material3.FloatingActionButton
 import androidx.compose.material3.Icon
 import androidx.compose.material3.LinearProgressIndicator
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.PullToRefreshBox
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.SnackbarDuration
 import androidx.compose.material3.SnackbarHost
@@ -108,6 +109,7 @@ fun PetScreen(
     val totalPoints by viewModel.totalPoints.collectAsStateWithLifecycle()
     val isEating by viewModel.isEating.collectAsStateWithLifecycle()
     val isSleeping by viewModel.isSleeping.collectAsStateWithLifecycle()
+    val isRefreshing by viewModel.isRefreshing.collectAsStateWithLifecycle()
     val profilePhotoUri by viewModel.profilePhotoUri.collectAsStateWithLifecycle()
     val googlePhotoUrl by viewModel.googlePhotoUrl.collectAsStateWithLifecycle()
     val petType by viewModel.petType.collectAsStateWithLifecycle()
@@ -276,13 +278,18 @@ fun PetScreen(
         val stats = choreboo!!
 
         Box(modifier = Modifier.fillMaxSize()) {
-            LazyColumn(
-                modifier = Modifier
-                    .fillMaxSize()
-                    .padding(padding)
-                    .padding(horizontal = 16.dp),
-                verticalArrangement = Arrangement.spacedBy(12.dp),
+            PullToRefreshBox(
+                isRefreshing = isRefreshing,
+                onRefresh = { viewModel.refreshData() },
+                modifier = Modifier.fillMaxSize(),
             ) {
+                LazyColumn(
+                    modifier = Modifier
+                        .fillMaxSize()
+                        .padding(padding)
+                        .padding(horizontal = 16.dp),
+                    verticalArrangement = Arrangement.spacedBy(12.dp),
+                ) {
                 // -------------------------------------------------------
                 // Pet animation box
                 // -------------------------------------------------------
@@ -482,7 +489,8 @@ fun PetScreen(
                 }
 
                 item { Spacer(modifier = Modifier.height(80.dp)) }
-            } // end LazyColumn
+                } // end LazyColumn
+            } // end PullToRefreshBox
 
             // Snackbar pinned above the nav bar
             Box(

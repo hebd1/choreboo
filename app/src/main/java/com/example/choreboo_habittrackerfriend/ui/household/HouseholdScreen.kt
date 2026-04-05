@@ -28,6 +28,7 @@ import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.PullToRefreshBox
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
@@ -61,6 +62,7 @@ fun HouseholdScreen(
     val pets by viewModel.householdPets.collectAsStateWithLifecycle()
     val habits by viewModel.householdHabits.collectAsStateWithLifecycle()
     val selectedPet by viewModel.selectedPet.collectAsStateWithLifecycle()
+    val isRefreshing by viewModel.isRefreshing.collectAsStateWithLifecycle()
 
     // ── Member habits popup ──────────────────────────────────────────
     selectedPet?.let { pet ->
@@ -72,12 +74,17 @@ fun HouseholdScreen(
         )
     }
 
-    Column(
-        modifier = Modifier
-            .fillMaxSize()
-            .padding(horizontal = 16.dp)
-            .padding(top = 16.dp, bottom = 96.dp),
+    PullToRefreshBox(
+        isRefreshing = isRefreshing,
+        onRefresh = { viewModel.refreshData() },
+        modifier = Modifier.fillMaxSize(),
     ) {
+        Column(
+            modifier = Modifier
+                .fillMaxSize()
+                .padding(horizontal = 16.dp)
+                .padding(top = 16.dp, bottom = 96.dp),
+        ) {
         // Header
         Text(
             text = household?.name ?: "Household",
@@ -134,7 +141,7 @@ fun HouseholdScreen(
                 }
             }
         }
-    }
+    } // end PullToRefreshBox
 }
 
 // ── Member habits dialog ─────────────────────────────────────────────────
