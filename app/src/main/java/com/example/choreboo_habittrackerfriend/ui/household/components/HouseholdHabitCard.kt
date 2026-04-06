@@ -12,28 +12,41 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.AccountCircle
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
+import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import coil3.compose.AsyncImage
 import com.example.choreboo_habittrackerfriend.domain.model.HouseholdHabitStatus
 
 /**
  * Card showing a single household habit and its today-completion status.
  * When completed, a green "Done" chip shows who completed it.
  * When not yet done, an amber "Pending" chip is shown.
+ *
+ * @param habit The household habit data
+ * @param assignedToPhotoUrl Profile photo URL of the assigned user (null = unassigned or no photo)
+ * @param modifier Optional modifier
  */
 @Composable
 fun HouseholdHabitCard(
     habit: HouseholdHabitStatus,
+    assignedToPhotoUrl: String? = null,
     modifier: Modifier = Modifier,
 ) {
     val isCompleted = habit.completedByName != null
@@ -54,23 +67,57 @@ fun HouseholdHabitCard(
                 .padding(horizontal = 16.dp, vertical = 12.dp),
             verticalAlignment = Alignment.CenterVertically,
         ) {
-            // Emoji icon
-            Box(
-                contentAlignment = Alignment.Center,
-                modifier = Modifier
-                    .size(44.dp)
-                    .clip(CircleShape)
-                    .background(
-                        if (isCompleted)
-                            MaterialTheme.colorScheme.primary.copy(alpha = 0.15f)
-                        else
-                            MaterialTheme.colorScheme.surfaceContainerHighest,
-                    ),
-            ) {
-                Text(
-                    text = habit.iconName,
-                    fontSize = 22.sp,
-                )
+            // Assigned user's profile photo or fallback to emoji/icon
+            if (!assignedToPhotoUrl.isNullOrBlank()) {
+                // Show profile photo
+                val photoFailed = remember(assignedToPhotoUrl) { mutableStateOf(false) }
+
+                if (!photoFailed.value) {
+                    AsyncImage(
+                        model = assignedToPhotoUrl,
+                        contentDescription = "Profile photo of ${habit.assignedToName}",
+                        contentScale = ContentScale.Crop,
+                        modifier = Modifier
+                            .size(44.dp)
+                            .clip(CircleShape),
+                        onError = { photoFailed.value = true },
+                    )
+                } else {
+                    // Photo failed to load — show fallback icon
+                    Box(
+                        contentAlignment = Alignment.Center,
+                        modifier = Modifier
+                            .size(44.dp)
+                            .clip(CircleShape)
+                            .background(MaterialTheme.colorScheme.surfaceContainerHighest),
+                    ) {
+                        Icon(
+                            imageVector = Icons.Default.AccountCircle,
+                            contentDescription = "Profile photo of ${habit.assignedToName}",
+                            tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                            modifier = Modifier.size(32.dp),
+                        )
+                    }
+                }
+            } else {
+                // No photo — show emoji icon (unassigned or user has no photo)
+                Box(
+                    contentAlignment = Alignment.Center,
+                    modifier = Modifier
+                        .size(44.dp)
+                        .clip(CircleShape)
+                        .background(
+                            if (isCompleted)
+                                MaterialTheme.colorScheme.primary.copy(alpha = 0.15f)
+                            else
+                                MaterialTheme.colorScheme.surfaceContainerHighest,
+                        ),
+                ) {
+                    Text(
+                        text = habit.iconName,
+                        fontSize = 22.sp,
+                    )
+                }
             }
 
             Spacer(modifier = Modifier.width(12.dp))
@@ -144,13 +191,14 @@ private fun StatusChip(
         modifier = modifier
             .clip(RoundedCornerShape(8.dp))
             .background(containerColor)
-            .padding(horizontal = 8.dp, vertical = 4.dp),
+            .padding(horizontal = 6.dp, vertical = 2.dp),
     ) {
         Text(
             text = label,
             style = MaterialTheme.typography.labelSmall,
             color = contentColor,
             fontWeight = FontWeight.Bold,
+            fontSize = 10.sp,
             maxLines = 1,
             overflow = TextOverflow.Ellipsis,
         )
