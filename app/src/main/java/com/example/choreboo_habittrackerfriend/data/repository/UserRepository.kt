@@ -53,11 +53,17 @@ class UserRepository @Inject constructor(
     suspend fun syncCurrentUserToCloud() {
         val user = getCurrentAppUser() ?: return
         try {
-            connector.upsertUser.execute(
-                displayName = user.displayName,
-            ) {
-                email = user.email
-                photoUrl = user.photoUrl
+            val timedOut = withTimeoutOrNull(CLOUD_TIMEOUT_MS) {
+                connector.upsertUser.execute(
+                    displayName = user.displayName,
+                ) {
+                    email = user.email
+                    photoUrl = user.photoUrl
+                }
+            }
+            if (timedOut == null) {
+                Log.w(TAG, "syncCurrentUserToCloud: timed out")
+                return
             }
             Log.d(TAG, "Synced user ${user.uid} to cloud")
         } catch (e: Exception) {
@@ -131,10 +137,16 @@ class UserRepository @Inject constructor(
 
         if (getCurrentUid() == null) return
         try {
-            connector.updateUserPoints.execute(
-                totalPoints = totalPoints,
-                totalLifetimeXp = totalLifetimeXp,
-            )
+            val timedOut = withTimeoutOrNull(CLOUD_TIMEOUT_MS) {
+                connector.updateUserPoints.execute(
+                    totalPoints = totalPoints,
+                    totalLifetimeXp = totalLifetimeXp,
+                )
+            }
+            if (timedOut == null) {
+                Log.w(TAG, "syncPointsToCloud: timed out")
+                return
+            }
             Log.d(TAG, "Synced points to cloud: totalPoints=$totalPoints, totalLifetimeXp=$totalLifetimeXp")
         } catch (e: Exception) {
             Log.e(TAG, "Failed to sync points to cloud", e)
@@ -265,7 +277,7 @@ class UserRepository @Inject constructor(
             Log.d(TAG, "Restored Firebase Auth photoUrl to: ${googlePhotoUrl ?: "null (email user)"}")
 
             // Clear DataStore
-            userPreferences.setProfilePhotoUri("")
+            userPreferences.setProfilePhotoUri(null)
             Log.d(TAG, "Cleared profile photo URI from DataStore")
 
             // Delete local file

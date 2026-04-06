@@ -525,7 +525,10 @@ class HabitRepository @Inject constructor(
                     assignedToName = cloudHabit.assignedTo?.displayName,
                     remoteId = remoteId,
                 )
-             habitDao.upsertHabit(entity)
+             val upsertedId = habitDao.upsertHabit(entity)
+                 // For new habits (existing == null) entity.id is 0; use the auto-generated ID
+                 // returned by upsertHabit instead so the PendingIntent request code is correct.
+                 val habitLocalId = existing?.id ?: upsertedId
 
                  // Schedule reminder immediately after syncing if enabled (fixes B17: new devices signing in for first time).
                  // On new devices, synced personal habits have reminderEnabled=true but no AlarmManager alarms were registered.
@@ -538,7 +541,7 @@ class HabitRepository @Inject constructor(
                         }
                         HabitReminderScheduler.scheduleReminder(
                             context,
-                            entity.id,
+                            habitLocalId,
                             cloudHabit.title,
                             parsedTime,
                             cloudHabit.customDays.split(",").map { it.trim() }.filter { it.isNotEmpty() },
@@ -615,7 +618,9 @@ class HabitRepository @Inject constructor(
                     assignedToName = cloudHabit.assignedTo?.displayName,
                     remoteId = remoteId,
                 )
-                 habitDao.upsertHabit(entity)
+                 val upsertedHhId = habitDao.upsertHabit(entity)
+                 // For new habits entity.id is 0; use the auto-generated ID for alarm scheduling.
+                 val hhHabitLocalId = existing?.id ?: upsertedHhId
 
                  // Schedule reminder for household habits assigned to current user (fixes B17: assignments on new devices).
                  // User A assigns a habit to User B → User B signs in on a new device → reminder should fire for User B.
@@ -628,7 +633,7 @@ class HabitRepository @Inject constructor(
                         }
                         HabitReminderScheduler.scheduleReminder(
                             context,
-                            entity.id,
+                            hhHabitLocalId,
                             cloudHabit.title,
                             parsedTime,
                             cloudHabit.customDays.split(",").map { it.trim() }.filter { it.isNotEmpty() },
@@ -669,7 +674,13 @@ class HabitRepository @Inject constructor(
         if (!habitDao.hasHouseholdHabits()) return
         val today = LocalDate.now().format(dateFormatter)
         try {
-            val result = connector.getHouseholdHabitLogsForDate.execute(date = today)
+            val result = withTimeoutOrNull(CLOUD_TIMEOUT_MS) {
+                connector.getHouseholdHabitLogsForDate.execute(date = today)
+            }
+            if (result == null) {
+                Log.w(TAG, "syncHouseholdHabitLogsForToday: timed out")
+                return
+            }
             val habitsWithLogs = result.data.user?.household?.habits_on_household
                 ?: return
 
@@ -716,10 +727,16 @@ class HabitRepository @Inject constructor(
         val startDate = LocalDate.now().minusDays(30).format(dateFormatter)
 
         try {
-            val result = connector.getMyLogsForDateRange.execute(
-                startDate = startDate,
-                endDate = endDate,
-            )
+            val result = withTimeoutOrNull(CLOUD_TIMEOUT_MS) {
+                connector.getMyLogsForDateRange.execute(
+                    startDate = startDate,
+                    endDate = endDate,
+                )
+            }
+            if (result == null) {
+                Log.w(TAG, "syncHabitLogsFromCloud: timed out")
+                return
+            }
             val cloudLogs = result.data.habitLogs
             Log.d(TAG, "Fetched ${cloudLogs.size} habit logs from cloud")
 

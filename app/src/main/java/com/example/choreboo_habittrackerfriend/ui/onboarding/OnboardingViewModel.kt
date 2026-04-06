@@ -6,8 +6,11 @@ import com.example.choreboo_habittrackerfriend.data.datastore.UserPreferences
 import com.example.choreboo_habittrackerfriend.data.repository.ChorebooRepository
 import com.example.choreboo_habittrackerfriend.domain.model.PetType
 import dagger.hilt.android.lifecycle.HiltViewModel
+import kotlinx.coroutines.flow.MutableSharedFlow
 import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.SharedFlow
 import kotlinx.coroutines.flow.StateFlow
+import kotlinx.coroutines.flow.asSharedFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.launch
 import javax.inject.Inject
@@ -24,6 +27,9 @@ class OnboardingViewModel @Inject constructor(
     private val _isHatching = MutableStateFlow(false)
     val isHatching: StateFlow<Boolean> = _isHatching.asStateFlow()
 
+    private val _events = MutableSharedFlow<OnboardingEvent>()
+    val events: SharedFlow<OnboardingEvent> = _events.asSharedFlow()
+
     fun selectPetType(petType: PetType) {
         _selectedPetType.value = petType
     }
@@ -34,9 +40,17 @@ class OnboardingViewModel @Inject constructor(
             try {
                 chorebooRepository.getOrCreateChoreboo(chorebooName, _selectedPetType.value)
                 userPreferences.setOnboardingComplete(true)
+                _events.emit(OnboardingEvent.NavigateToHome)
+            } catch (e: Exception) {
+                _events.emit(OnboardingEvent.Error(e.message ?: "Something went wrong. Please try again."))
             } finally {
                 _isHatching.value = false
             }
         }
     }
+}
+
+sealed class OnboardingEvent {
+    data object NavigateToHome : OnboardingEvent()
+    data class Error(val message: String) : OnboardingEvent()
 }

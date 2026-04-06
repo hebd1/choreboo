@@ -52,7 +52,7 @@ class HouseholdViewModel @Inject constructor(
     ) { pets, localPhoto, googlePhoto ->
         val currentUid = userRepository.getCurrentUid()
         pets.map { pet ->
-            if (pet.ownerUid == currentUid && pet.ownerPhotoUrl == null) {
+            if (pet.ownerUid == currentUid && pet.ownerPhotoUrl.isNullOrBlank()) {
                 pet.copy(ownerPhotoUrl = localPhoto ?: googlePhoto)
             } else {
                 pet

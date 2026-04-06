@@ -52,13 +52,19 @@ interface HabitLogDao {
     """)
     fun getStreaksForDate(date: String): Flow<List<HabitStreak>>
 
-    /** Total number of habit completions ever — used for badge computation. */
-    @Query("SELECT COUNT(*) FROM habit_logs")
-    fun getTotalCompletionCount(): Flow<Int>
+    /**
+     * Total number of habit completions by the given user — used for badge computation.
+     * Scoped to [uid] so household members' synced logs don't inflate the count.
+     */
+    @Query("SELECT COUNT(*) FROM habit_logs WHERE completedByUid = :uid")
+    fun getTotalCompletionCount(uid: String): Flow<Int>
 
-    /** Highest streak ever recorded across all habit logs — used for badge computation. */
-    @Query("SELECT COALESCE(MAX(streakAtCompletion), 0) FROM habit_logs")
-    fun getMaxStreakEver(): Flow<Int>
+    /**
+     * Highest streak ever recorded by the given user — used for badge computation.
+     * Scoped to [uid] so household members' streaks don't unlock badges for this user.
+     */
+    @Query("SELECT COALESCE(MAX(streakAtCompletion), 0) FROM habit_logs WHERE completedByUid = :uid")
+    fun getMaxStreakEver(uid: String): Flow<Int>
 
     /** Distinct dates with completions in a date range — used for weekly streak circles. */
     @Query("SELECT DISTINCT date FROM habit_logs WHERE date >= :startDate AND date <= :endDate")

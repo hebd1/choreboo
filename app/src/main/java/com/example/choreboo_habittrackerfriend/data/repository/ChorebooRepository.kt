@@ -38,6 +38,7 @@ data class XpResult(
 @Singleton
 class ChorebooRepository @Inject constructor(
     private val chorebooDao: ChorebooDao,
+    private val userRepository: UserRepository,
 ) {
     private val connector by lazy { ChorebooConnector.instance }
 
@@ -253,8 +254,15 @@ class ChorebooRepository @Inject constructor(
             )
             chorebooDao.updateChoreboo(updated)
 
-            // Write-through (fire-and-forget)
+            // Write-through: sync pet stats (fire-and-forget)
             writeScope.launch { syncStatsToCloud(updated) }
+
+            // Write-through: sync deducted points so cloud stays current
+            writeScope.launch {
+                val newPoints = userPreferences.totalPoints.first()
+                val newLifetimeXp = userPreferences.totalLifetimeXp.first()
+                userRepository.syncPointsToCloud(newPoints, newLifetimeXp)
+            }
         }
     }
 

@@ -32,6 +32,8 @@ import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.OutlinedTextFieldDefaults
+import androidx.compose.material3.SnackbarHost
+import androidx.compose.material3.SnackbarHostState
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
@@ -41,6 +43,7 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -54,6 +57,7 @@ import androidx.compose.ui.unit.sp
 import androidx.hilt.navigation.compose.hiltViewModel
 import com.example.choreboo_habittrackerfriend.domain.model.PetType
 import kotlinx.coroutines.delay
+import kotlinx.coroutines.launch
 
 private const val STEP_PET_SELECT = 0
 private const val STEP_NAME = 1
@@ -67,10 +71,23 @@ fun OnboardingScreen(
     var chorebooName by remember { mutableStateOf("") }
     var currentStep by remember { mutableIntStateOf(STEP_PET_SELECT) }
     var showContent by remember { mutableStateOf(false) }
+    val snackbarHostState = remember { SnackbarHostState() }
+    val scope = rememberCoroutineScope()
 
     LaunchedEffect(Unit) {
         delay(300)
         showContent = true
+    }
+
+    LaunchedEffect(Unit) {
+        viewModel.events.collect { event ->
+            when (event) {
+                is OnboardingEvent.NavigateToHome -> onComplete()
+                is OnboardingEvent.Error -> scope.launch {
+                    snackbarHostState.showSnackbar(event.message)
+                }
+            }
+        }
     }
 
     Box(
@@ -174,7 +191,6 @@ fun OnboardingScreen(
                         onComplete = {
                             val name = chorebooName.ifBlank { selectedPetType.displayName }
                             viewModel.completeOnboarding(name)
-                            onComplete()
                         },
                     )
                 }
@@ -182,6 +198,11 @@ fun OnboardingScreen(
 
             Spacer(modifier = Modifier.height(48.dp))
         }
+
+        SnackbarHost(
+            hostState = snackbarHostState,
+            modifier = Modifier.align(Alignment.BottomCenter),
+        )
     }
 }
 

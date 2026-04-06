@@ -7,6 +7,7 @@ import com.example.choreboo_habittrackerfriend.data.local.dao.HabitLogWithName
 import com.example.choreboo_habittrackerfriend.data.local.entity.HabitLogEntity
 import com.example.choreboo_habittrackerfriend.data.repository.AuthRepository
 import com.example.choreboo_habittrackerfriend.data.repository.HabitRepository
+import com.example.choreboo_habittrackerfriend.data.repository.SyncManager
 import io.mockk.every
 import io.mockk.mockk
 import kotlinx.coroutines.ExperimentalCoroutinesApi
@@ -39,6 +40,7 @@ class CalendarViewModelTest {
     private lateinit var habitRepository: HabitRepository
     private lateinit var userPreferences: UserPreferences
     private lateinit var authRepository: AuthRepository
+    private lateinit var syncManager: SyncManager
 
     private val monthLogFlow = MutableStateFlow<List<HabitLogEntity>>(emptyList())
 
@@ -47,6 +49,7 @@ class CalendarViewModelTest {
         habitRepository = mockk(relaxed = true)
         userPreferences = mockk(relaxed = true)
         authRepository = mockk(relaxed = true)
+        syncManager = mockk(relaxed = true)
 
         // Default stubs
         every { userPreferences.totalPoints } returns flowOf(0)
@@ -63,6 +66,7 @@ class CalendarViewModelTest {
         habitRepository = habitRepository,
         userPreferences = userPreferences,
         authRepository = authRepository,
+        syncManager = syncManager,
     )
 
     // -----------------------------------------------------------------------

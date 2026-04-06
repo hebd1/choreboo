@@ -9,6 +9,8 @@ import com.example.choreboo_habittrackerfriend.data.repository.ChorebooRepositor
 import com.example.choreboo_habittrackerfriend.data.repository.CompletionResult
 import com.example.choreboo_habittrackerfriend.data.repository.HabitRepository
 import com.example.choreboo_habittrackerfriend.data.repository.HouseholdRepository
+import com.example.choreboo_habittrackerfriend.data.repository.SyncManager
+import com.example.choreboo_habittrackerfriend.data.repository.UserRepository
 import com.example.choreboo_habittrackerfriend.data.repository.XpResult
 import com.example.choreboo_habittrackerfriend.domain.model.ChorebooMood
 import com.example.choreboo_habittrackerfriend.domain.model.ChorebooStage
@@ -51,6 +53,8 @@ class PetViewModelTest {
     private lateinit var userPreferences: UserPreferences
     private lateinit var authRepository: AuthRepository
     private lateinit var householdRepository: HouseholdRepository
+    private lateinit var syncManager: SyncManager
+    private lateinit var userRepository: UserRepository
 
     private val chorebooFlow = MutableStateFlow<ChorebooStats?>(null)
     private val habitsFlow = MutableStateFlow<List<Habit>>(emptyList())
@@ -78,6 +82,8 @@ class PetViewModelTest {
         userPreferences = mockk(relaxed = true)
         authRepository = mockk(relaxed = true)
         householdRepository = mockk(relaxed = true)
+        syncManager = mockk(relaxed = true)
+        userRepository = mockk(relaxed = true)
 
         // Default stubs
         every { chorebooRepository.getChoreboo() } returns chorebooFlow
@@ -85,6 +91,7 @@ class PetViewModelTest {
         every { habitRepository.getLogsForDate(any()) } returns logsForDateFlow
         every { habitRepository.getStreaksForToday() } returns flowOf(emptyMap())
         every { userPreferences.totalPoints } returns flowOf(100)
+        every { userPreferences.totalLifetimeXp } returns flowOf(500)
         every { userPreferences.profilePhotoUri } returns flowOf(null)
         every { authRepository.currentFirebaseUser } returns null
         every { householdRepository.householdMembers } returns flowOf(emptyList())
@@ -105,6 +112,8 @@ class PetViewModelTest {
         userPreferences = userPreferences,
         authRepository = authRepository,
         householdRepository = householdRepository,
+        syncManager = syncManager,
+        userRepository = userRepository,
     )
 
     // -----------------------------------------------------------------------

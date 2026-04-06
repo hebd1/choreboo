@@ -137,7 +137,7 @@ fun HouseholdPetCard(
         }
 
         // ── Owner avatar badge – upper-left corner overlay ───────────────
-        var avatarPhotoFailed by remember { mutableStateOf(false) }
+        var avatarPhotoFailed by remember(pet.ownerPhotoUrl) { mutableStateOf(false) }
 
         if (!pet.ownerPhotoUrl.isNullOrBlank() && !avatarPhotoFailed) {
             AsyncImage(

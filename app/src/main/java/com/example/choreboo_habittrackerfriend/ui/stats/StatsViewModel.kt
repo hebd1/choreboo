@@ -11,8 +11,10 @@ import com.example.choreboo_habittrackerfriend.domain.model.Badge
 import com.example.choreboo_habittrackerfriend.domain.model.ChorebooStats
 import com.example.choreboo_habittrackerfriend.domain.model.PetType
 import dagger.hilt.android.lifecycle.HiltViewModel
+import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
+import kotlinx.coroutines.flow.flatMapLatest
 import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.stateIn
 import java.time.DayOfWeek
@@ -82,8 +84,21 @@ class StatsViewModel @Inject constructor(
 
     val chorebooStats: StateFlow<ChorebooStats?> = chorebooFlow
 
-    private val todayLogsFlow = habitRepository
-        .getLogsForDate(LocalDate.now().format(DateTimeFormatter.ISO_LOCAL_DATE))
+    /**
+     * Reactive today date — holds an ISO-8601 string. Initialized at construction;
+     * external callers can trigger a refresh (e.g. on screen resume) via [refreshTodayDate].
+     */
+    private val _todayDate = MutableStateFlow(
+        LocalDate.now().format(DateTimeFormatter.ISO_LOCAL_DATE),
+    )
+
+    /** Refreshes the today date — call when the screen becomes visible to handle midnight crossings. */
+    fun refreshTodayDate() {
+        _todayDate.value = LocalDate.now().format(DateTimeFormatter.ISO_LOCAL_DATE)
+    }
+
+    private val todayLogsFlow = _todayDate
+        .flatMapLatest { date -> habitRepository.getLogsForDate(date) }
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), emptyList())
 
     // Directly observes today's logs — no dependency on _todayCompletions so XP
@@ -101,12 +116,16 @@ class StatsViewModel @Inject constructor(
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), emptyMap())
 
     /** Percentage of days in the current month (up to today) that have at least one habit completion. */
-    val monthlyCompletionRate: StateFlow<Int> = habitRepository.getLogsForMonth(YearMonth.now().toString())
-        .map { logs ->
-            val today = LocalDate.now()
-            val daysElapsed = today.dayOfMonth
-            val daysWithAny = logs.groupBy { it.date }.keys.size
-            if (daysElapsed > 0) (daysWithAny * 100 / daysElapsed) else 0
+    val monthlyCompletionRate: StateFlow<Int> = _todayDate
+        .flatMapLatest { dateStr ->
+            val yearMonth = YearMonth.parse(dateStr.substring(0, 7))
+            habitRepository.getLogsForMonth(yearMonth.toString())
+                .map { logs ->
+                    val today = LocalDate.parse(dateStr)
+                    val daysElapsed = today.dayOfMonth
+                    val daysWithAny = logs.groupBy { it.date }.keys.size
+                    if (daysElapsed > 0) (daysWithAny * 100 / daysElapsed) else 0
+                }
         }
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), 0)
 }

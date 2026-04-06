@@ -143,7 +143,7 @@ class AuthViewModel @Inject constructor(
                 // Priority: Google account photo URL > FirebaseUser photo URL (covers email users
                 // whose Firebase account was previously linked to Google).
                 val photoToSave = googleAccountPhotoUrl ?: result.user.photoUrl?.toString()
-                if (photoToSave != null && userPreferences.profilePhotoUri.first() == null) {
+                if (photoToSave != null && userPreferences.profilePhotoUri.first().isNullOrBlank()) {
                     userPreferences.setProfilePhotoUri(photoToSave)
                 }
 

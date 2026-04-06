@@ -65,9 +65,13 @@ interface HabitDao {
     @Query("DELETE FROM habits WHERE id = :id")
     suspend fun deleteHabitById(id: Long)
 
-    /** Total count of all habits (including archived) — used for badge computation. */
-    @Query("SELECT COUNT(*) FROM habits")
-    fun getTotalHabitCount(): Flow<Int>
+    /**
+     * Total count of habits owned by the given user (includes archived) — used for badge
+     * computation. Scoped to [uid] so other household members' synced habits don't inflate
+     * the count and unlock "Habit Collector" badges prematurely.
+     */
+    @Query("SELECT COUNT(*) FROM habits WHERE ownerUid = :uid")
+    fun getTotalHabitCount(uid: String): Flow<Int>
 
     /** All habits that have been synced to cloud (non-null remoteId) — used for G13 reconciliation. */
     @Query("SELECT * FROM habits WHERE remoteId IS NOT NULL")

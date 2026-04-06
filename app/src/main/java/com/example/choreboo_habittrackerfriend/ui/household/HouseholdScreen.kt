@@ -167,7 +167,7 @@ private fun MemberHabitsDialog(
             }
         },
         icon = {
-            var photoFailed by remember { mutableStateOf(false) }
+            var photoFailed by remember(pet.ownerPhotoUrl) { mutableStateOf(false) }
 
             if (!pet.ownerPhotoUrl.isNullOrBlank() && !photoFailed) {
                 AsyncImage(

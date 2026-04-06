@@ -45,8 +45,8 @@ fun ProfileAvatar(
     ) {
         // Priority: custom photo > Google photo > default icon
         when {
-            profilePhotoUri != null -> ProfileImage(url = profilePhotoUri, size = size)
-            googlePhotoUrl != null -> ProfileImage(url = googlePhotoUrl, size = size)
+            !profilePhotoUri.isNullOrBlank() -> ProfileImage(url = profilePhotoUri, size = size)
+            !googlePhotoUrl.isNullOrBlank() -> ProfileImage(url = googlePhotoUrl, size = size)
             else -> DefaultAvatarIcon(size = size)
         }
     }

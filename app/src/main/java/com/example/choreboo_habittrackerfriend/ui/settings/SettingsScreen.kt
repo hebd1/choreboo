@@ -406,7 +406,7 @@ fun SettingsScreen(
                         Spacer(modifier = Modifier.width(8.dp))
                         Text("Choose Photo from Gallery", modifier = Modifier.weight(1f), textAlign = TextAlign.Start)
                     }
-                    if (profilePhotoUri != null) {
+                    if (!profilePhotoUri.isNullOrBlank()) {
                         TextButton(
                             onClick = {
                                 showPhotoOptionsDialog = false

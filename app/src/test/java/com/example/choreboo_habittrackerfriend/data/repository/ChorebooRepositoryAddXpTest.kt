@@ -2,6 +2,7 @@ package com.example.choreboo_habittrackerfriend.data.repository
 
 import com.example.choreboo_habittrackerfriend.data.local.dao.ChorebooDao
 import com.example.choreboo_habittrackerfriend.data.local.entity.ChorebooEntity
+import com.example.choreboo_habittrackerfriend.data.repository.UserRepository
 import com.example.choreboo_habittrackerfriend.domain.model.ChorebooStage
 import io.mockk.coEvery
 import io.mockk.coVerify
@@ -25,6 +26,7 @@ import org.junit.Test
 class ChorebooRepositoryAddXpTest {
 
     private lateinit var chorebooDao: ChorebooDao
+    private lateinit var userRepository: UserRepository
     private lateinit var repo: ChorebooRepository
 
     private fun baseEntity(
@@ -51,7 +53,8 @@ class ChorebooRepositoryAddXpTest {
     @Before
     fun setUp() {
         chorebooDao = mockk(relaxed = true)
-        repo = ChorebooRepository(chorebooDao)
+        userRepository = mockk(relaxed = true)
+        repo = ChorebooRepository(chorebooDao, userRepository)
     }
 
     // ── Basic XP addition ───────────────────────────────────────────────

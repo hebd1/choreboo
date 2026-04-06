@@ -7,6 +7,8 @@ import com.example.choreboo_habittrackerfriend.data.repository.AuthRepository
 import com.example.choreboo_habittrackerfriend.data.repository.ChorebooRepository
 import com.example.choreboo_habittrackerfriend.data.repository.HabitRepository
 import com.example.choreboo_habittrackerfriend.data.repository.HouseholdRepository
+import com.example.choreboo_habittrackerfriend.data.repository.SyncManager
+import com.example.choreboo_habittrackerfriend.data.repository.UserRepository
 import com.example.choreboo_habittrackerfriend.domain.model.ChorebooMood
 import com.example.choreboo_habittrackerfriend.domain.model.ChorebooStats
 import com.example.choreboo_habittrackerfriend.domain.model.Habit
@@ -19,6 +21,7 @@ import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asSharedFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.combine
+import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.flatMapLatest
 import kotlinx.coroutines.flow.flowOf
 import kotlinx.coroutines.flow.map
@@ -36,6 +39,8 @@ class PetViewModel @Inject constructor(
     private val userPreferences: UserPreferences,
     private val authRepository: AuthRepository,
     private val householdRepository: HouseholdRepository,
+    private val syncManager: SyncManager,
+    private val userRepository: UserRepository,
 ) : ViewModel() {
 
     // -----------------------------------------------------------------------
@@ -68,6 +73,19 @@ class PetViewModel @Inject constructor(
     val isRefreshing: StateFlow<Boolean> = _isRefreshing.asStateFlow()
 
     // -----------------------------------------------------------------------
+    // Reactive today date — updates if the date changes while the app is open
+    // -----------------------------------------------------------------------
+
+    /**
+     * Holds today's date as an ISO-8601 string. Set once in init; refreshed
+     * whenever [refreshData] is called (covers the case where the app stays
+     * in the foreground past midnight).
+     */
+    private val _todayDate = MutableStateFlow(
+        LocalDate.now().format(DateTimeFormatter.ISO_LOCAL_DATE),
+    )
+
+    // -----------------------------------------------------------------------
     // Habit state (absorbed from HabitListViewModel)
     // -----------------------------------------------------------------------
 
@@ -90,10 +108,10 @@ class PetViewModel @Inject constructor(
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), emptyList())
 
     /** Today's completions as a reactive flow — no manual refresh needed. */
-    val todayCompletions: StateFlow<Map<Long, Int>> =
-        habitRepository.getLogsForDate(LocalDate.now().format(DateTimeFormatter.ISO_LOCAL_DATE))
-            .map { logs -> logs.groupBy { it.habitId }.mapValues { it.value.size } }
-            .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), emptyMap())
+    val todayCompletions: StateFlow<Map<Long, Int>> = _todayDate
+        .flatMapLatest { date -> habitRepository.getLogsForDate(date) }
+        .map { logs -> logs.groupBy { it.habitId }.mapValues { it.value.size } }
+        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), emptyMap())
 
     val streaks: StateFlow<Map<Long, Int>> = habitRepository.getStreaksForToday()
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), emptyMap())
@@ -123,7 +141,7 @@ class PetViewModel @Inject constructor(
      * Used to show "Completed by [name]" on household habit cards.
      */
     val householdCompleterNames: StateFlow<Map<Long, String?>> = combine(
-        habitRepository.getLogsForDate(LocalDate.now().format(DateTimeFormatter.ISO_LOCAL_DATE)),
+        _todayDate.flatMapLatest { date -> habitRepository.getLogsForDate(date) },
         householdRepository.householdMembers,
     ) { logs, members ->
         val memberNameMap = members.associate { it.uid to it.displayName }
@@ -164,6 +182,10 @@ class PetViewModel @Inject constructor(
                 chorebooRepository.feedChoreboo()
                 _isEating.value = true
                 _events.emit(PetEvent.Fed)
+                // Write-through: sync deducted points so cloud stays current
+                val newPoints = userPreferences.totalPoints.first()
+                val newLifetimeXp = userPreferences.totalLifetimeXp.first()
+                userRepository.syncPointsToCloud(newPoints, newLifetimeXp)
             } else {
                 _events.emit(PetEvent.InsufficientPoints)
             }
@@ -188,11 +210,14 @@ class PetViewModel @Inject constructor(
         _isEating.value = false
     }
 
-    /** Manual refresh: triggers cloud sync and stat decay. */
+    /** Manual refresh: syncs choreboo and habits from cloud, then applies stat decay. */
     fun refreshData() {
         viewModelScope.launch {
             _isRefreshing.value = true
             try {
+                // Refresh today's date in case the app stayed open past midnight
+                _todayDate.value = LocalDate.now().format(DateTimeFormatter.ISO_LOCAL_DATE)
+                syncManager.syncAll(force = true)
                 chorebooRepository.applyStatDecay()
             } finally {
                 _isRefreshing.value = false

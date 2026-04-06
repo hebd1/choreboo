@@ -4,8 +4,9 @@ import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.example.choreboo_habittrackerfriend.data.local.dao.HabitLogWithName
 import com.example.choreboo_habittrackerfriend.data.datastore.UserPreferences
-import com.example.choreboo_habittrackerfriend.data.repository.HabitRepository
 import com.example.choreboo_habittrackerfriend.data.repository.AuthRepository
+import com.example.choreboo_habittrackerfriend.data.repository.HabitRepository
+import com.example.choreboo_habittrackerfriend.data.repository.SyncManager
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -27,6 +28,7 @@ class CalendarViewModel @Inject constructor(
     private val habitRepository: HabitRepository,
     private val userPreferences: UserPreferences,
     private val authRepository: AuthRepository,
+    private val syncManager: SyncManager,
 ) : ViewModel() {
 
     private val _selectedMonth = MutableStateFlow(YearMonth.now())
@@ -96,12 +98,12 @@ class CalendarViewModel @Inject constructor(
         _selectedDate.value = if (_selectedDate.value == date) null else date
     }
 
-    /** Manual refresh: no-op for now, but hooks are ready for pull-to-refresh. */
+    /** Manual refresh: syncs habits and logs from cloud, then Room flows update automatically. */
     fun refreshData() {
         viewModelScope.launch {
             _isRefreshing.value = true
             try {
-                // Refresh logic can be added here if needed (e.g., force sync)
+                syncManager.syncAll(force = true)
             } finally {
                 _isRefreshing.value = false
             }

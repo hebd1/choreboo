@@ -4,9 +4,9 @@ import android.util.Log
 import com.example.choreboo_habittrackerfriend.data.local.dao.HouseholdMemberDao
 import com.example.choreboo_habittrackerfriend.data.local.dao.HouseholdDao
 import com.example.choreboo_habittrackerfriend.data.local.dao.HouseholdHabitStatusDao
-import com.example.choreboo_habittrackerfriend.data.local.entity.HouseholdMemberEntity
 import com.example.choreboo_habittrackerfriend.data.local.entity.HouseholdEntity
 import com.example.choreboo_habittrackerfriend.data.local.entity.HouseholdHabitStatusEntity
+import com.example.choreboo_habittrackerfriend.data.local.entity.HouseholdMemberEntity
 import com.example.choreboo_habittrackerfriend.dataconnect.ChorebooConnector
 import com.example.choreboo_habittrackerfriend.dataconnect.execute
 import com.example.choreboo_habittrackerfriend.dataconnect.instance
@@ -102,16 +102,20 @@ class HouseholdRepository @Inject constructor(
 
         return try {
             // Create the household in Data Connect
-            val createResult = connector.createHousehold.execute(
-                name = name,
-                inviteCode = inviteCode,
-            )
+            val createResult = withTimeoutOrNull(CLOUD_TIMEOUT_MS) {
+                connector.createHousehold.execute(
+                    name = name,
+                    inviteCode = inviteCode,
+                )
+            } ?: return HouseholdResult.Error("Request timed out. Please try again.")
             val householdId = createResult.data.household_insert.id
 
             // Assign the household to the current user
-            connector.updateUserHousehold.execute {
-                this.householdId = householdId
-            }
+            withTimeoutOrNull(CLOUD_TIMEOUT_MS) {
+                connector.updateUserHousehold.execute {
+                    this.householdId = householdId
+                }
+            } ?: return HouseholdResult.Error("Request timed out. Please try again.")
 
             val household = HouseholdEntity(
                 id = householdId.toString(),
@@ -139,16 +143,20 @@ class HouseholdRepository @Inject constructor(
 
         return try {
             // Look up the household by invite code
-            val queryResult = connector.getHouseholdByInviteCode.execute(
-                inviteCode = inviteCode.uppercase(),
-            )
+            val queryResult = withTimeoutOrNull(CLOUD_TIMEOUT_MS) {
+                connector.getHouseholdByInviteCode.execute(
+                    inviteCode = inviteCode.uppercase(),
+                )
+            } ?: return HouseholdResult.Error("Request timed out. Please try again.")
             val found = queryResult.data.households.firstOrNull()
                 ?: return HouseholdResult.Error("No household found with that invite code")
 
             // Assign the household to the current user
-            connector.updateUserHousehold.execute {
-                this.householdId = found.id
-            }
+            withTimeoutOrNull(CLOUD_TIMEOUT_MS) {
+                connector.updateUserHousehold.execute {
+                    this.householdId = found.id
+                }
+            } ?: return HouseholdResult.Error("Request timed out. Please try again.")
 
             val household = HouseholdEntity(
                 id = found.id.toString(),
@@ -185,9 +193,11 @@ class HouseholdRepository @Inject constructor(
             habitRepository.convertHouseholdHabitsToPersonal(uid)
 
             // Set user's householdId to null
-            connector.updateUserHousehold.execute {
-                this.householdId = null
-            }
+            withTimeoutOrNull(CLOUD_TIMEOUT_MS) {
+                connector.updateUserHousehold.execute {
+                    this.householdId = null
+                }
+            } ?: return HouseholdResult.Error("Request timed out. Please try again.")
 
             householdDao.deleteAll()
             householdMemberDao.deleteAll()
@@ -203,8 +213,12 @@ class HouseholdRepository @Inject constructor(
     }
 
     /**
-     * Fetch household members from Data Connect and write to Room.
+     * Fetch household members from Data Connect and write identity columns to Room.
      * Auth-scoped: traverses from the authenticated user to their household's members.
+     *
+     * Only updates (displayName, photoUrl, email, lastSyncedAt). Pet columns written by
+     * [refreshHouseholdPets] are never touched here — INSERT OR IGNORE + UPDATE ensures
+     * existing pet data is never overwritten by this call.
      */
     suspend fun refreshHouseholdMembers() {
         try {
@@ -215,32 +229,21 @@ class HouseholdRepository @Inject constructor(
             }
             val members = result.data.user?.household?.users_on_household
             if (members != null) {
-                val entities = members.map { user ->
-                    // GetMyHouseholdMembers returns identity fields only (no pet data).
-                    // Upsert preserves any existing pet data written by refreshHouseholdPets().
-                    HouseholdMemberEntity(
-                        uid = user.id,
-                        displayName = user.displayName,
-                        photoUrl = user.photoUrl,
-                        email = user.email,
-                        chorebooId = "",
-                        chorebooName = "",
-                        chorebooStage = "EGG",
-                        chorebooLevel = 1,
-                        chorebooXp = 0,
-                        chorebooHunger = 100,
-                        chorebooHappiness = 100,
-                        chorebooEnergy = 100,
-                        chorebooPetType = "FOX",
-                        lastSyncedAt = System.currentTimeMillis(),
-                    )
-                }
-                if (entities.isEmpty()) {
+                if (members.isEmpty()) {
                     householdMemberDao.deleteAll()
                 } else {
-                    householdMemberDao.upsertAll(entities)
+                    val now = System.currentTimeMillis()
+                    members.forEach { user ->
+                        householdMemberDao.upsertIdentityColumns(
+                            uid = user.id,
+                            displayName = user.displayName,
+                            photoUrl = user.photoUrl,
+                            email = user.email,
+                            lastSyncedAt = now,
+                        )
+                    }
                     // Reconcile: remove any cached member no longer in the household
-                    householdMemberDao.deleteMembersNotIn(entities.map { it.uid })
+                    householdMemberDao.deleteMembersNotIn(members.map { it.id })
                 }
                 Log.d(TAG, "Refreshed ${members.size} household members")
             } else {
@@ -253,10 +256,13 @@ class HouseholdRepository @Inject constructor(
 
     /**
      * Fetch all Choreboos belonging to household members from Data Connect and persist
-     * them to Room. Auth-scoped: traverses from the authenticated user to their
+     * pet columns to Room. Auth-scoped: traverses from the authenticated user to their
      * household's members' choreboos. Only members who have created a Choreboo are
-     * stored — members without pets are excluded. Departed members are reconciled out of
-     * the local cache.
+     * stored — members without pets are excluded.
+     *
+     * Only updates pet-related columns (choreboo*, displayName, photoUrl, lastSyncedAt).
+     * The email column is never touched here — INSERT OR IGNORE + UPDATE ensures email
+     * written by [refreshHouseholdMembers] is preserved.
      */
     suspend fun refreshHouseholdPets() {
         try {
@@ -267,33 +273,33 @@ class HouseholdRepository @Inject constructor(
             }
             val users = result.data.user?.household?.users_on_household
             if (users != null) {
-                val entities = users.mapNotNull { user ->
-                    val pet = user.choreboo_on_owner ?: return@mapNotNull null
-                    HouseholdMemberEntity(
-                        uid = user.id,
-                        displayName = user.displayName,
-                        photoUrl = user.photoUrl,
-                        email = null,
-                        chorebooId = pet.id.toString(),
-                        chorebooName = pet.name,
-                        chorebooStage = pet.stage,
-                        chorebooLevel = pet.level,
-                        chorebooXp = pet.xp,
-                        chorebooHunger = pet.hunger,
-                        chorebooHappiness = pet.happiness,
-                        chorebooEnergy = pet.energy,
-                        chorebooPetType = pet.petType,
-                        lastSyncedAt = System.currentTimeMillis(),
-                    )
-                }
-                if (entities.isEmpty()) {
+                val petUsers = users.filter { it.choreboo_on_owner != null }
+                if (petUsers.isEmpty()) {
                     householdMemberDao.deleteAll()
                 } else {
-                    householdMemberDao.upsertAll(entities)
+                    val now = System.currentTimeMillis()
+                    petUsers.forEach { user ->
+                        val pet = user.choreboo_on_owner!!
+                        householdMemberDao.upsertPetColumns(
+                            uid = user.id,
+                            displayName = user.displayName,
+                            photoUrl = user.photoUrl,
+                            chorebooId = pet.id.toString(),
+                            chorebooName = pet.name,
+                            chorebooStage = pet.stage,
+                            chorebooLevel = pet.level,
+                            chorebooXp = pet.xp,
+                            chorebooHunger = pet.hunger,
+                            chorebooHappiness = pet.happiness,
+                            chorebooEnergy = pet.energy,
+                            chorebooPetType = pet.petType,
+                            lastSyncedAt = now,
+                        )
+                    }
                     // Reconcile: remove any cached member no longer in the household
-                    householdMemberDao.deleteMembersNotIn(entities.map { it.uid })
+                    householdMemberDao.deleteMembersNotIn(petUsers.map { it.id })
                 }
-                Log.d(TAG, "Persisted ${entities.size} household pets to Room")
+                Log.d(TAG, "Persisted ${petUsers.size} household pets to Room")
             } else {
                 // User has no household — clear the local cache
                 householdMemberDao.deleteAll()
@@ -404,10 +410,13 @@ class HouseholdRepository @Inject constructor(
             } else {
                 householdDao.deleteAll()
             }
-            // Members, pets, and habits are independent — run in parallel
+            // Members must run before pets (members writes email; pets must not wipe it).
+            // Habits are independent — run in parallel with the member/pet chain.
             coroutineScope {
-                launch { refreshHouseholdMembers() }
-                launch { refreshHouseholdPets() }
+                launch {
+                    refreshHouseholdMembers()
+                    refreshHouseholdPets()
+                }
                 launch { refreshHouseholdHabits() }
             }
         } catch (e: Exception) {
