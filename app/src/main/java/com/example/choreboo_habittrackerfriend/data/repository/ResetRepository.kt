@@ -46,6 +46,11 @@ class ResetRepository @Inject constructor(
             ?: return@runExclusive ResetResult.Error("Not authenticated")
         val uid = currentUser.uid
 
+        // Cancel pending write-through coroutines before cloud cleanup so in-flight writes
+        // cannot re-create data that is about to be deleted.
+        habitRepository.cancelPendingWrites()
+        chorebooRepository.cancelPendingWrites()
+
         // ── Cloud cleanup (best-effort, FK-safe order) ──────────────────────────────
 
         // Step 1: Delete all habit logs (references Habit + User)

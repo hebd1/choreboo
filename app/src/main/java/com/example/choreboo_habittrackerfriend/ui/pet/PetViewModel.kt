@@ -231,26 +231,30 @@ class PetViewModel @Inject constructor(
 
     fun completeHabit(habitId: Long) {
         viewModelScope.launch {
-            val result = habitRepository.completeHabit(habitId)
-            if (result.alreadyComplete) {
-                _events.emit(PetEvent.AlreadyComplete)
-                return@launch
+            try {
+                val result = habitRepository.completeHabit(habitId)
+                if (result.alreadyComplete) {
+                    _events.emit(PetEvent.AlreadyComplete)
+                    return@launch
+                }
+                val xpResult = chorebooRepository.addXp(result.xpEarned)
+
+                // Auto-feed: if hunger < 30 and user has enough points, silently feed
+                chorebooRepository.autoFeedIfNeeded(userPreferences)
+
+                _events.emit(
+                    PetEvent.HabitCompleted(
+                        xpEarned = result.xpEarned,
+                        streak = result.newStreak,
+                        leveledUp = xpResult.levelsGained > 0,
+                        newLevel = xpResult.newLevel,
+                        evolved = xpResult.evolved,
+                        newStageName = xpResult.newStage?.displayName,
+                    ),
+                )
+            } catch (e: Exception) {
+                _events.emit(PetEvent.CompletionError(e.message ?: "Failed to complete habit"))
             }
-            val xpResult = chorebooRepository.addXp(result.xpEarned)
-
-            // Auto-feed: if hunger < 30 and user has enough points, silently feed
-            chorebooRepository.autoFeedIfNeeded(userPreferences)
-
-            _events.emit(
-                PetEvent.HabitCompleted(
-                    xpEarned = result.xpEarned,
-                    streak = result.newStreak,
-                    leveledUp = xpResult.levelsGained > 0,
-                    newLevel = xpResult.newLevel,
-                    evolved = xpResult.evolved,
-                    newStageName = xpResult.newStage?.displayName,
-                ),
-            )
         }
     }
 
@@ -279,4 +283,5 @@ sealed class PetEvent {
         val newStageName: String? = null,
     ) : PetEvent()
     data object AlreadyComplete : PetEvent()
+    data class CompletionError(val message: String) : PetEvent()
 }

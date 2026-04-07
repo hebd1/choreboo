@@ -38,6 +38,8 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
+import androidx.lifecycle.Lifecycle
+import androidx.lifecycle.compose.LifecycleEventEffect
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.alpha
@@ -72,6 +74,11 @@ fun StatsScreen(
     val monthlyCompletionRate by viewModel.monthlyCompletionRate.collectAsState()
 
     var showBadgeSheet by remember { mutableStateOf(false) }
+
+    // Refresh today's date on every screen resume to handle midnight crossings
+    LifecycleEventEffect(Lifecycle.Event.ON_RESUME) {
+        viewModel.refreshTodayDate()
+    }
 
     // Compute daily quest completion fraction for weekly streak card
     val scheduledToday = habits.filter { it.isScheduledForToday() }

@@ -14,7 +14,8 @@ class BootReceiver : BroadcastReceiver() {
 
     override fun onReceive(context: Context?, intent: Intent?) {
         if (context == null) return
-        if (intent?.action != Intent.ACTION_BOOT_COMPLETED) return
+        val action = intent?.action
+        if (action != Intent.ACTION_BOOT_COMPLETED && action != "android.intent.action.MY_PACKAGE_REPLACED") return
 
         // Use a WorkManager one-time job to reschedule all habit reminders
         val rescheduleWork = OneTimeWorkRequestBuilder<ReminderRescheduleWorker>()

@@ -16,6 +16,9 @@ private const val TAG = "SyncManager"
 /** Minimum time between background (app-resume) syncs. Auth-triggered syncs bypass this. */
 private const val SYNC_COOLDOWN_MS = 5 * 60 * 1000L // 5 minutes
 
+/** Delays between retry attempts for transient sync failures (1 s, then 2 s). */
+private val RETRY_DELAYS_MS = listOf(1_000L, 2_000L)
+
 @Singleton
 class SyncManager @Inject constructor(
     private val habitRepository: HabitRepository,
@@ -42,6 +45,34 @@ class SyncManager @Inject constructor(
      * (e.g., account reset).
      */
     suspend fun <T> runExclusive(block: suspend () -> T): T = syncMutex.withLock { block() }
+
+    /**
+     * Executes [block] with simple exponential-backoff retry.
+     * Retries up to [RETRY_DELAYS_MS].size times on exception, waiting the corresponding delay
+     * between attempts. Returns the result of the first successful invocation, or rethrows the
+     * last exception if all attempts fail.
+     */
+    private suspend fun <T> retryWithBackoff(block: suspend () -> T): T {
+        var lastException: Exception? = null
+        for ((attempt, delayMs) in RETRY_DELAYS_MS.withIndex()) {
+            try {
+                if (attempt > 0) {
+                    Log.d(TAG, "Retry attempt $attempt after ${delayMs}ms delay")
+                    delay(delayMs)
+                }
+                return block()
+            } catch (e: Exception) {
+                Log.w(TAG, "Attempt $attempt failed: ${e.message}")
+                lastException = e
+            }
+        }
+        // Final attempt (no delay after this)
+        return try {
+            block()
+        } catch (e: Exception) {
+            throw lastException ?: e
+        }
+    }
 
     /**
      * Run a full cloud-to-local sync: habits → choreboo → habit logs → user points.
@@ -96,10 +127,10 @@ class SyncManager @Inject constructor(
                 // 1. Habits (logs depend on habit remoteIds being present)
                 val habitsDeferred = async {
                     try {
-                        habitRepository.syncHabitsFromCloud()
+                        retryWithBackoff { habitRepository.syncHabitsFromCloud() }
                         true
                     } catch (e: Exception) {
-                        Log.e(TAG, "Habit sync failed", e)
+                        Log.e(TAG, "Habit sync failed after retries", e)
                         false
                     }
                 }
@@ -107,10 +138,10 @@ class SyncManager @Inject constructor(
                 // 2. Choreboo (independent of habits)
                 val chorebooDeferred = async {
                     try {
-                        chorebooRepository.syncFromCloud()
+                        retryWithBackoff { chorebooRepository.syncFromCloud() }
                         true
                     } catch (e: Exception) {
-                        Log.e(TAG, "Choreboo sync failed", e)
+                        Log.e(TAG, "Choreboo sync failed after retries", e)
                         false
                     }
                 }
@@ -118,10 +149,10 @@ class SyncManager @Inject constructor(
                 // 4. User points (independent of habits)
                 val pointsDeferred = async {
                     try {
-                        userRepository.syncPointsFromCloud()
+                        retryWithBackoff { userRepository.syncPointsFromCloud() }
                         true
                     } catch (e: Exception) {
-                        Log.e(TAG, "Points sync failed", e)
+                        Log.e(TAG, "Points sync failed after retries", e)
                         false
                     }
                 }
@@ -134,10 +165,10 @@ class SyncManager @Inject constructor(
                 // 3. Habit logs — sequential after step 1 (needs habit remoteIds)
                 if (habitsOk) {
                     try {
-                        habitRepository.syncHabitLogsFromCloud()
+                        retryWithBackoff { habitRepository.syncHabitLogsFromCloud() }
                         anySuccess = true
                     } catch (e: Exception) {
-                        Log.e(TAG, "Habit log sync failed", e)
+                        Log.e(TAG, "Habit log sync failed after retries", e)
                     }
                 }
 

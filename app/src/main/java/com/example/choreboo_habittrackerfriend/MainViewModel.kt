@@ -43,7 +43,7 @@ class MainViewModel @Inject constructor(
      * Set to `true` once all startup tasks have completed.
      * For unauthenticated / non-onboarded users this fires immediately after DataStore
      * resolves. For fully authenticated+onboarded users it waits for Room warmup only
-     * (sub-second). Cloud sync and Lottie animation parsing run in the background.
+     * (sub-second). Cloud sync and WebM animation loading run in the background.
      */
     private val _startupComplete = MutableStateFlow(false)
 
@@ -69,9 +69,9 @@ class MainViewModel @Inject constructor(
      * 1. Wait for DataStore to resolve (onboardingComplete != null).
      * 2. If user is unauthenticated or not yet onboarded → done immediately.
      * 3. Otherwise, run Room warmup (fast, sub-second) then show the app.
-     *    Cloud sync and Lottie animation parsing both run in the background and
+     *    Cloud sync and WebM animation loading both run in the background and
      *    do NOT block the splash screen. PetScreen shows an emoji placeholder
-     *    while Lottie animations load.
+     *    while WebM videos load.
      */
     private suspend fun runStartupSequence() {
         // 1. Wait for DataStore to emit the first real value
@@ -86,8 +86,8 @@ class MainViewModel @Inject constructor(
 
         // 3. Full startup for authenticated + onboarded users.
         //    Cloud sync is fire-and-forget — does NOT block the splash screen.
-        //    Lottie animations are also NOT awaited — PetScreen has an emoji
-        //    fallback and will crossfade to the animation once it's ready.
+        //    WebM animations are also NOT awaited — PetScreen has an emoji
+        //    fallback and will show the video once it's ready.
         Log.d(TAG, "Running full startup sequence")
 
         viewModelScope.launch {

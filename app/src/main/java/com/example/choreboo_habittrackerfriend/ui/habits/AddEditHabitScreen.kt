@@ -52,6 +52,7 @@ import androidx.compose.material3.OutlinedTextFieldDefaults
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Slider
 import androidx.compose.material3.SliderDefaults
+import androidx.compose.material3.SnackbarDuration
 import androidx.compose.material3.SnackbarHost
 import androidx.compose.material3.SnackbarHostState
 import com.example.choreboo_habittrackerfriend.ui.components.StitchSnackbar
@@ -130,6 +131,7 @@ fun AddEditHabitScreen(
                     snackbarHostState.showSnackbar(
                         message = event.message,
                         actionLabel = "error",
+                        duration = SnackbarDuration.Short,
                     )
                 }
             }

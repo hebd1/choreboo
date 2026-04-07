@@ -78,10 +78,6 @@ class SettingsViewModel @Inject constructor(
     val householdMembers: StateFlow<List<HouseholdMember>> = householdRepository.householdMembers
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), emptyList())
 
-    private val _householdNotificationsEnabled = userPreferences.householdNotificationsEnabled
-    val householdNotificationsEnabled: StateFlow<Boolean> = _householdNotificationsEnabled
-        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), true)
-
     private val _events = MutableSharedFlow<SettingsEvent>()
     val events: SharedFlow<SettingsEvent> = _events.asSharedFlow()
 
@@ -114,10 +110,6 @@ class SettingsViewModel @Inject constructor(
      fun setSoundEnabled(enabled: Boolean) {
          viewModelScope.launch { userPreferences.setSoundEnabled(enabled) }
      }
-
-    fun setHouseholdNotificationsEnabled(enabled: Boolean) {
-        viewModelScope.launch { userPreferences.setHouseholdNotificationsEnabled(enabled) }
-    }
 
     fun createHousehold(name: String) {
         viewModelScope.launch {
@@ -181,6 +173,10 @@ class SettingsViewModel @Inject constructor(
             } catch (e: Exception) {
                 android.util.Log.w("SettingsViewModel", "Error cancelling reminders on sign-out", e)
             }
+
+            // Cancel in-flight write-through coroutines to prevent stale cloud writes after sign-out
+            habitRepository.cancelPendingWrites()
+            chorebooRepository.cancelPendingWrites()
 
             // Clear all local data before signing out
             try {

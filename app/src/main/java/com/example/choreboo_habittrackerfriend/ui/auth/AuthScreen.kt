@@ -44,6 +44,7 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Scaffold
+import androidx.compose.material3.SnackbarDuration
 import androidx.compose.material3.SnackbarHost
 import androidx.compose.material3.SnackbarHostState
 import com.example.choreboo_habittrackerfriend.ui.components.StitchSnackbar
@@ -106,8 +107,8 @@ fun AuthScreen(
         viewModel.events.collect { event ->
             when (event) {
                 is AuthEvent.AuthSuccess -> onAuthSuccess(event.onboardingComplete)
-                is AuthEvent.ShowError -> snackbarHostState.showSnackbar(message = event.message, actionLabel = "error")
-                is AuthEvent.ShowMessage -> snackbarHostState.showSnackbar(message = event.message, actionLabel = "info")
+                is AuthEvent.ShowError -> snackbarHostState.showSnackbar(message = event.message, actionLabel = "error", duration = SnackbarDuration.Short)
+                is AuthEvent.ShowMessage -> snackbarHostState.showSnackbar(message = event.message, actionLabel = "info", duration = SnackbarDuration.Short)
             }
         }
     }

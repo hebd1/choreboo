@@ -57,7 +57,6 @@ class SettingsViewModelTest {
         every { userPreferences.soundEnabled } returns MutableStateFlow(true)
         every { userPreferences.totalPoints } returns MutableStateFlow(0)
         every { userPreferences.profilePhotoUri } returns MutableStateFlow(null)
-        every { userPreferences.householdNotificationsEnabled } returns MutableStateFlow(true)
         every { authRepository.currentUser } returns MutableStateFlow(null)
         every { householdRepository.currentHousehold } returns MutableStateFlow(null)
         every { householdRepository.householdMembers } returns MutableStateFlow(emptyList())

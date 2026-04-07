@@ -54,6 +54,10 @@ Defined in `dataconnect/schema/schema.gql`:
 - **Reactive reads**: DAOs return `Flow<>` → Repositories expose `Flow<>` → ViewModels expose `StateFlow` via `.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), default)`.
 - **One-shot writes**: DAO methods are `suspend`; called from `viewModelScope.launch {}` in ViewModels. Write-through to Data Connect happens in the same suspend function. Point deductions (feeding) also write-through to cloud via `UserRepository.syncPointsToCloud()`.
 - **One-shot events** (snackbars, navigation, level-up): `MutableSharedFlow` exposed as `events` in ViewModels (see `PetEvent`, `AddEditHabitEvent`, `AuthEvent`, `SettingsEvent`, `HouseholdEvent`).
+- **Loading states**: ViewModels expose `isSaving` / `isRefreshing` / `isHatching` / `isCreatingHousehold` / `isJoiningHousehold` / `isLeavingHousehold` as `StateFlow<Boolean>`, guarded by `try/finally` to ensure reset on error. Screens collect these to show `CircularProgressIndicator` and disable interaction.
+- **Pull-to-refresh**: `PetScreen`, `HouseholdScreen`, and `CalendarScreen` use `PullToRefreshBox` (Material3 experimental). Refresh calls `viewModel.refreshData()` which sets `_isRefreshing`, calls `syncManager.syncAll(force = true)` + stat decay, then clears the flag in `finally`.
+- **Habit creation snackbar**: `AddEditHabitEvent.Saved(isNew: Boolean)` carries a flag. In the nav graph, `isNew == true` sets `"habitCreated" = true` on the Pet back stack entry via `SavedStateHandle`. `PetScreen` reads this via `backStackEntry.savedStateHandle.getStateFlow("habitCreated", false)` and shows a `StitchSnackbar` confirmation, clearing the flag via `onHabitCreatedConsumed`.
+- **Cloud timeouts**: Every `withTimeoutOrNull(CLOUD_TIMEOUT_MS)` (5 000 ms) wraps all Data Connect `.execute()` calls across all repositories. On timeout the call returns `null` and the caller handles it gracefully (logs warning, no user-facing error for write-through).
 - **Stat decay**: Calculated on PetScreen open via `chorebooRepository.applyStatDecay()` based on `lastInteractionAt`.
 - **XP/Level-up**: `ChorebooRepository.addXp()` returns `XpResult(levelsGained, newLevel, evolved, newStage)` so callers can trigger celebration UI.
 - **Habit completion**: `HabitRepository.completeHabit()` returns `CompletionResult(xpEarned, newStreak, alreadyComplete)` with targetCount enforcement.
@@ -165,7 +169,7 @@ Deploy the backend (Data Connect schema/connectors + Storage rules) to the `chor
 - **Sealed class results** for operation outcomes — never throw for business logic errors:
   - `CompletionResult` (with `alreadyComplete` flag)
   - `XpResult` (levelsGained, newLevel, evolved, newStage)
-- **No try/catch in ViewModels or Screen composables** — coroutine failures propagate.
+- **Exception to try/catch rule**: `PetViewModel.completeHabit()` wraps its body in `try/catch` and emits `PetEvent.CompletionError` so the screen can show a snackbar — this is the only VM-level catch.
 - **Write-through failures** are silently caught in Repositories (no user-facing error).
 
 ## File Organization
@@ -197,18 +201,19 @@ Deploy the backend (Data Connect schema/connectors + Storage rules) to the `chor
 - Habit icons: **emoji-based** system (`EmojiIcon` data class with 15 preset emoji + custom emoji input). Not Material Icons.
 - Touch targets >= 48dp. Empty states show emoji + friendly message + CTA.
 - Use `AlertDialog` for confirmations; `ModalBottomSheet` for selection lists (feed).
-- Pet animations: emoji placeholders per `ChorebooMood`; designed to swap to Lottie JSON in `res/raw/`.
+- **`ShimmerPlaceholder`** (`ui/components/ShimmerPlaceholder.kt`) — reusable loading skeleton. Renders a rounded rectangle pulsing between alpha 0.3–0.7 with a 1-second tween. Parameters: `width: Dp = 100.dp`, `height: Dp = 24.dp`, `modifier`. Used in `PetScreen` while the Choreboo name is loading.
+- **Pet animations**: Animated WebP files with alpha transparency. FOX pet type has 9 animations (mood-based + action-based). Other pet types (AXOLOTL, CAPYBARA, PANDA) use emoji placeholders until WebP assets are added. `WebmAnimationView` composable in `ui/components/` handles playback via `AnimatedImageDrawable` (API 28+); API 24–27 gets a transparent placeholder. No ExoPlayer dependency.
 - Pet size scales by `ChorebooStage`.
 - **Auth screen**: Syncing overlay blocks interaction during cloud-to-local sync after login.
-- **Splash screen**: `MainActivity` shows a branded splash until `MainViewModel.isAppReady` becomes `true`. For fully authenticated+onboarded users, it waits for Room warmup only (sub-second). Cloud sync and Lottie animation parsing run in the background without blocking the splash.
+- **Splash screen**: `MainActivity` shows a branded splash until `MainViewModel.isAppReady` becomes `true`. For fully authenticated+onboarded users, it waits for Room warmup only (sub-second). Cloud sync and WebP animation loading run in the background without blocking the splash.
 
 ## Package Structure
 
 ```
 com.example.choreboo_habittrackerfriend/
 ├── MainActivity.kt                  # @AndroidEntryPoint, dynamic startDestination (Auth/Onboarding/Pet)
-├── MainViewModel.kt                 # @HiltViewModel — startup sequencer (DataStore → Room warmup → sync → Lottie); exposes isAppReady StateFlow
-├── ChorebooApplication.kt           # @HiltAndroidApp, notification channels, LottiePreloadManager.preloadAll()
+├── MainViewModel.kt                 # @HiltViewModel — startup sequencer (DataStore → Room warmup → sync); exposes isAppReady StateFlow
+├── ChorebooApplication.kt           # @HiltAndroidApp, notification channels
 ├── navigation/                      # ChorebooNavGraph.kt, Screen sealed class (8 routes)
 ├── data/
 │   ├── local/
@@ -217,9 +222,9 @@ com.example.choreboo_habittrackerfriend/
 │   │   │   └── Converters.kt        # Gson TypeConverter for List<String>
 │   │   ├── entity/                  # HabitEntity, HabitLogEntity, ChorebooEntity, HouseholdMemberEntity, HouseholdEntity, HouseholdHabitStatusEntity
 │   │   └── dao/                     # HabitDao, HabitLogDao, ChorebooDao, HouseholdMemberDao, HouseholdDao, HouseholdHabitStatusDao
-│   ├── datastore/                   # UserPreferences (theme, onboarding, sound, totalPoints, totalLifetimeXp, profilePhotoUri, householdNotifications)
+│   ├── datastore/                   # UserPreferences (theme, onboarding, sound, totalPoints, totalLifetimeXp, profilePhotoUri)
 │   └── repository/                  # HabitRepository, ChorebooRepository, AuthRepository, HouseholdRepository, UserRepository, BadgeRepository, ResetRepository, SyncManager
-├── di/                              # AppModule (DB, DAOs, DataStore, UserPreferences, FirebaseAuth), AppLifecycleObserver, LottiePreloadManager
+├── di/                              # AppModule (DB, DAOs, DataStore, UserPreferences, FirebaseAuth), AppLifecycleObserver
 ├── domain/model/                    # Habit, ChorebooStats, ChorebooMood, ChorebooStage, PetType, Household, AppUser, Badge
 ├── ui/
 │   ├── theme/                       # Color.kt, Theme.kt, Type.kt
@@ -275,6 +280,8 @@ Cloud steps are individually try/caught — a failure at one step logs a warning
 
 The app navigates to the Auth screen. Re-register with the same email (or any email) and go through onboarding for a clean slate.
 
+> **`reset-db.sh`** (project root) — dev-only shell script that opens an interactive Cloud SQL shell and prints the `TRUNCATE` command to wipe **all** cloud tables for all users (not just the current account). Use with care — it requires manual confirmation and does not delete Firebase Auth records.
+
 ## App Startup / Splash Screen
 
 `MainViewModel` owns the entire startup sequence and exposes `isAppReady: StateFlow<Boolean>`. `MainActivity` shows a branded splash screen until `isAppReady` becomes `true`.
@@ -286,7 +293,7 @@ The app navigates to the Auth screen. Re-register with the same email (or any em
 3. **Full path** (authenticated + onboarded users):
    - **Cloud sync** (fire-and-forget): `syncManager.syncAll(force = false)` is launched in a separate coroutine — it does NOT block the splash screen.
    - **Room warmup** (blocking): `chorebooRepository.getOrCreateChoreboo()` + `applyStatDecay()` ensures the local DB is consistent before the first screen renders. This is the only task that blocks the splash.
-   - **Lottie preload**: `LottiePreloadManager.preloadAll()` is kicked off in `ChorebooApplication.onCreate()` and runs independently — `MainViewModel` does not await it.
+   - **WebP animation loading**: `AnimatedImageDrawable` loads animated WebP files when `PetScreen` is rendered — `MainViewModel` does not await it. PetScreen shows emoji fallback until the drawable is ready.
 4. After Room warmup completes, `_startupComplete = true` and the splash dismisses.
 
 ### Key files
@@ -294,9 +301,9 @@ The app navigates to the Auth screen. Re-register with the same email (or any em
 | File | Role |
 |------|------|
 | `MainViewModel.kt` | `@HiltViewModel` — orchestrates startup, exposes `isAppReady` and `themeMode`/`onboardingComplete`/`petMood` state flows |
-| `di/LottiePreloadManager.kt` | `@Singleton` — kicks off async `LottieCompositionFactory.fromAsset()` for 9 animations; `isReady` flips to `true` when all finish (success or failure) |
 | `di/AppLifecycleObserver.kt` | `@Singleton` — skips cold-start `onStart` (handled by `MainViewModel`); triggers `syncAll(force = false)` on subsequent warm resumes |
-| `ChorebooApplication.kt` | Calls `lottiePreloadManager.preloadAll()` in `onCreate()` so parsing starts before any Activity |
+| `ChorebooApplication.kt` | `@HiltAndroidApp` — app entry point, sets up notification channels |
+| `ui/components/WebmAnimationView.kt` | `AnimatedImageDrawable`-based composable for animated WebP playback with alpha transparency and iteration control |
 
 ### isAppReady derivation
 
@@ -428,45 +435,15 @@ app/src/test/java/com/example/choreboo_habittrackerfriend/
 | AuthRepository | `signInWithEmail()` / `signUpWithEmail()` | email & password non-blank |
 | AuthRepository | `sendPasswordReset()` | email non-blank |
 
-## Known Issues (as of 2026-04-04)
+## Known Issues (as of 2026-04-06)
 
 ### Bugs (all resolved)
 
-All bugs B1–B26 have been fixed:
-- **B1**: Sign-out now clears Room tables, DataStore, and household state.
-- **B2**: `completeHabit()` saves cloud `remoteId` back to local log.
-- **B3**: `completeHabit()` sets `completedByUid` on local log entity.
-- **B4/B5**: `HabitCompleteReceiver` rewritten — uses Hilt `@AndroidEntryPoint`, delegates to repositories instead of duplicating logic. Now syncs to cloud and updates `TOTAL_LIFETIME_XP`.
-- **B6**: `sendPasswordReset()` returns `AuthResult.ResetEmailSent`.
-- **B7**: Habit completion race condition fixed — UNIQUE(`habitId`, `date`) index + `OnConflictStrategy.IGNORE` with -1L check.
-- **B8**: `applyStatDecay()` syncs cleared `sleepUntil` to cloud.
-- **B9**: `autoFeedIfNeeded()` updates `lastInteractionAt`.
-- **B10**: `customDays` split filters empty strings.
-- **B11**: `HabitReminderScheduler` uses `today.lengthOfMonth()`.
-- **B12**: `saveHabit()` now preserves `remoteId`, `ownerUid`, `householdId`, `createdAt`, and `isArchived` from the existing habit when editing. Previously these fields were reset to defaults on every edit, causing cloud duplicates and ownership loss.
-- **B13**: `householdId` is now resolved from `HouseholdRepository.currentHousehold` when `isHouseholdHabit` is toggled on. Previously the toggle set a boolean flag but never associated the habit with the user's actual household.
-- **B14**: `HabitReminderScheduler.calculateNextMonthlyTrigger()` now sorts `normalizedDays` so the loop finds the nearest scheduled day, not an arbitrary one. Dead `validDaysThisMonth` variable and unused `ChronoUnit` import removed.
-- **B15**: `HabitRepository` now receives `FirebaseAuth` via Hilt constructor injection instead of calling `FirebaseAuth.getInstance()` directly in 3 places.
-- **B16**: `SyncManager.syncAll()` now calls `getIdToken(false).await()` before any Data Connect calls. Fixes `UNAUTHENTICATED` gRPC errors caused by a race condition where `FirebaseAuth.currentUser` is non-null but the Data Connect SDK's internal `IdTokenListener` hasn't received the token yet.
-- **B17**: `HabitRepository.syncHouseholdHabitLogsForToday()` now checks `hasHouseholdHabits()` via `HabitDao` and returns early if the user has none. Prevents `NOT_FOUND` errors from `GetHouseholdHabitLogsForDate` when the user has no household habits.
-- **B18**: `SyncManager.getIdToken()` reverted to always pass `false` (prime cache only). Previously it reused `syncAll`'s `force` parameter, causing unnecessary token refresh on every post-auth sync.
-- **B19**: `ResetRepository.resetAll()` now runs inside `SyncManager.runExclusive()` to prevent `AppLifecycleObserver` from triggering `syncAll()` concurrently during account reset.
-- **B20**: `SettingsViewModel._isResetting` is now set to `false` on the success path before emitting `AccountReset`. Previously the spinner would persist if the event was lost (e.g., config change).
-- **B21**: `ResetRepository` household deletion now fetches from cloud (`GetMyHousehold`) instead of relying on the in-memory `MutableStateFlow` which may be `null` even when the user has a cloud household. Prevents orphaned Household records.
-- **B22**: `calculateStreak()` in `HabitRepository` rewritten to be schedule-aware. The old algorithm walked backward through consecutive calendar days, causing any non-scheduled gap day (e.g., Tuesday for a Mon/Wed/Fri habit) to break the streak. The new algorithm skips non-scheduled days and only counts a streak break when a scheduled day was actually missed. Handles weekly codes (`MON`/`WED`/`FRI`), monthly codes (`D1`/`D15`/`D31` where `D31` matches the last day of any month), and falls back to daily if no recognizable codes are present. 365-day lookback safety limit prevents infinite loops. Fixed both `streakAtCompletion` stored in logs and the XP streak bonus.
-- **B23**: `assignedToName` was present in the `Habit` domain model but never backed by Room or populated from cloud sync. Added `assignedToName: String?` column to `HabitEntity`, bumped Room DB to v11, and updated both `syncHabitsFromCloud()` paths to populate it from `assignedTo.displayName` in the cloud response.
-- **B24**: No max-length validation on text inputs allowed oversized strings past the UI. Added `require()` guards in `HabitRepository.upsertHabit()` (title ≤ 100 chars), `ChorebooRepository.getOrCreateChoreboo()` and `updateName()` (name ≤ 20 chars), and `HouseholdRepository.createHousehold()` (name ≤ 50 chars). UI layer also enforces limits via `onValueChange` filters and character counters that appear near the limit.
-- **B25**: `AddEditHabitViewModel.currentHousehold` used `SharingStarted.WhileSubscribed(5000)` but nothing in `AddEditHabitScreen` ever collected it. This meant `.value` was always `null` when `saveHabit()` checked it, causing a spurious "Join a household first to create shared habits" error even when the user was in a household. Changed to `SharingStarted.Eagerly` so the `StateFlow` activates immediately.
-- **B26**: Profile photos not appearing on household pet cards. The cloud `User.photoUrl` is only set for Google sign-in users (via `FirebaseAuth.currentUser.photoUrl`). Email/password users who pick a photo in Settings store it locally in DataStore (`profilePhotoUri`) but it was never propagated to the household view. `HouseholdViewModel.householdPets` now enriches the current user's pet card with the best available local/Google photo via `combine()` when the cloud value is null.
+All bugs B1–B26 have been fixed. See prior history for details.
 
 ### Critical Bugs (all resolved)
 
-All critical bugs C1–C5 found during the 2026-04-05 audit have been fixed:
-- **C1**: Points spending (feeding) was not synced to cloud. `PetViewModel.feedChoreboo()` deducted points locally but never called `UserRepository.syncPointsToCloud()`. Similarly, `ChorebooRepository.autoFeedIfNeeded()` deducted points without cloud write-through. Both now sync points after deduction. `ChorebooRepository` and `PetViewModel` now depend on `UserRepository`.
-- **C2**: Household pet data wiped on member refresh. `HouseholdMemberDao.upsertAll()` used `@Insert(onConflict = REPLACE)` which overwrote all columns. `refreshHouseholdMembers()` only populated identity columns, zeroing out pet stats. Replaced with two partial-update `@Transaction` methods: `upsertIdentityColumns()` (only touches displayName, photoUrl, email, lastSyncedAt) and `upsertPetColumns()` (only touches choreboo* fields). `refreshAll()` now runs members→pets sequentially to avoid the race.
-- **C3**: GQL queries `GetHabitById`, `GetLogsForHabit`, and `GetLogsForHabitAndDate` allowed any authenticated user to read any household habit by knowing its UUID. The `isHouseholdHabit` branch now also checks that the caller's `auth.uid` is a member of the habit's household via `household: { users_on_household: { id: { eq_expr: "auth.uid" } } }`.
-- **C4**: Synced habits had `reminderEnabled = true` but local ID was 0 (not yet inserted). `HabitReminderScheduler.scheduleReminder()` used `habit.id.toInt()` as the `PendingIntent` request code — all synced habits shared request code 0, so only the last one's alarm survived. Fixed by capturing the upserted local ID from `habitDao.upsertHabit()` and passing it to the scheduler.
-- **C5**: Badge thresholds were checked against unscoped DAO queries — `getTotalCompletionCount()`, `getMaxStreakEver()`, and `getTotalHabitCount()` counted all users' data in Room. After cloud sync pulled in household data, badge progress inflated. All three queries now take a `uid` parameter and filter by `completedByUid`/`ownerUid`. `BadgeRepository` now injects `FirebaseAuth` and passes the current user's UID.
+All critical bugs C1–C5 found during the 2026-04-05 audit have been fixed. See prior history for details.
 
 ### Security Gaps (resolved)
 
@@ -479,50 +456,128 @@ All critical bugs C1–C5 found during the 2026-04-05 audit have been fixed:
 - **G13**: Deletion reconciliation added to `syncHabitsFromCloud()` and `syncHabitLogsFromCloud()`. After upserting cloud data, any local habit (with non-null `remoteId`, owned by current user) or local log (within the 30-day sync window, with non-null `remoteId`) not present in the cloud response is deleted from Room.
 - **G16**: `totalPoints` and `totalLifetimeXp` added to `User` cloud table and `AppUser` domain model. `completeHabit()` calls `userRepository.syncPointsToCloud()` as write-through. `SyncManager` calls `userRepository.syncPointsFromCloud()` (max-wins merge, pushes back if merged values differ) on every sync.
 
+### High Priority Issues (all resolved)
+
+- **H1**: Onboarding race condition fixed — `OnboardingViewModel` now uses a `MutableSharedFlow<OnboardingEvent>` for navigation; `OnboardingScreen` collects events and navigates only after the coroutine completes. `SnackbarHost` added for error feedback.
+- **H2**: Stale `LocalDate.now()` fixed across `PetViewModel`, `StatsViewModel`, `CalendarViewModel`, and `CalendarScreen`. All now use a reactive `_todayDate: MutableStateFlow` refreshed via `LifecycleEventEffect(ON_RESUME)`.
+- **H5**: Stale household habit statuses fixed — `HouseholdHabitStatusDao` now has `getHabitStatusesForDate(date)` with a `WHERE cachedDate = ?` filter. `HouseholdRepository` uses a reactive `_todayDate` + `flatMapLatest` so yesterday's data is never shown as today's.
+- **H6**: `BootReceiver` now also handles `MY_PACKAGE_REPLACED` intent — added to both `AndroidManifest.xml` and `BootReceiver.kt` so alarms are rescheduled after app updates, not just reboots.
+- **H8**: `HouseholdScreen` now collects `HouseholdViewModel.events` via `LaunchedEffect` and displays them using `SnackbarHost` + `StitchSnackbar` in a `Box` wrapper.
+
+### Medium Priority Issues (all resolved)
+
+- **M1**: `writeScope` in `ChorebooRepository` and `HabitRepository` changed to `private var`. Added `cancelPendingWrites()` that cancels via `coroutineContext[Job]?.cancel()` and creates a fresh scope. Called by `SettingsViewModel.signOut()` and `ResetRepository.resetAll()`.
+- **M2**: `SyncManager` now retries each sync step with exponential backoff. Added `RETRY_DELAYS_MS = listOf(1_000L, 2_000L)` constant and `retryWithBackoff {}` helper. All 4 independent sync steps wrapped in `retryWithBackoff`.
+- **M3**: `ResetRepository.resetAll()` now calls `chorebooRepository.cancelPendingWrites()` and `habitRepository.cancelPendingWrites()` at the top before cloud cleanup.
+- **M8**: Dead `householdNotificationsEnabled` preference removed entirely — from `UserPreferences.kt`, `SettingsViewModel.kt`, `SettingsScreen.kt`, and `SettingsViewModelTest.kt`.
+
+### Low Priority Issues (all resolved)
+
+- **L1**: `isCreatingHousehold`, `isJoiningHousehold`, and `isLeavingHousehold` StateFlows now collected in `SettingsScreen`. Dialog confirm buttons show `CircularProgressIndicator` and are disabled while in-progress. "Create a Household" and "Join with Invite Code" rows are also disabled while either operation is running.
+- **L3**: Audited — all `contentDescription = null` instances are on purely decorative icons. No changes needed.
+- **L4**: Sleep duration extracted to `private const val SLEEP_DURATION_MS = 24 * 60 * 60 * 1000L` at top of `ChorebooRepository.kt`.
+- **L9**: `PetViewModel.completeHabit()` now wraps the entire body in `try/catch`. Added `PetEvent.CompletionError(message: String)` to the sealed class. `PetScreen` event handler shows a snackbar for `CompletionError`.
+- **L12**: `StatBar` root `Row` now has `.clearAndSetSemantics { contentDescription = "$label: $value out of $maxValue" }`. `StatBentoCard` and `EnergyBentoCard` outer `Box` modifiers now have `.semantics(mergeDescendants = true) { contentDescription = "..." }`.
+
 ### Remaining Sync Gaps
 
 | ID | Description |
 |----|-------------|
 | G14 | 30-day habit log sync limit means older logs are never synced |
 
-### Remaining Issues (from 2026-04-05 audit)
+### Deferred (out of scope)
 
-34 issues were identified across 3 exploration passes. 5 critical (C1-C5) have been fixed above. The remaining confirmed issues are tracked below.
+| ID | Description |
+|----|-------------|
+| L5 | No pagination on habit log queries |
+| L11 | No deep link support for household invite codes |
 
-#### High
+## Pet Animation Asset Pipeline
 
-| ID | Description | Files |
-|----|-------------|-------|
-| H1 | Onboarding race condition — `OnboardingScreen` calls `onComplete()` (navigation) synchronously after `viewModel.completeOnboarding()` without awaiting the coroutine. Cloud write-through may never finish; if `getOrCreateChoreboo()` fails, user ends up on PetScreen with no Choreboo. | `ui/onboarding/OnboardingViewModel.kt`, `ui/onboarding/OnboardingScreen.kt` |
-| H2 | Stale `LocalDate.now()` captured at class-body level in PetViewModel (`todayCompletions`, `householdCompleterNames`), StatsViewModel (`todayLogsFlow`, `monthlyCompletionRate`), CalendarScreen (`remember { LocalDate.now() }`). After midnight, completions show wrong day. | `ui/pet/PetViewModel.kt`, `ui/stats/StatsViewModel.kt`, `ui/calendar/CalendarScreen.kt` |
-| H5 | Stale household habit statuses — `HouseholdHabitStatusDao.getAllHabitStatuses()` has no `WHERE cachedDate = ?` filter; `HouseholdViewModel`/`HouseholdScreen` never check if `cachedDate` matches today. Yesterday's completion data shows as today's. | `data/local/dao/HouseholdHabitStatusDao.kt`, `ui/household/HouseholdViewModel.kt` |
-| H6 | `BootReceiver` missing `MY_PACKAGE_REPLACED` — manifest only declares `BOOT_COMPLETED`; receiver code rejects non-BOOT_COMPLETED intents. All reminders silently lost after app updates until next reboot. | `worker/BootReceiver.kt`, `AndroidManifest.xml` |
-| H8 | `HouseholdScreen` never collects ViewModel's `SharedFlow<HouseholdEvent>`, but no events are currently emitted either. Latent dead code — will silently drop events when household event handling is added. | `ui/household/HouseholdScreen.kt`, `ui/household/HouseholdViewModel.kt` |
+All fox animations live in `app/src/main/assets/animations/fox/` as animated WebP files with per-frame alpha transparency. `AnimatedImageDrawable` (API 28+) renders them via `ImageDecoder.createSource(assetManager, path)`.
 
-#### Medium
+### Static ffmpeg binary
 
-| ID | Description | Files |
-|----|-------------|-------|
-| M1 | `writeScope` in `ChorebooRepository` and `HabitRepository` — `CoroutineScope(SupervisorJob() + Dispatchers.IO)` never cancelled on sign-out/reset. Pending write-throughs can execute after sign-out, writing stale data to cloud/Room. | `data/repository/ChorebooRepository.kt`, `data/repository/HabitRepository.kt` |
-| M2 | No retry logic in `SyncManager.syncAll()` — single failure means data stays out of sync for 5+ minutes (cooldown period). | `data/repository/SyncManager.kt` |
-| M3 | `ResetRepository.resetAll()` doesn't cancel write scopes. Pending writes launched before reset could re-create cloud data that was just deleted. | `data/repository/ResetRepository.kt` |
-| M8 | `householdNotificationsEnabled` preference toggle in Settings UI has no functional effect — no code reads it to gate notifications. | `data/datastore/UserPreferences.kt`, `ui/settings/SettingsViewModel.kt`, `ui/settings/SettingsScreen.kt` |
+A portable static ffmpeg binary is kept at `/tmp/ffmpeg-static/ffmpeg-7.0.2-amd64-static/ffmpeg` for WSL use. Re-download if the `/tmp` directory is cleared:
 
-#### Low
+```bash
+mkdir -p /tmp/ffmpeg-static && cd /tmp/ffmpeg-static
+wget https://johnvansickle.com/ffmpeg/releases/ffmpeg-release-amd64-static.tar.xz
+tar xf ffmpeg-release-amd64-static.tar.xz
+# binary at: /tmp/ffmpeg-static/ffmpeg-7.0.2-amd64-static/ffmpeg
+```
 
-| ID | Description | Files |
-|----|-------------|-------|
-| L1 | No loading indicator during household join/create — `isCreatingHousehold`/`isJoiningHousehold` StateFlows exist in SettingsViewModel but are never collected by SettingsScreen. | `ui/settings/SettingsScreen.kt`, `ui/settings/SettingsViewModel.kt` |
-| L3 | 19 instances of `contentDescription = null` on interactive/meaningful icons across multiple screens. | `ui/settings/SettingsScreen.kt`, `ui/habits/AddEditHabitScreen.kt`, `ui/auth/AuthScreen.kt`, `ui/onboarding/OnboardingScreen.kt` |
-| L4 | Sleep duration hardcoded to `24 * 60 * 60 * 1000` inline in `ChorebooRepository.putToSleep()`. Should be a named constant. | `data/repository/ChorebooRepository.kt` |
-| L5 | No pagination on habit log queries — both local Room DAO and cloud GQL queries are unbounded. | `data/local/dao/HabitLogDao.kt`, `dataconnect/choreboo-connector/queries.gql` |
-| L9 | `PetViewModel.completeHabit()` has no try/catch; no error event variant in `PetEvent` sealed class. Unhandled exceptions crash silently. | `ui/pet/PetViewModel.kt` |
-| L11 | No deep link support for household invite codes. | — |
-| L12 | `StatBar` and `PetScreen` stat cards have no accessibility semantics. | `ui/pet/components/StatBar.kt`, `ui/pet/PetScreen.kt` |
+### Converting WebM (VP8+alpha) → animated WebP
+
+Android's hardware `MediaCodec` decoders ignore the VP8 alpha plane (output `yuv420p`, black background). Use ffmpeg's software `libvpx` decoder to preserve alpha:
+
+```bash
+FFMPEG=/tmp/ffmpeg-static/ffmpeg-7.0.2-amd64-static/ffmpeg
+$FFMPEG -vcodec libvpx -i input.webm \
+  -vf "fps=15,format=yuva420p" \
+  -loop 0 -vcodec libwebp -lossless 0 -quality 70 \
+  output.webp
+```
+
+- `-vcodec libvpx` **before** `-i` forces the software decoder (reads the alpha plane).
+- `fps=15` halves the typical 30 fps source — reduces file size ~50% with negligible quality loss for this art style.
+- `quality 70` with `-lossless 0` gives good visual quality at reasonable file sizes.
+- Verify output has alpha: the script below checks for `ALPH` inside `ANMF` frames.
+
+### Converting MP4 (green screen) → animated WebP
+
+For MP4 sources with a solid green screen background (`hsl(112.16deg, 82.57%, 52.75%)` ≈ `#3DEA23`):
+
+```bash
+FFMPEG=/tmp/ffmpeg-static/ffmpeg-7.0.2-amd64-static/ffmpeg
+$FFMPEG -i input.mp4 \
+  -vf "colorkey=0x3DEA23:0.3:0.1,fps=15,format=yuva420p" \
+  -loop 0 -vcodec libwebp -lossless 0 -quality 70 \
+  output.webp
+```
+
+- `colorkey=COLOR:SIMILARITY:BLEND` — `0.3` similarity and `0.1` blend work well for this asset set. Increase similarity slightly (e.g. `0.35`) if green fringing remains.
+- Adjust the hex color if the source uses a different green screen shade.
+
+### Verifying alpha in output WebP
+
+```python
+import struct
+
+with open('output.webp', 'rb') as f:
+    data = f.read()
+
+# Find first ANMF and check for ALPH sub-chunk inside it
+anmf_pos = data.index(b'ANMF')
+frame_data_start = anmf_pos + 8 + 16  # skip ANMF tag+size + 16-byte frame header
+tag = data[frame_data_start:frame_data_start+4]
+print('First sub-chunk in ANMF:', tag)  # should be b'ALPH'
+```
+
+### Current fox animation inventory
+
+| File | Source | Size | Notes |
+|------|--------|------|-------|
+| `fox_happy.webp` | WebM (VP8+alpha) | 1.1 MB | |
+| `fox_idle.webp` | WebM (VP8+alpha) | 842 KB | |
+| `fox_sad.webp` | WebM (VP8+alpha) | 864 KB | |
+| `fox_eating.webp` | WebM (VP8+alpha) | 1.0 MB | |
+| `fox_hungry.webp` | MP4 (green screen) | 2.4 MB | Converted via colorkey filter |
+| `fox_interact.webp` | WebM (VP8+alpha) | 1.1 MB | |
+| `fox_thumbs_up.webp` | WebM (VP8+alpha) | 986 KB | |
+| `fox_start_sleep.webp` | WebM (VP8+alpha) | 863 KB | |
+| `fox_loop_sleeping.webp` | WebM (VP8+alpha) | 365 KB | |
+
+### `repeatCount` semantics
+
+`AnimatedImageDrawable.repeatCount` = extra plays **after** the first play:
+- `iterations = 1` → `repeatCount = 0`
+- `iterations = 3` → `repeatCount = 2`
+- `iterations = Int.MAX_VALUE` → `repeatCount = AnimatedImageDrawable.REPEAT_INFINITE` (`-1`)
 
 ## Not Yet Implemented
 
 - Glance widget (today's habits + pet mood)
 - Sound effects
-- Lottie animations (replace emoji placeholders)
+- WebP animations for other pet types (AXOLOTL, CAPYBARA, PANDA)
 - Multiple Choreboos

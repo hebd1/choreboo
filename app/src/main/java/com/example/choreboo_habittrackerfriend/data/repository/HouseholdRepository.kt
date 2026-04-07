@@ -19,6 +19,8 @@ import com.example.choreboo_habittrackerfriend.domain.model.PetType
 import kotlinx.coroutines.async
 import kotlinx.coroutines.coroutineScope
 import kotlinx.coroutines.flow.Flow
+import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.flatMapLatest
 import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withTimeoutOrNull
@@ -43,6 +45,12 @@ class HouseholdRepository @Inject constructor(
     private val habitRepository: HabitRepository,
 ) {
     private val connector by lazy { ChorebooConnector.instance }
+
+    /**
+     * Tracks today's date so householdHabits re-filters when the date rolls over.
+     * Updated by [refreshTodayDate] (called from [refreshAll]) and on class init.
+     */
+    private val _todayDate = MutableStateFlow(LocalDate.now().toString())
 
     /**
      * Current household — Room-backed. Reactive and persists across process death.
@@ -75,10 +83,20 @@ class HouseholdRepository @Inject constructor(
         }
 
     /**
-     * Household habit statuses — Room-backed. Includes today's completion overlay.
+     * Household habit statuses — Room-backed, filtered to today's date.
+     * Prevents stale completion data from a previous day showing as current.
+     * Re-queries whenever [_todayDate] changes (covers midnight roll-over).
      */
-    val householdHabits: Flow<List<HouseholdHabitStatus>> = householdHabitStatusDao.getAllHabitStatuses()
-        .map { entities -> entities.map { it.toDomain() } }
+    val householdHabits: Flow<List<HouseholdHabitStatus>> = _todayDate
+        .flatMapLatest { date ->
+            householdHabitStatusDao.getHabitStatusesForDate(date)
+                .map { entities -> entities.map { it.toDomain() } }
+        }
+
+    /** Refreshes the tracked date — called from [refreshAll] so the date is always current. */
+    private fun refreshTodayDate() {
+        _todayDate.value = LocalDate.now().toString()
+    }
 
     /**
      * Generate a random 6-character alphanumeric invite code.
@@ -410,6 +428,8 @@ class HouseholdRepository @Inject constructor(
             } else {
                 householdDao.deleteAll()
             }
+            // Refresh the tracked date so householdHabits re-filters correctly after midnight.
+            refreshTodayDate()
             // Members must run before pets (members writes email; pets must not wipe it).
             // Habits are independent — run in parallel with the member/pet chain.
             coroutineScope {

@@ -13,6 +13,7 @@ import com.example.choreboo_habittrackerfriend.domain.model.PetType
 import com.google.firebase.Timestamp
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.Job
 import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.first
@@ -27,6 +28,7 @@ import kotlin.math.max
 
 private const val TAG = "ChorebooRepository"
 private const val CLOUD_TIMEOUT_MS = 5000L
+private const val SLEEP_DURATION_MS = 24 * 60 * 60 * 1000L // 24 hours
 
 data class XpResult(
     val levelsGained: Int = 0,
@@ -43,7 +45,17 @@ class ChorebooRepository @Inject constructor(
     private val connector by lazy { ChorebooConnector.instance }
 
     /** Fire-and-forget scope for silent write-through calls. */
-    private val writeScope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
+    private var writeScope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
+
+    /**
+     * Cancel all pending write-through coroutines and create a fresh scope.
+     * Called on sign-out and account reset to prevent stale writes executing after
+     * the user's data has been cleared.
+     */
+    fun cancelPendingWrites() {
+        writeScope.coroutineContext[Job]?.cancel()
+        writeScope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
+    }
 
     fun getChoreboo(): Flow<ChorebooStats?> = chorebooDao.getChoreboo().map { it?.toDomain() }
 
@@ -212,7 +224,7 @@ class ChorebooRepository @Inject constructor(
     suspend fun putToSleep() {
         val choreboo = chorebooDao.getChorebooSync() ?: return
         val now = System.currentTimeMillis()
-        val sleepUntilTime = now + (24 * 60 * 60 * 1000) // 24 hours from now
+        val sleepUntilTime = now + SLEEP_DURATION_MS
         val updated = choreboo.copy(
             sleepUntil = sleepUntilTime,
             lastInteractionAt = now,

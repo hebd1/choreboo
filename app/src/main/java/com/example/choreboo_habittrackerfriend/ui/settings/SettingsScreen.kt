@@ -53,6 +53,7 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.OutlinedTextFieldDefaults
 import androidx.compose.material3.Scaffold
+import androidx.compose.material3.SnackbarDuration
 import androidx.compose.material3.SnackbarHost
 import androidx.compose.material3.SnackbarHostState
 import com.example.choreboo_habittrackerfriend.ui.components.StitchSnackbar
@@ -137,6 +138,7 @@ fun SettingsScreen(
                     snackbarHostState.showSnackbar(
                         message = "Google sign-in failed. Please try again.",
                         actionLabel = "error",
+                        duration = SnackbarDuration.Short,
                     )
                 }
             }
@@ -146,8 +148,9 @@ fun SettingsScreen(
     // Household state
     val currentHousehold by viewModel.currentHousehold.collectAsState()
     val householdMembers by viewModel.householdMembers.collectAsState()
-    val householdNotificationsEnabled by viewModel.householdNotificationsEnabled.collectAsState()
-
+    val isCreatingHousehold by viewModel.isCreatingHousehold.collectAsState()
+    val isJoiningHousehold by viewModel.isJoiningHousehold.collectAsState()
+    val isLeavingHousehold by viewModel.isLeavingHousehold.collectAsState()
     LaunchedEffect(Unit) {
         viewModel.events.collect { event ->
             when (event) {
@@ -155,13 +158,13 @@ fun SettingsScreen(
                 is SettingsEvent.AccountReset -> onSignOut()
                 is SettingsEvent.ShowError -> {
                     scope.launch {
-                        snackbarHostState.showSnackbar(message = event.message, actionLabel = "error")
+                        snackbarHostState.showSnackbar(message = event.message, actionLabel = "error", duration = SnackbarDuration.Short)
                     }
                 }
                 is SettingsEvent.ShowSuccess -> {
                     showEditNameDialog = false
                     scope.launch {
-                        snackbarHostState.showSnackbar(message = event.message, actionLabel = "success")
+                        snackbarHostState.showSnackbar(message = event.message, actionLabel = "success", duration = SnackbarDuration.Short)
                     }
                 }
             }
@@ -478,9 +481,17 @@ fun SettingsScreen(
                             showCreateHouseholdDialog = false
                         }
                     },
-                    enabled = householdName.isNotBlank(),
+                    enabled = householdName.isNotBlank() && !isCreatingHousehold,
                 ) {
-                    Text("Create")
+                    if (isCreatingHousehold) {
+                        CircularProgressIndicator(
+                            modifier = Modifier.size(16.dp),
+                            strokeWidth = 2.dp,
+                            color = MaterialTheme.colorScheme.onPrimary,
+                        )
+                    } else {
+                        Text("Create")
+                    }
                 }
             },
             dismissButton = {
@@ -527,9 +538,17 @@ fun SettingsScreen(
                             showJoinDialog = false
                         }
                     },
-                    enabled = inviteCode.length == 6,
+                    enabled = inviteCode.length == 6 && !isJoiningHousehold,
                 ) {
-                    Text("Join")
+                    if (isJoiningHousehold) {
+                        CircularProgressIndicator(
+                            modifier = Modifier.size(16.dp),
+                            strokeWidth = 2.dp,
+                            color = MaterialTheme.colorScheme.onPrimary,
+                        )
+                    } else {
+                        Text("Join")
+                    }
                 }
             },
             dismissButton = {
@@ -674,11 +693,20 @@ fun SettingsScreen(
                         showLeaveHouseholdDialog = false
                         viewModel.leaveHousehold()
                     },
+                    enabled = !isLeavingHousehold,
                     colors = ButtonDefaults.buttonColors(
                         containerColor = MaterialTheme.colorScheme.error,
                     ),
                 ) {
-                    Text("Leave")
+                    if (isLeavingHousehold) {
+                        CircularProgressIndicator(
+                            modifier = Modifier.size(16.dp),
+                            strokeWidth = 2.dp,
+                            color = MaterialTheme.colorScheme.onError,
+                        )
+                    } else {
+                        Text("Leave")
+                    }
                 }
             },
             dismissButton = {
@@ -874,30 +902,6 @@ fun SettingsScreen(
                             )
                         }
 
-                        Spacer(modifier = Modifier.height(12.dp))
-
-                        // Household Notifications toggle
-                        Row(
-                            modifier = Modifier.fillMaxWidth(),
-                            verticalAlignment = Alignment.CenterVertically,
-                        ) {
-                            Column(modifier = Modifier.weight(1f)) {
-                                Text(
-                                    "Household Notifications",
-                                    style = MaterialTheme.typography.labelMedium,
-                                    fontWeight = FontWeight.SemiBold,
-                                )
-                                Text(
-                                    "Get notified when housemates complete habits",
-                                    style = MaterialTheme.typography.bodySmall,
-                                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                                )
-                            }
-                            Switch(
-                                checked = householdNotificationsEnabled,
-                                onCheckedChange = { viewModel.setHouseholdNotificationsEnabled(it) },
-                            )
-                        }
                     } else {
                         // No household — show create/join options
                         Text(
@@ -919,17 +923,26 @@ fun SettingsScreen(
                                 .fillMaxWidth()
                                 .clip(RoundedCornerShape(12.dp))
                                 .background(MaterialTheme.colorScheme.surfaceContainerHighest)
-                                .clickable { showCreateHouseholdDialog = true }
+                                .clickable(enabled = !isCreatingHousehold && !isJoiningHousehold) {
+                                    showCreateHouseholdDialog = true
+                                }
                                 .padding(12.dp),
                             verticalAlignment = Alignment.CenterVertically,
                             horizontalArrangement = Arrangement.spacedBy(12.dp),
                         ) {
-                            Icon(
-                                Icons.Default.Home,
-                                contentDescription = "Create Household",
-                                tint = MaterialTheme.colorScheme.secondary,
-                                modifier = Modifier.size(20.dp),
-                            )
+                            if (isCreatingHousehold) {
+                                CircularProgressIndicator(
+                                    modifier = Modifier.size(20.dp),
+                                    strokeWidth = 2.dp,
+                                )
+                            } else {
+                                Icon(
+                                    Icons.Default.Home,
+                                    contentDescription = "Create Household",
+                                    tint = MaterialTheme.colorScheme.secondary,
+                                    modifier = Modifier.size(20.dp),
+                                )
+                            }
                             Text(
                                 "Create a Household",
                                 style = MaterialTheme.typography.labelMedium,
@@ -946,17 +959,26 @@ fun SettingsScreen(
                                 .fillMaxWidth()
                                 .clip(RoundedCornerShape(12.dp))
                                 .background(MaterialTheme.colorScheme.surfaceContainerHighest)
-                                .clickable { showJoinDialog = true }
+                                .clickable(enabled = !isCreatingHousehold && !isJoiningHousehold) {
+                                    showJoinDialog = true
+                                }
                                 .padding(12.dp),
                             verticalAlignment = Alignment.CenterVertically,
                             horizontalArrangement = Arrangement.spacedBy(12.dp),
                         ) {
-                            Icon(
-                                Icons.Default.PersonAdd,
-                                contentDescription = "Join Household",
-                                tint = MaterialTheme.colorScheme.secondary,
-                                modifier = Modifier.size(20.dp),
-                            )
+                            if (isJoiningHousehold) {
+                                CircularProgressIndicator(
+                                    modifier = Modifier.size(20.dp),
+                                    strokeWidth = 2.dp,
+                                )
+                            } else {
+                                Icon(
+                                    Icons.Default.PersonAdd,
+                                    contentDescription = "Join Household",
+                                    tint = MaterialTheme.colorScheme.secondary,
+                                    modifier = Modifier.size(20.dp),
+                                )
+                            }
                             Text(
                                 "Join with Invite Code",
                                 style = MaterialTheme.typography.labelMedium,

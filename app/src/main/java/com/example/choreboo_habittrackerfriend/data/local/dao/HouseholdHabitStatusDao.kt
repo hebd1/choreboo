@@ -10,10 +10,17 @@ import kotlinx.coroutines.flow.Flow
 @Dao
 interface HouseholdHabitStatusDao {
     /**
-     * Get all household habit statuses (reactive).
+     * Get all household habit statuses (reactive, unfiltered).
      */
     @Query("SELECT * FROM household_habit_statuses")
     fun getAllHabitStatuses(): Flow<List<HouseholdHabitStatusEntity>>
+
+    /**
+     * Get household habit statuses for a specific date (reactive).
+     * Returns only rows whose cachedDate matches the given date string.
+     */
+    @Query("SELECT * FROM household_habit_statuses WHERE cachedDate = :date")
+    fun getHabitStatusesForDate(date: String): Flow<List<HouseholdHabitStatusEntity>>
 
     /**
      * Get all household habit statuses (synchronous).

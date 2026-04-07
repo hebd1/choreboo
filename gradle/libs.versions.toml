@@ -14,7 +14,6 @@ hiltWork = "1.2.0"
 room = "2.7.1"
 navigationCompose = "2.9.0"
 ksp = "2.0.21-1.0.27"
-lottieCompose = "6.6.2"
 coilCompose = "3.1.0"
 datastore = "1.1.7"
 workManager = "2.10.1"
@@ -56,8 +55,6 @@ room-ktx = { group = "androidx.room", name = "room-ktx", version.ref = "room" }
 room-compiler = { group = "androidx.room", name = "room-compiler", version.ref = "room" }
 # Navigation
 navigation-compose = { group = "androidx.navigation", name = "navigation-compose", version.ref = "navigationCompose" }
-# Lottie
-lottie-compose = { group = "com.airbnb.android", name = "lottie-compose", version.ref = "lottieCompose" }
 # Coil
 coil-compose = { group = "io.coil-kt.coil3", name = "coil-compose", version.ref = "coilCompose" }
 coil-network-okhttp = { group = "io.coil-kt.coil3", name = "coil-network-okhttp", version.ref = "coilCompose" }

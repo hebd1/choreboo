@@ -16,6 +16,7 @@ import com.example.choreboo_habittrackerfriend.worker.HabitReminderScheduler
 import com.google.firebase.auth.FirebaseAuth
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.Job
 import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.first
@@ -53,7 +54,17 @@ class HabitRepository @Inject constructor(
     private val dateFormatter = DateTimeFormatter.ISO_LOCAL_DATE
 
     /** Fire-and-forget scope for silent write-through calls. */
-    private val writeScope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
+    private var writeScope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
+
+    /**
+     * Cancel all pending write-through coroutines and create a fresh scope.
+     * Called on sign-out and account reset to prevent stale writes executing after
+     * the user's data has been cleared.
+     */
+    fun cancelPendingWrites() {
+        writeScope.coroutineContext[Job]?.cancel()
+        writeScope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
+    }
 
     fun getAllHabits(): Flow<List<Habit>> = habitDao.getAllHabits().map { entities ->
         entities.map { it.toDomain() }

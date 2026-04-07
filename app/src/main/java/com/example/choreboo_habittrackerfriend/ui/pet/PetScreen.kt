@@ -67,6 +67,8 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.TransformOrigin
 import androidx.compose.ui.hapticfeedback.HapticFeedbackType
 import androidx.compose.ui.platform.LocalHapticFeedback
+import androidx.compose.ui.semantics.contentDescription
+import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
@@ -74,17 +76,14 @@ import androidx.compose.ui.unit.sp
 import androidx.compose.ui.window.Dialog
 import androidx.compose.ui.window.DialogProperties
 import androidx.hilt.navigation.compose.hiltViewModel
-import com.airbnb.lottie.compose.LottieAnimation
-import com.airbnb.lottie.compose.LottieCompositionSpec
-import com.airbnb.lottie.compose.LottieConstants
-import com.airbnb.lottie.compose.rememberLottieAnimatable
-import com.airbnb.lottie.compose.rememberLottieComposition
 import com.example.choreboo_habittrackerfriend.domain.model.ChorebooMood
+import com.example.choreboo_habittrackerfriend.ui.components.WebmAnimationView
 import com.example.choreboo_habittrackerfriend.domain.model.Habit
 import com.example.choreboo_habittrackerfriend.domain.model.PetType
 import com.example.choreboo_habittrackerfriend.ui.components.ProfileAvatar
 import com.example.choreboo_habittrackerfriend.ui.components.ShimmerPlaceholder
 import com.example.choreboo_habittrackerfriend.ui.components.StitchSnackbar
+import com.example.choreboo_habittrackerfriend.ui.components.WebmAnimationView
 import com.example.choreboo_habittrackerfriend.ui.habits.components.HabitCard
 import com.example.choreboo_habittrackerfriend.ui.theme.PetMoodContentStart
 import com.example.choreboo_habittrackerfriend.ui.theme.PetMoodHappyStart
@@ -180,6 +179,13 @@ fun PetScreen(
                     snackbarHostState.showSnackbar(
                         message = "Already completed for today! \u2705",
                         actionLabel = "info",
+                        duration = SnackbarDuration.Short,
+                    )
+                }
+                is PetEvent.CompletionError -> {
+                    snackbarHostState.showSnackbar(
+                        message = "Couldn't complete habit: ${event.message}",
+                        actionLabel = "error",
                         duration = SnackbarDuration.Short,
                     )
                 }
@@ -856,7 +862,8 @@ private fun StatBentoCard(
         modifier = modifier
             .height(110.dp)
             .clip(RoundedCornerShape(16.dp))
-            .background(MaterialTheme.colorScheme.surfaceContainerLowest),
+            .background(MaterialTheme.colorScheme.surfaceContainerLowest)
+            .semantics(mergeDescendants = true) { contentDescription = "$label: $value%, $statusText" },
     ) {
         Column(
             modifier = Modifier
@@ -930,7 +937,8 @@ private fun EnergyBentoCard(
             .fillMaxWidth()
             .height(100.dp)
             .clip(RoundedCornerShape(16.dp))
-            .background(MaterialTheme.colorScheme.surfaceContainerLowest),
+            .background(MaterialTheme.colorScheme.surfaceContainerLowest)
+            .semantics(mergeDescendants = true) { contentDescription = "Energy levels: $value%, $statusText" },
     ) {
         Column(
             modifier = Modifier
@@ -1082,40 +1090,6 @@ private fun PetAnimation(
     if (petType == PetType.FOX) {
         var phase by remember { mutableStateOf(AnimationPhase.MOOD) }
 
-        // Always-needed compositions — load eagerly so the first frame is instant.
-        val happyComposition by rememberLottieComposition(
-            LottieCompositionSpec.Asset("animations/fox/fox_happy_lottie.json"),
-        )
-        val hungryComposition by rememberLottieComposition(
-            LottieCompositionSpec.Asset("animations/fox/fox_hungry_lottie.json"),
-        )
-        val sadComposition by rememberLottieComposition(
-            LottieCompositionSpec.Asset("animations/fox/fox_sad_lottie.json"),
-        )
-        val idleComposition by rememberLottieComposition(
-            LottieCompositionSpec.Asset("animations/fox/fox_idle_lottie.json"),
-        )
-
-        // Triggered compositions — loaded eagerly for API compatibility, but only
-        // play when their corresponding phase is active.
-        val eatingComposition by rememberLottieComposition(
-            LottieCompositionSpec.Asset("animations/fox/fox_eating_lottie.json"),
-        )
-        val interactComposition by rememberLottieComposition(
-            LottieCompositionSpec.Asset("animations/fox/fox_interact_lottie.json"),
-        )
-        val thumbsUpComposition by rememberLottieComposition(
-            LottieCompositionSpec.Asset("animations/fox/fox_thumbs_up_lottie.json"),
-        )
-        val startSleepComposition by rememberLottieComposition(
-            LottieCompositionSpec.Asset("animations/fox/fox_start_sleep_lottie.json"),
-        )
-        val sleepingComposition by rememberLottieComposition(
-            LottieCompositionSpec.Asset("animations/fox/fox_loop_sleeping_lottie.json"),
-        )
-
-        val lottieAnimatable = rememberLottieAnimatable()
-
         LaunchedEffect(isEating) {
             if (isEating && !isSleeping) {
                 phase = AnimationPhase.EATING
@@ -1142,60 +1116,23 @@ private fun PetAnimation(
             }
         }
 
-        val currentPhaseComposition = when (phase) {
-            AnimationPhase.MOOD -> when (mood) {
-                ChorebooMood.HAPPY,
-                ChorebooMood.CONTENT -> happyComposition
-                ChorebooMood.HUNGRY -> hungryComposition
-                else -> sadComposition
-            }
-            AnimationPhase.IDLE -> idleComposition
-            AnimationPhase.EATING -> eatingComposition
-            AnimationPhase.INTERACTING -> interactComposition
-            AnimationPhase.THUMBS_UP -> thumbsUpComposition
-            AnimationPhase.START_SLEEPING -> startSleepComposition
-            AnimationPhase.SLEEPING -> sleepingComposition
-        }
-
-        LaunchedEffect(phase, currentPhaseComposition) {
-            if (currentPhaseComposition != null) {
-                lottieAnimatable.animate(
-                    composition = currentPhaseComposition,
-                    iterations = when (phase) {
-                        AnimationPhase.MOOD -> 1
-                        AnimationPhase.IDLE -> 3
-                        AnimationPhase.EATING -> 1
-                        AnimationPhase.INTERACTING -> 1
-                        AnimationPhase.THUMBS_UP -> 1
-                        AnimationPhase.START_SLEEPING -> 1
-                        AnimationPhase.SLEEPING -> LottieConstants.IterateForever
-                    },
-                )
-
-                when (phase) {
-                    AnimationPhase.MOOD -> phase = AnimationPhase.IDLE
-                    AnimationPhase.IDLE -> phase = AnimationPhase.MOOD
-                    AnimationPhase.EATING -> {
-                        onEatingComplete()
-                        phase = AnimationPhase.MOOD
-                    }
-                    AnimationPhase.INTERACTING -> {
-                        onInteractComplete()
-                        phase = AnimationPhase.MOOD
-                    }
-                    AnimationPhase.THUMBS_UP -> {
-                        onThumbsUpComplete()
-                        phase = AnimationPhase.MOOD
-                    }
-                    AnimationPhase.START_SLEEPING -> {
-                        onStartSleepComplete()
-                        phase = AnimationPhase.SLEEPING
-                    }
-                    AnimationPhase.SLEEPING -> {
-                        phase = if (isSleeping) AnimationPhase.SLEEPING else AnimationPhase.MOOD
-                    }
+        // Determine the current animation asset and iteration count based on phase
+        val (assetPath, iterations) = when (phase) {
+            AnimationPhase.MOOD -> {
+                val moodAsset = when (mood) {
+                    ChorebooMood.HAPPY,
+                    ChorebooMood.CONTENT -> "animations/fox/fox_happy.webp"
+                    ChorebooMood.HUNGRY -> "animations/fox/fox_hungry.webp"
+                    else -> "animations/fox/fox_sad.webp"
                 }
+                moodAsset to 1
             }
+            AnimationPhase.IDLE -> "animations/fox/fox_idle.webp" to 3
+            AnimationPhase.EATING -> "animations/fox/fox_eating.webp" to 1
+            AnimationPhase.INTERACTING -> "animations/fox/fox_interact.webp" to 1
+            AnimationPhase.THUMBS_UP -> "animations/fox/fox_thumbs_up.webp" to 1
+            AnimationPhase.START_SLEEPING -> "animations/fox/fox_start_sleep.webp" to 1
+            AnimationPhase.SLEEPING -> "animations/fox/fox_loop_sleeping.webp" to Int.MAX_VALUE
         }
 
         Crossfade(
@@ -1203,35 +1140,68 @@ private fun PetAnimation(
             animationSpec = tween(durationMillis = 100),
             label = "petAnimationCrossfade",
         ) { animPhase ->
-            val currentComposition = when (animPhase) {
+            val (currentAsset, currentIterations) = when (animPhase) {
                 AnimationPhase.MOOD -> {
-                    when (mood) {
+                    val moodAsset = when (mood) {
                         ChorebooMood.HAPPY,
-                        ChorebooMood.CONTENT -> happyComposition
-                        ChorebooMood.HUNGRY -> hungryComposition
-                        else -> sadComposition
+                        ChorebooMood.CONTENT -> "animations/fox/fox_happy.webp"
+                        ChorebooMood.HUNGRY -> "animations/fox/fox_hungry.webp"
+                        else -> "animations/fox/fox_sad.webp"
                     }
+                    moodAsset to 1
                 }
-                AnimationPhase.IDLE -> idleComposition
-                AnimationPhase.EATING -> eatingComposition
-                AnimationPhase.INTERACTING -> interactComposition
-                AnimationPhase.THUMBS_UP -> thumbsUpComposition
-                AnimationPhase.START_SLEEPING -> startSleepComposition
-                AnimationPhase.SLEEPING -> sleepingComposition
+                AnimationPhase.IDLE -> "animations/fox/fox_idle.webp" to 3
+                AnimationPhase.EATING -> "animations/fox/fox_eating.webp" to 1
+                AnimationPhase.INTERACTING -> "animations/fox/fox_interact.webp" to 1
+                AnimationPhase.THUMBS_UP -> "animations/fox/fox_thumbs_up.webp" to 1
+                AnimationPhase.START_SLEEPING -> "animations/fox/fox_start_sleep.webp" to 1
+                AnimationPhase.SLEEPING -> "animations/fox/fox_loop_sleeping.webp" to Int.MAX_VALUE
             }
 
-            if (currentComposition != null) {
-                LottieAnimation(
-                    composition = currentComposition,
-                    progress = { lottieAnimatable.progress },
-                    modifier = modifier.clickable { onTap() },
-                )
-            } else {
-                // Composition still parsing — show the pet's emoji so the space is never blank.
-                Box(modifier = modifier.clickable { onTap() }, contentAlignment = Alignment.Center) {
-                    Text(text = petType.emoji, fontSize = 64.sp)
-                }
-            }
+            WebmAnimationView(
+                assetPath = currentAsset,
+                iterations = currentIterations,
+                onComplete = {
+                    when (animPhase) {
+                        AnimationPhase.MOOD -> {
+                            if (phase == AnimationPhase.MOOD) phase = AnimationPhase.IDLE
+                        }
+                        AnimationPhase.IDLE -> {
+                            if (phase == AnimationPhase.IDLE) phase = AnimationPhase.MOOD
+                        }
+                        AnimationPhase.EATING -> {
+                            if (phase == AnimationPhase.EATING) {
+                                onEatingComplete()
+                                phase = AnimationPhase.MOOD
+                            }
+                        }
+                        AnimationPhase.INTERACTING -> {
+                            if (phase == AnimationPhase.INTERACTING) {
+                                onInteractComplete()
+                                phase = AnimationPhase.MOOD
+                            }
+                        }
+                        AnimationPhase.THUMBS_UP -> {
+                            if (phase == AnimationPhase.THUMBS_UP) {
+                                onThumbsUpComplete()
+                                phase = AnimationPhase.MOOD
+                            }
+                        }
+                        AnimationPhase.START_SLEEPING -> {
+                            if (phase == AnimationPhase.START_SLEEPING) {
+                                onStartSleepComplete()
+                                phase = AnimationPhase.SLEEPING
+                            }
+                        }
+                        AnimationPhase.SLEEPING -> {
+                            if (phase == AnimationPhase.SLEEPING) {
+                                phase = if (isSleeping) AnimationPhase.SLEEPING else AnimationPhase.MOOD
+                            }
+                        }
+                    }
+                },
+                modifier = modifier.clickable { onTap() },
+            )
         }
     } else {
         val sizeMultiplier = 64.sp

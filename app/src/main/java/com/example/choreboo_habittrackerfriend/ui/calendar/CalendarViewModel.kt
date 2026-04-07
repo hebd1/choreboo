@@ -103,10 +103,31 @@ class CalendarViewModel @Inject constructor(
         viewModelScope.launch {
             _isRefreshing.value = true
             try {
+                refreshTodayDate()
                 syncManager.syncAll(force = true)
             } finally {
                 _isRefreshing.value = false
             }
+        }
+    }
+
+    /**
+     * Re-evaluates what "today" is. If the currently selected month/date were tracking
+     * the day the ViewModel was constructed (i.e. the user hasn't navigated away), they
+     * are updated to the real current date. Call on screen resume to handle midnight crossings.
+     */
+    fun refreshTodayDate() {
+        val today = LocalDate.now()
+        val todayMonth = YearMonth.from(today)
+        // Only advance the month forward — never move the user backward
+        if (_selectedMonth.value.isBefore(todayMonth)) {
+            _selectedMonth.value = todayMonth
+        }
+        // If the selected date is in the future (e.g. ViewModel init ran just before midnight),
+        // clamp it back to today
+        val sel = _selectedDate.value
+        if (sel != null && sel.isAfter(today)) {
+            _selectedDate.value = today
         }
     }
 }

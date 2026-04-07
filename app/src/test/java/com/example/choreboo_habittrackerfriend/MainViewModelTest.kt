@@ -28,9 +28,9 @@ import org.junit.Test
 /**
  * Tests for [MainViewModel]: startup sequencing, fast/full path logic, and state flow derivations.
  *
- * Lottie preloading no longer blocks the splash screen — it runs in the background via
- * [LottiePreloadManager] without any involvement from [MainViewModel]. The only blocking
- * work in the full startup path is Room warmup, which is mocked here to complete instantly.
+ * WebM animation loading no longer blocks the splash screen — it runs in the background.
+ * The only blocking work in the full startup path is Room warmup, which is mocked here to
+ * complete instantly.
  */
 @OptIn(ExperimentalCoroutinesApi::class)
 class MainViewModelTest {

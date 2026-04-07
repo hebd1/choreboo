@@ -40,13 +40,10 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import coil3.compose.AsyncImage
-import com.airbnb.lottie.compose.LottieAnimation
-import com.airbnb.lottie.compose.LottieCompositionSpec
-import com.airbnb.lottie.compose.rememberLottieAnimatable
-import com.airbnb.lottie.compose.rememberLottieComposition
 import com.example.choreboo_habittrackerfriend.domain.model.ChorebooMood
 import com.example.choreboo_habittrackerfriend.domain.model.HouseholdPet
 import com.example.choreboo_habittrackerfriend.domain.model.PetType
+import com.example.choreboo_habittrackerfriend.ui.components.WebmAnimationView
 
 private enum class HouseholdAnimPhase { MOOD, IDLE }
 
@@ -171,11 +168,11 @@ fun HouseholdPetCard(
 /**
  * Pet animation area for the household card.
  *
- * FOX: Lottie mood-idle alternating loop — plays the mood-appropriate animation
+ * FOX: WebM mood-idle alternating loop — plays the mood-appropriate animation
  * once (happy/hungry/sad), then the idle animation 3 times, then repeats.
  *
  * All other pet types (AXOLOTL, CAPYBARA, PANDA): emoji placeholder until
- * their Lottie assets are added under assets/animations/<type>/.
+ * their WebM assets are added under assets/animations/<type>/.
  */
 @Composable
 private fun HouseholdPetAnimation(
@@ -186,45 +183,17 @@ private fun HouseholdPetAnimation(
     if (petType == PetType.FOX) {
         var phase by remember { mutableStateOf(HouseholdAnimPhase.MOOD) }
 
-        val happyComposition by rememberLottieComposition(
-            LottieCompositionSpec.Asset("animations/fox/fox_happy_lottie.json"),
-        )
-        val hungryComposition by rememberLottieComposition(
-            LottieCompositionSpec.Asset("animations/fox/fox_hungry_lottie.json"),
-        )
-        val sadComposition by rememberLottieComposition(
-            LottieCompositionSpec.Asset("animations/fox/fox_sad_lottie.json"),
-        )
-        val idleComposition by rememberLottieComposition(
-            LottieCompositionSpec.Asset("animations/fox/fox_idle_lottie.json"),
-        )
-
-        val lottieAnimatable = rememberLottieAnimatable()
-
-        val currentPhaseComposition = when (phase) {
-            HouseholdAnimPhase.MOOD -> when (mood) {
-                ChorebooMood.HAPPY,
-                ChorebooMood.CONTENT -> happyComposition
-                ChorebooMood.HUNGRY -> hungryComposition
-                else -> sadComposition
-            }
-            HouseholdAnimPhase.IDLE -> idleComposition
-        }
-
-        LaunchedEffect(phase, currentPhaseComposition) {
-            if (currentPhaseComposition != null) {
-                lottieAnimatable.animate(
-                    composition = currentPhaseComposition,
-                    iterations = when (phase) {
-                        HouseholdAnimPhase.MOOD -> 1
-                        HouseholdAnimPhase.IDLE -> 3
-                    },
-                )
-                phase = when (phase) {
-                    HouseholdAnimPhase.MOOD -> HouseholdAnimPhase.IDLE
-                    HouseholdAnimPhase.IDLE -> HouseholdAnimPhase.MOOD
+        val (assetPath, iterations) = when (phase) {
+            HouseholdAnimPhase.MOOD -> {
+                val moodAsset = when (mood) {
+                    ChorebooMood.HAPPY,
+                    ChorebooMood.CONTENT -> "animations/fox/fox_happy.webp"
+                    ChorebooMood.HUNGRY -> "animations/fox/fox_hungry.webp"
+                    else -> "animations/fox/fox_sad.webp"
                 }
+                moodAsset to 1
             }
+            HouseholdAnimPhase.IDLE -> "animations/fox/fox_idle.webp" to 3
         }
 
         Crossfade(
@@ -232,23 +201,33 @@ private fun HouseholdPetAnimation(
             animationSpec = tween(durationMillis = 100),
             label = "householdPetAnimCrossfade",
         ) { animPhase ->
-            val composition = when (animPhase) {
-                HouseholdAnimPhase.MOOD -> when (mood) {
-                    ChorebooMood.HAPPY,
-                    ChorebooMood.CONTENT -> happyComposition
-                    ChorebooMood.HUNGRY -> hungryComposition
-                    else -> sadComposition
+            val (currentAsset, currentIterations) = when (animPhase) {
+                HouseholdAnimPhase.MOOD -> {
+                    val moodAsset = when (mood) {
+                        ChorebooMood.HAPPY,
+                        ChorebooMood.CONTENT -> "animations/fox/fox_happy.webp"
+                        ChorebooMood.HUNGRY -> "animations/fox/fox_hungry.webp"
+                        else -> "animations/fox/fox_sad.webp"
+                    }
+                    moodAsset to 1
                 }
-                HouseholdAnimPhase.IDLE -> idleComposition
+                HouseholdAnimPhase.IDLE -> "animations/fox/fox_idle.webp" to 3
             }
-            LottieAnimation(
-                composition = composition,
-                progress = { lottieAnimatable.progress },
+
+            WebmAnimationView(
+                assetPath = currentAsset,
+                iterations = currentIterations,
+                onComplete = {
+                    phase = when (phase) {
+                        HouseholdAnimPhase.MOOD -> HouseholdAnimPhase.IDLE
+                        HouseholdAnimPhase.IDLE -> HouseholdAnimPhase.MOOD
+                    }
+                },
                 modifier = modifier,
             )
         }
     } else {
-        // Emoji placeholder for AXOLOTL, CAPYBARA, PANDA until their Lottie
+        // Emoji placeholder for AXOLOTL, CAPYBARA, PANDA until their WebM
         // assets are added under assets/animations/<pettype>/.
         Box(modifier = modifier, contentAlignment = Alignment.Center) {
             Text(

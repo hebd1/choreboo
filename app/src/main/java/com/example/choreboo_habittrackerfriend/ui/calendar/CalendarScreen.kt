@@ -36,7 +36,11 @@ import androidx.compose.material3.TopAppBar
 import androidx.compose.material3.TopAppBarDefaults
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
+import androidx.lifecycle.Lifecycle
+import androidx.lifecycle.compose.LifecycleEventEffect
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -72,6 +76,14 @@ fun CalendarScreen(
     val googlePhotoUrl by viewModel.googlePhotoUrl.collectAsStateWithLifecycle()
 
     val today = remember { LocalDate.now() }
+    var todayDate by remember { mutableStateOf(today) }
+
+    // Refresh today's date and ViewModel date state on every screen resume
+    // so that the "today" highlight is correct after midnight crossings.
+    LifecycleEventEffect(Lifecycle.Event.ON_RESUME) {
+        todayDate = LocalDate.now()
+        viewModel.refreshTodayDate()
+    }
 
     // Calendar grid metrics
     val totalDaysWithAny = completions.values.count { it > 0 }
@@ -226,7 +238,7 @@ fun CalendarScreen(
                                         ) {
                                             if (dayNum in 1..daysInMonth) {
                                                 val date = selectedMonth.atDay(dayNum)
-                                                val isToday = date == today
+                                                val isToday = date == todayDate
                                                 val isSelected = date == selectedDate
                                                 val count = completions[date] ?: 0
 

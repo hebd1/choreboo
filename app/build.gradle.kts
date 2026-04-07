@@ -91,9 +91,6 @@ dependencies {
     // Navigation
     implementation(libs.navigation.compose)
 
-    // Lottie
-    implementation(libs.lottie.compose)
-
     // Coil
     implementation(libs.coil.compose)
     implementation(libs.coil.network.okhttp)

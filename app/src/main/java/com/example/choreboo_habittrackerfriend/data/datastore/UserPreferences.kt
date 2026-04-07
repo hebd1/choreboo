@@ -26,7 +26,6 @@ class UserPreferences @Inject constructor(
          val ONBOARDING_COMPLETE = booleanPreferencesKey("onboarding_complete")
          val SOUND_ENABLED = booleanPreferencesKey("sound_enabled")
          val PROFILE_PHOTO_URI = stringPreferencesKey("profile_photo_uri") // Custom profile photo path, null = use Google photo
-         val HOUSEHOLD_NOTIFICATIONS = booleanPreferencesKey("household_notifications_enabled")
      }
 
      val totalPoints: Flow<Int> = dataStore.data.map { it[TOTAL_POINTS] ?: 0 }
@@ -40,8 +39,6 @@ class UserPreferences @Inject constructor(
     val soundEnabled: Flow<Boolean> = dataStore.data.map { it[SOUND_ENABLED] ?: true }
 
     val profilePhotoUri: Flow<String?> = dataStore.data.map { it[PROFILE_PHOTO_URI] }
-
-    val householdNotificationsEnabled: Flow<Boolean> = dataStore.data.map { it[HOUSEHOLD_NOTIFICATIONS] ?: true }
 
     suspend fun addPoints(amount: Int) {
         dataStore.edit { prefs ->
@@ -99,10 +96,6 @@ class UserPreferences @Inject constructor(
                 prefs[PROFILE_PHOTO_URI] = uri
             }
         }
-    }
-
-    suspend fun setHouseholdNotificationsEnabled(enabled: Boolean) {
-        dataStore.edit { it[HOUSEHOLD_NOTIFICATIONS] = enabled }
     }
 
     /** Clear all preferences — used for sign-out data cleanup. */
