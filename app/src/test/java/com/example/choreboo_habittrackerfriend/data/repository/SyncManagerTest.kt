@@ -26,6 +26,7 @@ class SyncManagerTest {
     private lateinit var habitRepository: HabitRepository
     private lateinit var chorebooRepository: ChorebooRepository
     private lateinit var userRepository: UserRepository
+    private lateinit var backgroundRepository: BackgroundRepository
     private lateinit var firebaseAuth: FirebaseAuth
     private lateinit var syncManager: SyncManager
 
@@ -34,6 +35,7 @@ class SyncManagerTest {
         habitRepository = mockk(relaxed = true)
         chorebooRepository = mockk(relaxed = true)
         userRepository = mockk(relaxed = true)
+        backgroundRepository = mockk(relaxed = true)
         firebaseAuth = mockk()
 
         // Default: authenticated user with a valid token
@@ -42,7 +44,7 @@ class SyncManagerTest {
         val tokenTask = Tasks.forResult(mockk<GetTokenResult>())
         every { user.getIdToken(false) } returns tokenTask
 
-        syncManager = SyncManager(habitRepository, chorebooRepository, userRepository, firebaseAuth)
+        syncManager = SyncManager(habitRepository, chorebooRepository, userRepository, backgroundRepository, firebaseAuth)
     }
 
     // ── Auth guard ──────────────────────────────────────────────────────

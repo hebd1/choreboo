@@ -1,7 +1,7 @@
 # ============================================================
 # Choreboo Habit Tracker - Firebase Data Connect Schema
 # ============================================================
-# Tables: User, Household, Choreboo, Habit, HabitLog
+# Tables: User, Household, Choreboo, Habit, HabitLog, PurchasedBackground
 # ============================================================
 
 # ---- User ----
@@ -30,6 +30,8 @@ type Household @table {
 
 # ---- Choreboo (Pet) ----
 # One per user. Owner tracked by ownerUid FK to User.
+# backgroundId references the selected background from the BACKGROUND_REGISTRY (e.g. "sunset").
+# Null means the default mood-based gradient is shown.
 type Choreboo @table {
   id: UUID! @default(expr: "uuidV4()")
   owner: User! @ref @unique
@@ -44,6 +46,17 @@ type Choreboo @table {
   lastInteractionAt: Timestamp!
   createdAt: Timestamp! @default(expr: "request.time")
   sleepUntil: Timestamp
+  backgroundId: String
+}
+
+# ---- PurchasedBackground ----
+# One row per background purchased by a user.
+# backgroundId matches a BackgroundItem.id from the client-side BACKGROUND_REGISTRY.
+# Unique constraint on (owner, backgroundId) prevents duplicate purchases.
+type PurchasedBackground @table(key: ["owner", "backgroundId"]) {
+  owner: User! @ref
+  backgroundId: String!
+  purchasedAt: Timestamp! @default(expr: "request.time")
 }
 
 # ---- Habit ----

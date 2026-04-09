@@ -32,4 +32,6 @@ data class HouseholdMemberEntity(
     val chorebooEnergy: Int = 100,
     val chorebooPetType: String = "FOX",
     val lastSyncedAt: Long = System.currentTimeMillis(),
+    /** Selected background id for this member's Choreboo. Null = Default mood gradient. */
+    val chorebooBackgroundId: String? = null,
 )

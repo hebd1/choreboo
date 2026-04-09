@@ -12,12 +12,14 @@ import com.example.choreboo_habittrackerfriend.data.local.dao.ChorebooDao
 import com.example.choreboo_habittrackerfriend.data.local.dao.HouseholdMemberDao
 import com.example.choreboo_habittrackerfriend.data.local.dao.HouseholdDao
 import com.example.choreboo_habittrackerfriend.data.local.dao.HouseholdHabitStatusDao
+import com.example.choreboo_habittrackerfriend.data.local.dao.PurchasedBackgroundDao
 import com.example.choreboo_habittrackerfriend.data.local.entity.HabitEntity
 import com.example.choreboo_habittrackerfriend.data.local.entity.HabitLogEntity
 import com.example.choreboo_habittrackerfriend.data.local.entity.ChorebooEntity
 import com.example.choreboo_habittrackerfriend.data.local.entity.HouseholdMemberEntity
 import com.example.choreboo_habittrackerfriend.data.local.entity.HouseholdEntity
 import com.example.choreboo_habittrackerfriend.data.local.entity.HouseholdHabitStatusEntity
+import com.example.choreboo_habittrackerfriend.data.local.entity.PurchasedBackgroundEntity
 
 @Database(
     entities = [
@@ -27,8 +29,9 @@ import com.example.choreboo_habittrackerfriend.data.local.entity.HouseholdHabitS
         HouseholdMemberEntity::class,
         HouseholdEntity::class,
         HouseholdHabitStatusEntity::class,
+        PurchasedBackgroundEntity::class,
     ],
-    version = 14,
+    version = 16,
     exportSchema = true,
 )
 @TypeConverters(Converters::class)
@@ -39,6 +42,7 @@ abstract class ChorebooDatabase : RoomDatabase() {
     abstract fun householdMemberDao(): HouseholdMemberDao
     abstract fun householdDao(): HouseholdDao
     abstract fun householdHabitStatusDao(): HouseholdHabitStatusDao
+    abstract fun purchasedBackgroundDao(): PurchasedBackgroundDao
 
     companion object {
         @Volatile

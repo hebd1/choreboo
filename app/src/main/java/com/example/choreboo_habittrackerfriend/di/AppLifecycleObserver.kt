@@ -3,6 +3,7 @@ package com.example.choreboo_habittrackerfriend.di
 import android.util.Log
 import androidx.lifecycle.DefaultLifecycleObserver
 import androidx.lifecycle.LifecycleOwner
+import com.example.choreboo_habittrackerfriend.data.repository.BillingRepository
 import com.example.choreboo_habittrackerfriend.data.repository.SyncManager
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
@@ -28,6 +29,7 @@ private const val TAG = "AppLifecycleObserver"
 @Singleton
 class AppLifecycleObserver @Inject constructor(
     private val syncManager: SyncManager,
+    private val billingRepository: BillingRepository,
 ) : DefaultLifecycleObserver {
 
     private val scope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
@@ -52,6 +54,15 @@ class AppLifecycleObserver @Inject constructor(
             } catch (e: Exception) {
                 // Background sync failures are silent — they do not surface to the user
                 Log.e(TAG, "Background sync error", e)
+            }
+        }
+        // Re-verify billing subscription status on each app foreground (no cooldown needed —
+        // the BillingClient query is lightweight and fast).
+        scope.launch {
+            try {
+                billingRepository.verifyPremiumStatus()
+            } catch (e: Exception) {
+                Log.e(TAG, "Billing verification error", e)
             }
         }
     }

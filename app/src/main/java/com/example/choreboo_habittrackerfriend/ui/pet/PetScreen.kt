@@ -32,6 +32,7 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.ExpandMore
+import androidx.compose.material.icons.filled.Palette
 import androidx.compose.material.icons.filled.Stars
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
@@ -66,7 +67,9 @@ import androidx.compose.ui.draw.rotate
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.TransformOrigin
 import androidx.compose.ui.hapticfeedback.HapticFeedbackType
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalHapticFeedback
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.font.FontWeight
@@ -76,21 +79,28 @@ import androidx.compose.ui.unit.sp
 import androidx.compose.ui.window.Dialog
 import androidx.compose.ui.window.DialogProperties
 import androidx.hilt.navigation.compose.hiltViewModel
+import com.example.choreboo_habittrackerfriend.R
 import com.example.choreboo_habittrackerfriend.domain.model.ChorebooMood
-import com.example.choreboo_habittrackerfriend.ui.components.WebmAnimationView
 import com.example.choreboo_habittrackerfriend.domain.model.Habit
 import com.example.choreboo_habittrackerfriend.domain.model.PetType
+import com.example.choreboo_habittrackerfriend.ui.components.BannerAdView
+import com.example.choreboo_habittrackerfriend.ui.components.PetBackgroundImage
+import com.example.choreboo_habittrackerfriend.ui.components.PremiumBadge
 import com.example.choreboo_habittrackerfriend.ui.components.ProfileAvatar
 import com.example.choreboo_habittrackerfriend.ui.components.ShimmerPlaceholder
 import com.example.choreboo_habittrackerfriend.ui.components.StitchSnackbar
 import com.example.choreboo_habittrackerfriend.ui.components.WebmAnimationView
 import com.example.choreboo_habittrackerfriend.ui.habits.components.HabitCard
+import com.example.choreboo_habittrackerfriend.ui.pet.components.BackgroundPickerSheet
 import com.example.choreboo_habittrackerfriend.ui.theme.PetMoodContentStart
 import com.example.choreboo_habittrackerfriend.ui.theme.PetMoodHappyStart
 import com.example.choreboo_habittrackerfriend.ui.theme.PetMoodHungryStart
 import com.example.choreboo_habittrackerfriend.ui.theme.PetMoodSadStart
 import com.example.choreboo_habittrackerfriend.ui.theme.PetMoodTiredStart
 import com.example.choreboo_habittrackerfriend.ui.theme.XpPurple
+import com.example.choreboo_habittrackerfriend.ui.util.displayName
+import com.example.choreboo_habittrackerfriend.ui.util.labelRes
+import com.example.choreboo_habittrackerfriend.ui.util.hasLocalizedLabel
 import kotlinx.coroutines.launch
 
 private enum class AnimationPhase { MOOD, IDLE, EATING, INTERACTING, THUMBS_UP, START_SLEEPING, SLEEPING }
@@ -122,6 +132,14 @@ fun PetScreen(
     val streaks by viewModel.streaks.collectAsStateWithLifecycle()
     val householdCompleterNames by viewModel.householdCompleterNames.collectAsStateWithLifecycle()
 
+    // Background state
+    val backgroundId by viewModel.backgroundId.collectAsStateWithLifecycle()
+    val unlockedBackgroundIds by viewModel.unlockedBackgroundIds.collectAsStateWithLifecycle()
+    val backgroundCatalogue by viewModel.backgroundCatalogue.collectAsStateWithLifecycle()
+    val isPremium by viewModel.isPremium.collectAsStateWithLifecycle()
+
+    val context = LocalContext.current
+
     // Local UI state
     val snackbarHostState = remember { SnackbarHostState() }
     var showSleepDialog by remember { mutableStateOf(false) }
@@ -131,35 +149,49 @@ fun PetScreen(
     var isInteracting by remember { mutableStateOf(false) }
     var showStartSleepAnimation by remember { mutableStateOf(false) }
     var showThumbsUp by remember { mutableStateOf(false) }
+    var showBackgroundPicker by remember { mutableStateOf(false) }
+    var resubscribeNudgeDismissed by remember { mutableStateOf(false) }
+
+    // True when user has a premium pet but no active subscription
+    val showResubscribeNudge = !isPremium && petType.isPremium && !resubscribeNudgeDismissed
 
     // Event collector
+    val fedMsg = stringResource(R.string.pet_snack_fed)
+    val notEnoughPointsMsg = stringResource(R.string.pet_snack_not_enough_points)
+    val sleepingNowMsg = stringResource(R.string.pet_snack_sleeping_now)
+    val alreadySleepingMsg = stringResource(R.string.pet_snack_already_sleeping)
+    val habitCompletedFmt = stringResource(R.string.pet_snack_habit_completed)
+    val alreadyCompletedMsg = stringResource(R.string.pet_snack_already_completed)
+    val completionErrorMsg = stringResource(R.string.pet_snack_completion_error_generic)
+    val bgUnlockedFmt = stringResource(R.string.pet_snack_background_unlocked)
+    val habitCreatedMsg = stringResource(R.string.pet_snack_habit_created)
     LaunchedEffect(Unit) {
         viewModel.events.collect { event ->
             when (event) {
                 is PetEvent.Fed -> {
                     snackbarHostState.showSnackbar(
-                        message = "Yum! Your Choreboo loved that! \uD83D\uDE0B",
+                        message = fedMsg,
                         actionLabel = "success",
                         duration = SnackbarDuration.Short,
                     )
                 }
                 is PetEvent.InsufficientPoints -> {
                     snackbarHostState.showSnackbar(
-                        message = "Not enough points to feed! Complete habits to earn more. \uD83D\uDCAA",
+                        message = notEnoughPointsMsg,
                         actionLabel = "error",
                         duration = SnackbarDuration.Short,
                     )
                 }
                 is PetEvent.Sleeping -> {
                     snackbarHostState.showSnackbar(
-                        message = "Your Choreboo is now sleeping! \uD83D\uDE34 Stats are frozen for 24 hours.",
+                        message = sleepingNowMsg,
                         actionLabel = "info",
                         duration = SnackbarDuration.Short,
                     )
                 }
                 is PetEvent.AlreadySleeping -> {
                     snackbarHostState.showSnackbar(
-                        message = "Your Choreboo is already sleeping! Let them rest. \uD83D\uDCA4",
+                        message = alreadySleepingMsg,
                         actionLabel = "info",
                         duration = SnackbarDuration.Short,
                     )
@@ -170,22 +202,30 @@ fun PetScreen(
                         showLevelUpDialog = event
                     }
                     snackbarHostState.showSnackbar(
-                        message = "+${event.xpEarned} XP! \uD83D\uDD25 ${event.streak}-day streak!",
+                        message = habitCompletedFmt.format(event.xpEarned, event.streak),
                         actionLabel = "achievement",
                         duration = SnackbarDuration.Short,
                     )
                 }
                 is PetEvent.AlreadyComplete -> {
                     snackbarHostState.showSnackbar(
-                        message = "Already completed for today! \u2705",
+                        message = alreadyCompletedMsg,
                         actionLabel = "info",
                         duration = SnackbarDuration.Short,
                     )
                 }
                 is PetEvent.CompletionError -> {
                     snackbarHostState.showSnackbar(
-                        message = "Couldn't complete habit: ${event.message}",
+                        message = completionErrorMsg,
                         actionLabel = "error",
+                        duration = SnackbarDuration.Short,
+                    )
+                }
+                is PetEvent.BackgroundPurchased -> {
+                    val label = context.getString(event.item.labelRes())
+                    snackbarHostState.showSnackbar(
+                        message = bgUnlockedFmt.format(event.item.emoji, label),
+                        actionLabel = "success",
                         duration = SnackbarDuration.Short,
                     )
                 }
@@ -197,7 +237,7 @@ fun PetScreen(
     LaunchedEffect(habitJustCreated) {
         if (habitJustCreated) {
             snackbarHostState.showSnackbar(
-                message = "Habit created! Keep it up! \uD83C\uDF1F",
+                message = habitCreatedMsg,
                 duration = SnackbarDuration.Short,
             )
             onHabitCreatedConsumed()
@@ -240,6 +280,8 @@ fun PetScreen(
                                 fontWeight = FontWeight.ExtraBold,
                                 color = MaterialTheme.colorScheme.primary,
                             )
+                            Spacer(modifier = Modifier.width(8.dp))
+                            PremiumBadge(isPremium = isPremium)
                         } else {
                             ShimmerPlaceholder(
                                 width = 120.dp,
@@ -259,7 +301,7 @@ fun PetScreen(
                     ) {
                         Icon(
                             Icons.Default.Stars,
-                            contentDescription = "Points",
+                            contentDescription = stringResource(R.string.pet_points_cd),
                             tint = MaterialTheme.colorScheme.secondaryContainer,
                             modifier = Modifier.size(18.dp),
                         )
@@ -282,14 +324,14 @@ fun PetScreen(
                 shape = RoundedCornerShape(16.dp),
                 modifier = Modifier.padding(bottom = 72.dp),
             ) {
-                Icon(Icons.Default.Add, contentDescription = "Add Habit")
+                Icon(Icons.Default.Add, contentDescription = stringResource(R.string.pet_add_habit_cd))
             }
         },
         snackbarHost = { },
     ) { padding ->
         if (choreboo == null) {
             Box(Modifier.fillMaxSize().padding(padding), contentAlignment = Alignment.Center) {
-                Text("Loading your Choreboo...")
+                Text(stringResource(R.string.pet_loading))
             }
             return@Scaffold
         }
@@ -319,10 +361,15 @@ fun PetScreen(
                             modifier = Modifier
                                 .fillMaxWidth()
                                 .height(220.dp)
-                                .clip(RoundedCornerShape(16.dp))
-                                .background(moodBgStart),
+                                .clip(RoundedCornerShape(16.dp)),
                             contentAlignment = Alignment.Center,
                         ) {
+                            // Background layer — fills entire clipped box
+                            PetBackgroundImage(
+                                backgroundId = backgroundId,
+                                mood = mood,
+                                moodColor = moodBgStart,
+                            )
                             PetAnimation(
                                 petType = stats.petType,
                                 mood = mood,
@@ -353,15 +400,15 @@ fun PetScreen(
                                     verticalAlignment = Alignment.CenterVertically,
                                     horizontalArrangement = Arrangement.spacedBy(4.dp),
                                 ) {
-                                    Text(
-                                        text = if (isSleeping) "\uD83D\uDE34 SLEEPING" else "${mood.emoji} ${mood.displayName.uppercase()}",
-                                        style = MaterialTheme.typography.labelMedium,
-                                        fontWeight = FontWeight.Bold,
-                                        color = MaterialTheme.colorScheme.onSurface,
-                                    )
+                                                Text(
+                                                    text = if (isSleeping) "\uD83D\uDE34 ${stringResource(R.string.pet_sleeping_label)}" else "${mood.emoji} ${mood.displayName().uppercase()}",
+                                                    style = MaterialTheme.typography.labelMedium,
+                                                    fontWeight = FontWeight.Bold,
+                                                    color = MaterialTheme.colorScheme.onSurface,
+                                                )
                                     Icon(
                                         imageVector = Icons.Default.ExpandMore,
-                                        contentDescription = "View stats",
+                                        contentDescription = stringResource(R.string.pet_view_stats_cd),
                                         tint = MaterialTheme.colorScheme.onSurface,
                                         modifier = Modifier.size(14.dp),
                                     )
@@ -383,14 +430,33 @@ fun PetScreen(
                                 verticalAlignment = Alignment.CenterVertically,
                                 horizontalArrangement = Arrangement.spacedBy(4.dp),
                             ) {
-                                Text("\u2B50", fontSize = 18.sp)
-                                Text(
-                                    text = "Lv.${stats.level}",
-                                    fontWeight = FontWeight.Black,
-                                    style = MaterialTheme.typography.titleMedium,
-                                    color = MaterialTheme.colorScheme.onSecondaryContainer,
-                                )
+                                 Text("\u2B50", fontSize = 18.sp)
+                                 Text(
+                                     text = stringResource(R.string.level_badge, stats.level),
+                                     fontWeight = FontWeight.Black,
+                                     style = MaterialTheme.typography.titleMedium,
+                                     color = MaterialTheme.colorScheme.onSecondaryContainer,
+                                 )
                             }
+                        }
+
+                        // Background edit button — bottom-end, outside the clipped box
+                        Box(
+                            modifier = Modifier
+                                .align(Alignment.BottomEnd)
+                                .offset(x = 4.dp, y = 4.dp)
+                                .size(36.dp)
+                                .clip(CircleShape)
+                                .background(MaterialTheme.colorScheme.surfaceContainerHigh.copy(alpha = 0.92f))
+                                .clickable { showBackgroundPicker = true },
+                            contentAlignment = Alignment.Center,
+                        ) {
+                            Icon(
+                                imageVector = Icons.Default.Palette,
+                                contentDescription = stringResource(R.string.pet_change_background_cd),
+                                tint = MaterialTheme.colorScheme.onSurface,
+                                modifier = Modifier.size(18.dp),
+                            )
                         }
                     }
                 }
@@ -405,7 +471,7 @@ fun PetScreen(
                     ) {
                         ActionButton(
                             modifier = Modifier.weight(1f),
-                            label = "Feed",
+                            label = stringResource(R.string.pet_feed_button),
                             emoji = "\uD83C\uDF56",
                             onClick = { viewModel.feedChoreboo() },
                             enabled = totalPoints >= 10 && !isSleeping,
@@ -413,7 +479,7 @@ fun PetScreen(
                         )
                         ActionButton(
                             modifier = Modifier.weight(1f),
-                            label = "Play",
+                            label = stringResource(R.string.pet_play_button),
                             emoji = "\uD83C\uDFAE",
                             onClick = { isInteracting = true },
                             enabled = !isSleeping,
@@ -421,7 +487,7 @@ fun PetScreen(
                         )
                         ActionButton(
                             modifier = Modifier.weight(1f),
-                            label = "Sleep",
+                            label = stringResource(R.string.pet_sleep_button),
                             emoji = "\uD83D\uDE34",
                             onClick = { showSleepDialog = true },
                             enabled = !isSleeping,
@@ -431,8 +497,73 @@ fun PetScreen(
                 }
 
                 // -------------------------------------------------------
+                // Lapsed-premium resubscribe nudge
+                // -------------------------------------------------------
+                if (showResubscribeNudge) {
+                    item {
+                        Card(
+                            shape = RoundedCornerShape(16.dp),
+                            colors = CardDefaults.cardColors(
+                                containerColor = MaterialTheme.colorScheme.tertiaryContainer,
+                            ),
+                            modifier = Modifier.fillMaxWidth(),
+                        ) {
+                            Row(
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .padding(14.dp),
+                                verticalAlignment = Alignment.CenterVertically,
+                                horizontalArrangement = Arrangement.spacedBy(10.dp),
+                            ) {
+                                Text("👑", style = MaterialTheme.typography.titleLarge)
+                                Column(modifier = Modifier.weight(1f)) {
+                                    Text(
+                                        stringResource(R.string.pet_resubscribe),
+                                        style = MaterialTheme.typography.labelMedium,
+                                        fontWeight = FontWeight.Bold,
+                                        color = MaterialTheme.colorScheme.onTertiaryContainer,
+                                    )
+                                    Text(
+                                        stringResource(R.string.pet_resubscribe_body, petType.name.lowercase().replaceFirstChar { it.uppercase() }),
+                                        style = MaterialTheme.typography.bodySmall,
+                                        color = MaterialTheme.colorScheme.onTertiaryContainer,
+                                    )
+                                }
+                                TextButton(
+                                    onClick = {
+                                        val activity = context as? android.app.Activity
+                                        if (activity != null) {
+                                            viewModel.launchPremiumPurchase(activity)
+                                        }
+                                    },
+                                ) {
+                                    Text(
+                                        stringResource(R.string.pet_subscribe_button),
+                                        color = MaterialTheme.colorScheme.onTertiaryContainer,
+                                        fontWeight = FontWeight.Bold,
+                                    )
+                                }
+                                Icon(
+                                    imageVector = Icons.Default.Close,
+                                    contentDescription = stringResource(R.string.pet_dismiss_cd),
+                                    tint = MaterialTheme.colorScheme.onTertiaryContainer,
+                                    modifier = Modifier
+                                        .size(18.dp)
+                                        .clickable { resubscribeNudgeDismissed = true },
+                                )
+                            }
+                        }
+                    }
+                }
+
+                // -------------------------------------------------------
                 // Daily Quest section header + Habit list
                 // -------------------------------------------------------
+                // Banner ad — only shown for free-tier users
+                item {
+                    BannerAdView(isPremium = isPremium)
+                }
+
                 if (isLoading) {
                     item {
                         Box(
@@ -444,7 +575,7 @@ fun PetScreen(
                             CircularProgressIndicator()
                         }
                     }
-                } else if (habits.isEmpty()) {
+                                } else if (habits.isEmpty()) {
                     item {
                         Box(
                             modifier = Modifier
@@ -456,13 +587,13 @@ fun PetScreen(
                                 Text(text = "\uD83D\uDCCB", style = MaterialTheme.typography.displayLarge)
                                 Spacer(modifier = Modifier.height(16.dp))
                                 Text(
-                                    text = "No habits yet!",
+                                    text = stringResource(R.string.pet_no_habits_title),
                                     style = MaterialTheme.typography.titleLarge,
                                     fontWeight = FontWeight.SemiBold,
                                 )
                                 Spacer(modifier = Modifier.height(8.dp))
                                 Text(
-                                    text = "Tap + to create your first habit\nand start earning rewards for your Choreboo!",
+                                    text = stringResource(R.string.pet_no_habits_body),
                                     style = MaterialTheme.typography.bodyMedium,
                                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                                     textAlign = TextAlign.Center,
@@ -478,13 +609,13 @@ fun PetScreen(
                             verticalAlignment = Alignment.CenterVertically,
                         ) {
                             Text(
-                                text = "Daily Quest",
+                                text = stringResource(R.string.pet_daily_quest),
                                 style = MaterialTheme.typography.titleMedium,
                                 fontWeight = FontWeight.Bold,
                                 color = MaterialTheme.colorScheme.onSurface,
                             )
                             Text(
-                                text = "$completedToday of ${scheduledToday.size} Completed",
+                                text = stringResource(R.string.pet_progress_summary, completedToday, scheduledToday.size),
                                 style = MaterialTheme.typography.labelMedium,
                                 fontWeight = FontWeight.Medium,
                                 color = MaterialTheme.colorScheme.onSurfaceVariant,
@@ -501,7 +632,7 @@ fun PetScreen(
                             onComplete = { viewModel.completeHabit(habit.id) },
                             onEdit = { onEditHabit(habit.id) },
                             onDelete = { habitToDelete = habit },
-                            isOwnedByCurrentUser = habit.ownerUid == viewModel.currentUserUid,
+                            canModify = habit.ownerUid == viewModel.currentUserUid || habit.assignedToUid == viewModel.currentUserUid,
                             householdCompleterName = householdCompleterNames[habit.id],
                         )
                     }
@@ -586,13 +717,13 @@ fun PetScreen(
                                         )
                                         Column {
                                             Text(
-                                                text = if (isSleeping) "Sleeping" else mood.displayName,
+                                                text = if (isSleeping) stringResource(R.string.stat_sleeping) else mood.displayName(),
                                                 style = MaterialTheme.typography.titleMedium,
                                                 fontWeight = FontWeight.Bold,
                                                 color = MaterialTheme.colorScheme.onSurface,
                                             )
                                             Text(
-                                                text = "${stats.name}'s stats",
+                                                text = stringResource(R.string.pet_stats_header, stats.name),
                                                 style = MaterialTheme.typography.labelSmall,
                                                 color = MaterialTheme.colorScheme.onSurfaceVariant,
                                             )
@@ -606,9 +737,9 @@ fun PetScreen(
                                             .clickable { showDetailedStats = false },
                                         contentAlignment = Alignment.Center,
                                     ) {
-                                        Icon(
+                                         Icon(
                                             imageVector = Icons.Default.Close,
-                                            contentDescription = "Close",
+                                            contentDescription = stringResource(R.string.pet_close_cd),
                                             tint = MaterialTheme.colorScheme.onSurfaceVariant,
                                             modifier = Modifier.size(16.dp),
                                         )
@@ -622,27 +753,27 @@ fun PetScreen(
                                 ) {
                                     StatBentoCard(
                                         modifier = Modifier.weight(1f),
-                                        label = "HUNGER",
+                                        label = stringResource(R.string.pet_hunger_label),
                                         emoji = "\uD83C\uDF56",
                                         value = stats.hunger,
                                         statusText = when {
-                                            stats.hunger >= 80 -> "Full"
-                                            stats.hunger >= 50 -> "Peckish"
-                                            stats.hunger >= 25 -> "Hungry"
-                                            else -> "Starving!"
+                                            stats.hunger >= 80 -> stringResource(R.string.stat_full)
+                                            stats.hunger >= 50 -> stringResource(R.string.stat_peckish)
+                                            stats.hunger >= 25 -> stringResource(R.string.stat_hungry)
+                                            else -> stringResource(R.string.stat_starving)
                                         },
                                         barColor = MaterialTheme.colorScheme.secondary,
                                     )
                                     StatBentoCard(
                                         modifier = Modifier.weight(1f),
-                                        label = "JOY",
+                                        label = stringResource(R.string.pet_joy_label),
                                         emoji = "\uD83D\uDC95",
                                         value = stats.happiness,
                                         statusText = when {
-                                            stats.happiness >= 80 -> "Happy"
-                                            stats.happiness >= 50 -> "Content"
-                                            stats.happiness >= 25 -> "Sad"
-                                            else -> "Miserable!"
+                                            stats.happiness >= 80 -> stringResource(R.string.stat_happy)
+                                            stats.happiness >= 50 -> stringResource(R.string.stat_content)
+                                            stats.happiness >= 25 -> stringResource(R.string.stat_sad)
+                                            else -> stringResource(R.string.stat_miserable)
                                         },
                                         barColor = MaterialTheme.colorScheme.primary,
                                     )
@@ -652,10 +783,10 @@ fun PetScreen(
                                 EnergyBentoCard(
                                     value = stats.energy,
                                     statusText = when {
-                                        stats.energy >= 70 -> "Energized"
-                                        stats.energy >= 40 -> "Recharging"
-                                        stats.energy >= 15 -> "Needs Nap Soon"
-                                        else -> "Exhausted!"
+                                        stats.energy >= 70 -> stringResource(R.string.stat_energized)
+                                        stats.energy >= 40 -> stringResource(R.string.stat_recharging)
+                                        stats.energy >= 15 -> stringResource(R.string.stat_needs_nap)
+                                        else -> stringResource(R.string.stat_exhausted)
                                     },
                                 )
 
@@ -666,10 +797,10 @@ fun PetScreen(
                                     xpProgressFraction = stats.xpProgressFraction,
                                 )
                             }
+                            }
                         }
                     }
                 }
-            }
         }
 
         // Sleep confirmation dialog
@@ -677,12 +808,10 @@ fun PetScreen(
             AlertDialog(
                 onDismissRequest = { showSleepDialog = false },
                 title = {
-                    Text("Put Choreboo to Sleep?", fontWeight = FontWeight.Bold)
+                    Text(stringResource(R.string.pet_sleep_dialog_title), fontWeight = FontWeight.Bold)
                 },
                 text = {
-                    Text(
-                        "Your Choreboo will sleep for 24 hours. During this time, their stats will not decrease and they'll be fully rested! \uD83D\uDE34\n\nAfter 24 hours, normal stat decay will resume.",
-                    )
+                    Text(stringResource(R.string.pet_sleep_dialog_body))
                 },
                 confirmButton = {
                     Button(
@@ -692,14 +821,14 @@ fun PetScreen(
                             showSleepDialog = false
                         },
                     ) {
-                        Text("Let Them Sleep")
+                        Text(stringResource(R.string.pet_sleep_dialog_confirm))
                     }
                 },
                 dismissButton = {
                     TextButton(
                         onClick = { showSleepDialog = false },
                     ) {
-                        Text("Cancel")
+                        Text(stringResource(R.string.pet_cancel_button))
                     }
                 },
             )
@@ -709,9 +838,9 @@ fun PetScreen(
         habitToDelete?.let { habit ->
             AlertDialog(
                 onDismissRequest = { habitToDelete = null },
-                title = { Text("Delete Habit?", fontWeight = FontWeight.Bold) },
+                title = { Text(stringResource(R.string.pet_delete_habit_title), fontWeight = FontWeight.Bold) },
                 text = {
-                    Text("Are you sure you want to delete \"${habit.title}\"? This will also remove all completion history.")
+                    Text(stringResource(R.string.pet_delete_habit_text, habit.title))
                 },
                 confirmButton = {
                     TextButton(
@@ -720,12 +849,12 @@ fun PetScreen(
                             habitToDelete = null
                         },
                     ) {
-                        Text("Delete", color = MaterialTheme.colorScheme.error)
+                        Text(stringResource(R.string.pet_delete_button), color = MaterialTheme.colorScheme.error)
                     }
                 },
                 dismissButton = {
                     TextButton(onClick = { habitToDelete = null }) {
-                        Text("Cancel")
+                        Text(stringResource(R.string.pet_cancel_button))
                     }
                 },
             )
@@ -738,6 +867,26 @@ fun PetScreen(
                 onDismiss = { showLevelUpDialog = null },
             )
         }
+    }
+
+    // Background picker — shown as a ModalBottomSheet on top of everything
+    if (showBackgroundPicker) {
+        BackgroundPickerSheet(
+            catalogue = backgroundCatalogue,
+            unlockedIds = unlockedBackgroundIds,
+            currentBackgroundId = backgroundId,
+            totalPoints = totalPoints,
+            isPremium = isPremium,
+            onSelect = { id ->
+                viewModel.selectBackground(id)
+                showBackgroundPicker = false
+            },
+            onPurchase = { item ->
+                viewModel.purchaseBackground(item)
+                // Keep sheet open so user can see it's been unlocked and then apply
+            },
+            onDismiss = { showBackgroundPicker = false },
+        )
     }
 }
 
@@ -764,7 +913,7 @@ private fun XpProgressCard(
                 horizontalArrangement = Arrangement.SpaceBetween,
             ) {
                 Text(
-                    text = "XP PROGRESS",
+                    text = stringResource(R.string.pet_xp_progress_label),
                     style = MaterialTheme.typography.labelSmall,
                     fontWeight = FontWeight.Bold,
                     color = XpPurple,
@@ -858,12 +1007,13 @@ private fun StatBentoCard(
     statusText: String,
     barColor: Color,
 ) {
+    val contentDescriptionText = stringResource(R.string.stat_bento_cd, label, value, statusText)
     Box(
         modifier = modifier
             .height(110.dp)
             .clip(RoundedCornerShape(16.dp))
             .background(MaterialTheme.colorScheme.surfaceContainerLowest)
-            .semantics(mergeDescendants = true) { contentDescription = "$label: $value%, $statusText" },
+            .semantics(mergeDescendants = true) { contentDescription = contentDescriptionText },
     ) {
         Column(
             modifier = Modifier
@@ -932,14 +1082,15 @@ private fun EnergyBentoCard(
     statusText: String,
     modifier: Modifier = Modifier,
 ) {
+    val contentDescriptionText = stringResource(R.string.energy_bento_cd, value, statusText)
     Box(
-        modifier = modifier
-            .fillMaxWidth()
-            .height(100.dp)
-            .clip(RoundedCornerShape(16.dp))
-            .background(MaterialTheme.colorScheme.surfaceContainerLowest)
-            .semantics(mergeDescendants = true) { contentDescription = "Energy levels: $value%, $statusText" },
-    ) {
+         modifier = modifier
+             .fillMaxWidth()
+             .height(100.dp)
+             .clip(RoundedCornerShape(16.dp))
+             .background(MaterialTheme.colorScheme.surfaceContainerLowest)
+             .semantics(mergeDescendants = true) { contentDescription = contentDescriptionText },
+     ) {
         Column(
             modifier = Modifier
                 .fillMaxSize()
@@ -957,7 +1108,7 @@ private fun EnergyBentoCard(
                 ) {
                     Text("\u26A1", fontSize = 20.sp)
                     Text(
-                        text = "ENERGY LEVELS",
+                        text = stringResource(R.string.pet_energy_label),
                         style = MaterialTheme.typography.labelSmall,
                         fontWeight = FontWeight.Bold,
                         color = MaterialTheme.colorScheme.onSurfaceVariant,
@@ -1036,7 +1187,7 @@ private fun LevelUpDialog(
                     horizontalAlignment = Alignment.CenterHorizontally,
                 ) {
                     Text(
-                        text = if (event.evolved) "\uD83C\uDF89 Evolution! \uD83C\uDF89" else "\uD83C\uDF89 Level Up! \uD83C\uDF89",
+                        text = if (event.evolved) stringResource(R.string.levelup_evolved_title) else stringResource(R.string.levelup_level_up_title),
                         style = MaterialTheme.typography.titleLarge,
                         fontWeight = FontWeight.Bold,
                         color = MaterialTheme.colorScheme.onSecondary,
@@ -1045,9 +1196,9 @@ private fun LevelUpDialog(
                     Spacer(modifier = Modifier.height(12.dp))
                     Text(
                         text = if (event.evolved)
-                            "Your Choreboo evolved to ${event.newStageName}! \uD83C\uDF1F\nNow Level ${event.newLevel}!"
+                            stringResource(R.string.levelup_evolved_body, event.newStage?.displayName() ?: "", event.newLevel)
                         else
-                            "Your Choreboo reached Level ${event.newLevel}! \uD83C\uDF1F\nKeep completing habits to evolve!",
+                            stringResource(R.string.levelup_level_up_body, event.newLevel),
                         style = MaterialTheme.typography.bodyLarge,
                         color = MaterialTheme.colorScheme.onSecondary,
                         textAlign = TextAlign.Center,
@@ -1055,7 +1206,7 @@ private fun LevelUpDialog(
                     Spacer(modifier = Modifier.height(20.dp))
                     TextButton(onClick = onDismiss) {
                         Text(
-                            text = "Awesome! \uD83C\uDF8A",
+                            text = stringResource(R.string.levelup_awesome),
                             style = MaterialTheme.typography.labelLarge,
                             fontWeight = FontWeight.Bold,
                             color = MaterialTheme.colorScheme.onSecondary,

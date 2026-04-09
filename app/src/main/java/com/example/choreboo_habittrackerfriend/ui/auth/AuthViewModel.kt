@@ -1,8 +1,10 @@
 package com.example.choreboo_habittrackerfriend.ui.auth
 
 import android.util.Log
+import androidx.annotation.StringRes
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
+import com.example.choreboo_habittrackerfriend.R
 import com.example.choreboo_habittrackerfriend.data.datastore.UserPreferences
 import com.example.choreboo_habittrackerfriend.data.repository.AuthRepository
 import com.example.choreboo_habittrackerfriend.data.repository.AuthResult
@@ -24,14 +26,26 @@ import javax.inject.Inject
 
 private const val TAG = "AuthViewModel"
 
+/**
+ * Typed validation error for auth form fields. Each variant maps to a string resource so the
+ * UI can call `stringResource(error.messageRes)` without raw strings in the ViewModel.
+ */
+sealed class AuthValidationError(@StringRes val messageRes: Int) {
+    data object EmailRequired : AuthValidationError(R.string.auth_error_email_required)
+    data object EmailInvalid : AuthValidationError(R.string.auth_error_email_invalid)
+    data object PasswordRequired : AuthValidationError(R.string.auth_error_password_required)
+    data object PasswordTooShort : AuthValidationError(R.string.auth_error_password_too_short)
+    data object EnterEmailFirst : AuthValidationError(R.string.auth_error_enter_email_first)
+}
+
 data class AuthFormState(
     val email: String = "",
     val password: String = "",
     val isSignUp: Boolean = false,
     val isLoading: Boolean = false,
     val isSyncing: Boolean = false,
-    val emailError: String? = null,
-    val passwordError: String? = null,
+    val emailError: AuthValidationError? = null,
+    val passwordError: AuthValidationError? = null,
     val showForgotPassword: Boolean = false,
 )
 
@@ -100,7 +114,7 @@ class AuthViewModel @Inject constructor(
     fun sendPasswordReset() {
         val email = _formState.value.email.trim()
         if (email.isBlank()) {
-            _formState.update { it.copy(emailError = "Enter your email address first.") }
+            _formState.update { it.copy(emailError = AuthValidationError.EnterEmailFirst) }
             return
         }
         viewModelScope.launch {
@@ -109,9 +123,9 @@ class AuthViewModel @Inject constructor(
             _formState.update { it.copy(isLoading = false, showForgotPassword = false) }
             when (result) {
                 is AuthResult.ResetEmailSent ->
-                    _events.emit(AuthEvent.ShowMessage("Password reset email sent to $email"))
+                    _events.emit(AuthEvent.ShowMessage(R.string.auth_reset_email_sent, email))
                 is AuthResult.Error ->
-                    _events.emit(AuthEvent.ShowError(result.message))
+                    _events.emit(AuthEvent.ShowError(result.errorType.messageRes))
                 is AuthResult.Success -> { /* Should not happen for password reset */ }
             }
         }
@@ -120,17 +134,17 @@ class AuthViewModel @Inject constructor(
     private fun validate(state: AuthFormState): Boolean {
         var valid = true
         if (state.email.isBlank()) {
-            _formState.update { it.copy(emailError = "Email is required.") }
+            _formState.update { it.copy(emailError = AuthValidationError.EmailRequired) }
             valid = false
         } else if (!android.util.Patterns.EMAIL_ADDRESS.matcher(state.email.trim()).matches()) {
-            _formState.update { it.copy(emailError = "Enter a valid email address.") }
+            _formState.update { it.copy(emailError = AuthValidationError.EmailInvalid) }
             valid = false
         }
         if (state.password.isBlank()) {
-            _formState.update { it.copy(passwordError = "Password is required.") }
+            _formState.update { it.copy(passwordError = AuthValidationError.PasswordRequired) }
             valid = false
         } else if (state.isSignUp && state.password.length < 6) {
-            _formState.update { it.copy(passwordError = "Password must be at least 6 characters.") }
+            _formState.update { it.copy(passwordError = AuthValidationError.PasswordTooShort) }
             valid = false
         }
         return valid
@@ -163,7 +177,7 @@ class AuthViewModel @Inject constructor(
                 }
 
                 if (!syncSucceeded) {
-                    _events.emit(AuthEvent.ShowMessage("Signed in — couldn't sync cloud data"))
+                    _events.emit(AuthEvent.ShowMessage(R.string.auth_signed_in_sync_failed))
                 }
 
                 // Phase 3: Detect whether this user has already completed onboarding.
@@ -176,7 +190,7 @@ class AuthViewModel @Inject constructor(
 
                 _events.emit(AuthEvent.AuthSuccess(result.user.uid, onboardingComplete = hasChoreboo))
             }
-            is AuthResult.Error -> _events.emit(AuthEvent.ShowError(result.message))
+            is AuthResult.Error -> _events.emit(AuthEvent.ShowError(result.errorType.messageRes))
             is AuthResult.ResetEmailSent -> { /* Handled separately in sendPasswordReset() */ }
         }
     }
@@ -184,6 +198,6 @@ class AuthViewModel @Inject constructor(
 
 sealed class AuthEvent {
     data class AuthSuccess(val uid: String, val onboardingComplete: Boolean) : AuthEvent()
-    data class ShowError(val message: String) : AuthEvent()
-    data class ShowMessage(val message: String) : AuthEvent()
+    data class ShowError(@StringRes val messageRes: Int) : AuthEvent()
+    data class ShowMessage(@StringRes val messageRes: Int, val formatArg: String? = null) : AuthEvent()
 }

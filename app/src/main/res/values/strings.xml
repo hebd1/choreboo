@@ -1,4 +1,707 @@
 <resources>
     <string name="app_name">Choreboo - Habit Tracker Friend</string>
     <string name="default_web_client_id">1003527545101-vugsienjkf1hu483jtlsnr1d7ivotec8.apps.googleusercontent.com</string>
-</resources>
+
+    <!-- ===== BOTTOM NAV BAR ===== -->
+    <string name="nav_choreboo">Choreboo</string>
+    <string name="nav_stats">Stats</string>
+    <string name="nav_house">House</string>
+    <string name="nav_history">History</string>
+    <string name="nav_settings">Settings</string>
+
+    <!-- ===== AUTH SCREEN ===== -->
+    <string name="auth_create_account">Create your account</string>
+    <string name="auth_welcome_back">Welcome back!</string>
+    <string name="auth_email_label">Email</string>
+    <string name="auth_password_label">Password</string>
+    <string name="auth_hide_password">Hide password</string>
+    <string name="auth_show_password">Show password</string>
+    <string name="auth_forgot_password">Forgot password?</string>
+    <string name="auth_create_account_button">Create Account</string>
+    <string name="auth_sign_in_button">Sign In</string>
+    <string name="auth_sign_up_button">Sign Up</string>
+    <string name="auth_or_divider">or</string>
+    <string name="auth_continue_with_google">Continue with Google</string>
+    <string name="auth_privacy_policy">Privacy Policy</string>
+    <string name="auth_already_have_account">Already have an account? </string>
+    <string name="auth_dont_have_account">Don\'t have an account? </string>
+    <string name="auth_syncing_data">Syncing your data…</string>
+    <string name="auth_reset_password_title">Reset Password</string>
+    <string name="auth_send_reset_email">Send Reset Email</string>
+    <string name="auth_cancel">Cancel</string>
+    <string name="auth_reset_email_placeholder">(enter your email first)</string>
+    <!-- Parameterized: "We'll send a reset link to [email]" -->
+    <string name="auth_reset_email_body">We\'ll send a reset link to %1$s</string>
+
+    <!-- Auth validation errors (emitted by AuthViewModel) -->
+    <string name="auth_error_email_required">Email is required.</string>
+    <string name="auth_error_email_invalid">Enter a valid email address.</string>
+    <string name="auth_error_password_required">Password is required.</string>
+    <string name="auth_error_password_too_short">Password must be at least 6 characters.</string>
+    <string name="auth_error_enter_email_first">Enter your email address first.</string>
+    <!-- Parameterized: "Password reset email sent to [email]" -->
+    <string name="auth_reset_email_sent">Password reset email sent to %1$s</string>
+    <string name="auth_signed_in_sync_failed">Signed in — couldn\'t sync cloud data</string>
+
+    <!-- Auth error messages from Firebase (AuthRepository.toFriendlyMessage) -->
+    <string name="auth_error_unknown">An unknown error occurred.</string>
+    <string name="auth_error_invalid_credentials">Incorrect email or password.</string>
+    <string name="auth_error_email_already_exists">An account with this email already exists.</string>
+    <string name="auth_error_weak_password">Password must be at least 6 characters.</string>
+    <string name="auth_error_invalid_email">Please enter a valid email address.</string>
+    <string name="auth_error_user_not_found">No account found with this email.</string>
+    <string name="auth_error_too_many_requests">Too many attempts. Please try again later.</string>
+    <string name="auth_error_network">Network error. Check your connection and try again.</string>
+    <string name="auth_error_sign_in_no_user">Sign-in failed: no user returned.</string>
+    <string name="auth_error_sign_up_no_user">Sign-up failed: no user returned.</string>
+    <string name="auth_error_google_no_user">Google sign-in failed: no user returned.</string>
+    <string name="auth_error_google_failed">Google sign-in failed. Please try again.</string>
+
+    <!-- ===== ONBOARDING SCREEN ===== -->
+    <string name="onboarding_how_use_title">How will you use Choreboo?</string>
+    <string name="onboarding_how_use_subtitle">Help us personalise your experience.</string>
+    <string name="onboarding_continue">Continue →</string>
+    <string name="onboarding_biggest_challenge_title">What\'s your biggest challenge?</string>
+    <string name="onboarding_biggest_challenge_subtitle">We\'ll tailor Choreboo\'s coaching for you.</string>
+    <string name="onboarding_back">← Back</string>
+    <string name="onboarding_how_it_helps_title">Here\'s how Choreboo helps you</string>
+    <string name="onboarding_next_pick_pet">Let\'s pick your pet! →</string>
+    <string name="onboarding_choose_companion">Choose your companion</string>
+    <string name="onboarding_pet_premium_note">Fox &amp; Panda are free. Axolotl &amp; Capybara unlock with Premium.</string>
+    <string name="onboarding_selected_cd">Selected</string>
+    <string name="onboarding_premium_cd">Premium</string>
+    <!-- Parameterized: "Name your [Fox]!" -->
+    <string name="onboarding_name_your_pet">Name your %1$s!</string>
+    <string name="onboarding_name_change_later">You can always change it later.</string>
+    <!-- Parameterized: "What will you call your [Fox]?" -->
+    <string name="onboarding_name_hint_label">What will you call your %1$s?</string>
+    <string name="onboarding_name_placeholder">e.g. Sprout, Mochi, Pixel…</string>
+    <string name="onboarding_hatching">Hatching…</string>
+    <string name="onboarding_change_pet">← Change pet</string>
+    <string name="onboarding_terms">By hatching, you agree to our Terms of Adventure.</string>
+    <string name="onboarding_unlock_premium">Unlock Choreboo Premium</string>
+    <string name="onboarding_start_free_trial">Start Free Trial</string>
+    <string name="onboarding_opening_store">Opening…</string>
+    <string name="onboarding_continue_free">Maybe later — continue free</string>
+    <string name="onboarding_cancel_anytime">Cancel anytime…</string>
+    <string name="onboarding_error_generic">Something went wrong. Please try again.</string>
+    <string name="onboarding_error_purchase_screen">Unable to open the purchase screen. Please try again later.</string>
+    <!-- Parameterized: "Choose [Fox] 🦊" — emoji is already in PetType, no need to translate -->
+    <string name="onboarding_choose_pet">Choose %1$s %2$s</string>
+    <string name="onboarding_hatch_cta">Hatch My Choreboo! %1$s</string>
+    <string name="onboarding_snack_premium_fallback">Premium required for that pet — switched to Fox!</string>
+    <string name="onboarding_cancel_sub_note">Cancel anytime. Prices may vary by region.\nManage subscriptions in Google Play.</string>
+    <string name="onboarding_premium_feature_pets">Exclusive pets: Axolotl &amp; Capybara</string>
+    <string name="onboarding_premium_feature_backgrounds">Premium backgrounds: Galaxy, Underwater, Aurora</string>
+    <string name="onboarding_premium_feature_badge">Premium badge next to your pet\'s name</string>
+    <string name="onboarding_premium_feature_no_ads">No ads — ever</string>
+
+    <!-- Onboarding HowItHelps personalised bullets -->
+    <string name="onboarding_help_bullet_base">Complete daily habits to earn XP and level up your pet.</string>
+    <string name="onboarding_help_bullet_stages">Level up your pet through 6 stages — Egg → Baby → Child → Teen → Adult → Legendary!</string>
+    <string name="onboarding_help_chores_household">Create a Household so your family or roommates can see your progress together.</string>
+    <string name="onboarding_help_chores_schedule">Set recurring habits with custom days to build lasting routines.</string>
+    <string name="onboarding_help_chores_tasks">Track one-off and daily tasks all in one place.</string>
+    <string name="onboarding_help_motivation">Streaks and XP keep you coming back — your pet depends on you!</string>
+    <string name="onboarding_help_time">Quick habit check-ins take under 10 seconds. Set reminder alarms so you never forget.</string>
+    <string name="onboarding_help_remembering">Daily notifications remind you what to complete before midnight.</string>
+    <string name="onboarding_help_getting_started">Start with just one habit. Choreboo celebrates every tiny win.</string>
+
+    <!-- Onboarding UsageIntent labels -->
+    <string name="usage_intent_chores">Track chores with friends &amp; family</string>
+    <string name="usage_intent_habits">Build better habits &amp; routines</string>
+    <string name="usage_intent_tasks">Stay on top of tasks &amp; to-dos</string>
+
+    <!-- Onboarding BiggestStruggle labels -->
+    <string name="struggle_motivation">Staying motivated</string>
+    <string name="struggle_time">Finding time</string>
+    <string name="struggle_remembering">Remembering what to do</string>
+    <string name="struggle_getting_started">Getting started</string>
+
+    <!-- Onboarding HowItHelpsStep bullets (personalised per UsageIntent) -->
+    <string name="help_chores_1">Assign tasks to family members</string>
+    <string name="help_chores_2">Track who did what and when</string>
+    <string name="help_chores_3">Keep everyone accountable — with fun!</string>
+    <string name="help_habits_1">Build habits with XP rewards</string>
+    <string name="help_habits_2">Evolve your Choreboo as you grow</string>
+    <string name="help_habits_3">Celebrate every streak milestone</string>
+    <string name="help_tasks_1">Never miss a to-do again</string>
+    <string name="help_tasks_2">Daily reminders keep you on track</string>
+    <string name="help_tasks_3">Turn tasks into achievements</string>
+
+    <!-- ===== PET SCREEN ===== -->
+    <string name="pet_loading">Loading your Choreboo…</string>
+    <string name="pet_points_cd">Points</string>
+    <string name="pet_add_habit_cd">Add Habit</string>
+    <string name="pet_daily_quest">Daily Quest</string>
+    <!-- Parameterized: "2 of 5 Completed" -->
+    <string name="pet_progress_summary">%1$d of %2$d Completed</string>
+    <string name="pet_no_habits_title">No habits yet!</string>
+    <string name="pet_no_habits_body">Tap + to create your first habit\nand start earning rewards for your Choreboo!</string>
+    <string name="pet_sleeping_label">SLEEPING</string>
+    <string name="pet_view_stats_cd">View stats</string>
+    <string name="pet_change_background_cd">Change background</string>
+    <string name="pet_feed_button">Feed</string>
+    <string name="pet_play_button">Play</string>
+    <string name="pet_sleep_button">Sleep</string>
+    <string name="pet_resubscribe">Resubscribe to Premium</string>
+    <!-- Parameterized: "Your [Fox] needs an active subscription." -->
+    <string name="pet_needs_subscription">Your %1$s needs an active subscription.</string>
+    <string name="pet_subscribe_button">Subscribe</string>
+    <string name="pet_dismiss_cd">Dismiss</string>
+    <string name="pet_xp_progress_label">XP PROGRESS</string>
+    <string name="pet_hunger_label">HUNGER</string>
+    <string name="pet_joy_label">JOY</string>
+    <string name="pet_energy_label">ENERGY LEVELS</string>
+
+    <!-- Stat status texts -->
+    <string name="stat_full">Full</string>
+    <string name="stat_peckish">Peckish</string>
+    <string name="stat_hungry">Hungry</string>
+    <string name="stat_starving">Starving!</string>
+    <string name="stat_happy">Happy</string>
+    <string name="stat_content">Content</string>
+    <string name="stat_sad">Sad</string>
+    <string name="stat_miserable">Miserable!</string>
+    <string name="stat_energized">Energized</string>
+    <string name="stat_recharging">Recharging</string>
+    <string name="stat_needs_nap">Needs Nap Soon</string>
+    <string name="stat_exhausted">Exhausted!</string>
+    <string name="stat_sleeping">Sleeping</string>
+
+    <!-- Pet screen dialogs -->
+    <string name="pet_sleep_dialog_title">Put Choreboo to Sleep?</string>
+    <string name="pet_sleep_dialog_body">Your Choreboo will sleep for 24 hours. During this time, their stats will not decrease and they\'ll be fully rested! 😴\n\nAfter 24 hours, normal stat decay will resume.</string>
+    <string name="pet_sleep_dialog_confirm">Let Them Sleep</string>
+    <string name="pet_delete_habit_title">Delete Habit?</string>
+    <!-- Parameterized: "Are you sure you want to delete \"Drink water\"? ..." -->
+    <string name="pet_delete_habit_text">Are you sure you want to delete \"%1$s\"? This will also remove all completion history.</string>
+    <string name="pet_delete_button">Delete</string>
+    <string name="pet_cancel_button">Cancel</string>
+    <string name="pet_close_cd">Close</string>
+    <!-- Parameterized: "Your [Fox]'s stats" -->
+    <string name="pet_stats_header">%1$s\'s stats</string>
+    <!-- Parameterized: "Your [Fox] needs an active subscription." -->
+    <string name="pet_resubscribe_body">Your %1$s needs an active subscription.</string>
+
+    <!-- Pet screen snackbar messages -->
+    <string name="pet_snack_fed">Yum! Your Choreboo loved that! 😋</string>
+    <string name="pet_snack_not_enough_points">Not enough points to feed! Complete habits to earn more. 💪</string>
+    <string name="pet_snack_sleeping_now">Your Choreboo is now sleeping! 😴 Stats are frozen for 24 hours.</string>
+    <string name="pet_snack_already_sleeping">Your Choreboo is already sleeping! Let them rest. 💤</string>
+    <!-- Parameterized: "+25 XP! 🔥 3-day streak!" -->
+    <string name="pet_snack_habit_completed">+%1$d XP! 🔥 %2$d-day streak!</string>
+    <string name="pet_snack_already_completed">Already completed for today! ✅</string>
+    <!-- Parameterized: "Couldn't complete habit: [reason]" -->
+    <string name="pet_snack_completion_error">Couldn\'t complete habit: %1$s</string>
+    <string name="pet_snack_completion_error_generic">Failed to complete habit</string>
+    <!-- Parameterized: "[emoji] [label] background unlocked!" -->
+    <string name="pet_snack_background_unlocked">%1$s %2$s background unlocked!</string>
+    <string name="pet_snack_habit_created">Habit created! Keep it up! 🌟</string>
+
+    <!-- Level-up dialog (inline in PetScreen) -->
+    <string name="levelup_evolved_title">🎉 Evolution! 🎉</string>
+    <string name="levelup_level_up_title">🎉 Level Up! 🎉</string>
+    <!-- Parameterized: "Your Choreboo evolved to [Teen]! 🌟\nNow Level 5!" -->
+    <string name="levelup_evolved_body">Your Choreboo evolved to %1$s! 🌟\nNow Level %2$d!</string>
+    <!-- Parameterized: "Your Choreboo reached Level 5! 🌟\nKeep completing habits to evolve!" -->
+    <string name="levelup_level_up_body">Your Choreboo reached Level %1$d! 🌟\nKeep completing habits to evolve!</string>
+    <string name="levelup_awesome">Awesome! 🎊</string>
+
+    <!-- ===== ADD / EDIT HABIT SCREEN ===== -->
+    <string name="add_habit_title_new">New Habit</string>
+    <string name="add_habit_title_edit">Edit Habit</string>
+    <string name="add_habit_motivational">Every great journey starts with a small step.</string>
+    <string name="add_habit_name_label">HABIT NAME</string>
+    <string name="add_habit_name_placeholder">Drink more water…</string>
+    <string name="add_habit_pick_icon">Pick an icon</string>
+    <string name="add_habit_custom_emoji_cd">Add custom emoji</string>
+    <string name="add_habit_frequency_label">Frequency</string>
+    <string name="add_habit_difficulty_label">DIFFICULTY</string>
+    <string name="add_habit_difficulty_easy">Easy</string>
+    <string name="add_habit_difficulty_medium">Medium</string>
+    <string name="add_habit_difficulty_hard">Hard</string>
+    <string name="add_habit_xp_label">XP</string>
+    <string name="add_habit_daily_reminder">Daily Reminder</string>
+    <string name="add_habit_reminder_enabled">Enabled</string>
+    <string name="add_habit_reminder_not_set">Not set</string>
+    <string name="add_habit_notification_permission_title">Notification Permission</string>
+    <string name="add_habit_notification_permission_body">We need permission to send you habit reminders. Please grant permission in settings.</string>
+    <string name="add_habit_notification_ok">OK</string>
+    <string name="add_habit_remind_at">Remind me at</string>
+    <string name="add_habit_change_time_cd">Change time</string>
+    <string name="add_habit_select_time">Select Time</string>
+    <string name="add_habit_cancel_time">Cancel</string>
+    <string name="add_habit_custom_emoji_dialog">Pick a custom emoji</string>
+    <string name="add_habit_household_habit">Household Habit</string>
+    <string name="add_habit_household_visible">Visible to all household members</string>
+    <string name="add_habit_assign_to_label">ASSIGN TO</string>
+    <string name="add_habit_assign_to_body">Who is responsible for this habit? Leave as Anyone for all members.</string>
+    <string name="add_habit_assign_anyone">Anyone</string>
+    <string name="add_habit_save_update">Update Habit</string>
+    <string name="add_habit_save_create">Create Habit</string>
+    <string name="add_habit_cancel_back">Cancel &amp; Go Back</string>
+    <string name="add_habit_top_bar_title">Choreboo</string>
+    <string name="add_habit_notifications_cd">Notifications</string>
+    <string name="add_habit_quick_select">Quick select:</string>
+    <string name="add_habit_monthly_1st">1st</string>
+    <string name="add_habit_monthly_15th">15th</string>
+    <string name="add_habit_monthly_last">Last</string>
+    <string name="add_habit_pick_days">Or pick specific days:</string>
+
+    <!-- Frequency mode labels -->
+    <string name="frequency_daily">Daily</string>
+    <string name="frequency_weekly">Weekly</string>
+    <string name="frequency_monthly">Monthly</string>
+
+    <!-- ===== HABIT CARD ===== -->
+    <string name="habit_card_not_scheduled_cd">Not scheduled</string>
+    <string name="habit_card_edit_cd">Edit</string>
+    <string name="habit_card_delete_cd">Delete</string>
+    <string name="habit_card_completed_cd">Completed</string>
+    <!-- Parameterized: "✓ Completed by [Alice]" -->
+    <string name="habit_card_completed_by">✓ Completed by %1$s</string>
+    <string name="habit_card_completed">✓ Completed</string>
+    <string name="habit_card_streak_cd">Streak</string>
+    <!-- Parameterized: "3 day streak" -->
+    <string name="habit_card_streak_label">%1$d day streak</string>
+    <string name="habit_freq_daily">Daily</string>
+    <string name="habit_freq_weekdays">Weekdays</string>
+    <string name="habit_freq_weekends">Weekends</string>
+    <string name="habit_freq_not_today">Not today</string>
+    <string name="habit_freq_custom">Custom</string>
+    <string name="habit_freq_monthly">Monthly</string>
+    <!-- Parameterized: "+25 XP" -->
+    <string name="habit_xp_badge">+%1$d XP</string>
+
+    <!-- ===== STATS SCREEN ===== -->
+    <string name="stats_title">Stats</string>
+    <string name="stats_points_cd">Points</string>
+    <string name="stats_weekly_streak">WEEKLY STREAK</string>
+    <string name="stats_total_days">Total Days</string>
+    <string name="stats_completed_cd">Completed</string>
+    <string name="stats_badges_section">BADGES</string>
+    <string name="stats_no_badges">Complete habits\nto earn badges!</string>
+    <string name="stats_xp_today">XP TODAY</string>
+    <string name="stats_star_points">STAR POINTS</string>
+    <string name="stats_pet_mood">PET MOOD</string>
+    <!-- Parameterized: "LEVEL 5" -->
+    <string name="stats_level_label">LEVEL %1$d</string>
+    <!-- Parameterized: "450 / 500 XP" -->
+    <string name="stats_xp_progress">%1$d / %2$d XP</string>
+    <string name="stats_monthly_mastery">MONTHLY MASTERY</string>
+    <!-- Monthly mastery motivational messages -->
+    <string name="stats_mastery_legendary">Legendary! 🏆 Perfect month!</string>
+    <string name="stats_mastery_champion">Champion! 🌟 Almost there!</string>
+    <string name="stats_mastery_warrior">Warrior! 💪 Great progress!</string>
+    <string name="stats_mastery_beginner">Keep going! 🌱 You\'re building momentum!</string>
+    <!-- Badge sheet -->
+    <string name="stats_badge_collection">Badge Collection</string>
+    <!-- Parameterized: "3 of 10 earned" -->
+    <string name="stats_badges_earned_count">%1$d of %2$d earned</string>
+    <string name="stats_badge_earned_cd">Earned</string>
+    <string name="stats_badge_locked_cd">Locked</string>
+
+    <!-- Stats pet mood labels (for StatsScreen mood display) -->
+    <string name="mood_feeling_loved">Feeling Loved</string>
+    <string name="mood_feeling_good">Feeling Good</string>
+    <string name="mood_feeling_hungry">Feeling Hungry</string>
+    <string name="mood_feeling_tired">Feeling Tired</string>
+    <string name="mood_feeling_sad">Feeling Sad</string>
+    <string name="mood_feeling_idle">Feeling Idle</string>
+
+    <!-- ===== CALENDAR SCREEN ===== -->
+    <string name="calendar_title">History</string>
+    <string name="calendar_points_cd">Points</string>
+    <string name="calendar_prev_month_cd">Previous month</string>
+    <string name="calendar_next_month_cd">Next month</string>
+    <!-- Parameterized: "15/30 Days Complete" -->
+    <string name="calendar_days_complete">%1$d/%2$d Days Complete</string>
+    <!-- Parameterized: "+450 XP Total" -->
+    <string name="calendar_xp_total">+%1$d XP Total</string>
+    <string name="calendar_no_completions">No completions on this day</string>
+    <!-- Parameterized: "🔥 3 Day Streak" -->
+    <string name="calendar_streak">🔥 %1$d Day Streak</string>
+    <!-- Parameterized: "+25 XP" -->
+    <string name="calendar_xp_earned">+%1$d XP</string>
+    <string name="calendar_legend_4_plus">4+ Tasks</string>
+    <string name="calendar_legend_1_3">1–3 Tasks</string>
+    <string name="calendar_legend_none">None</string>
+
+    <!-- ===== HOUSEHOLD SCREEN ===== -->
+    <string name="household_title_fallback">Household</string>
+    <string name="household_chores_section">Household Chores</string>
+    <string name="household_close_button">Close</string>
+    <!-- Parameterized: "[Alice]'s Chores" -->
+    <string name="household_member_chores">%1$s\'s Chores</string>
+    <!-- Parameterized: "Profile photo of [Alice]" -->
+    <string name="household_profile_photo_cd">Profile photo of %1$s</string>
+    <string name="household_no_chores">No household chores yet</string>
+    <!-- Parameterized: "✓ Done by [Alice]" -->
+    <string name="household_done_by">✓ Done by %1$s</string>
+    <string name="household_pending">Pending</string>
+    <string name="household_quiet_title">Your household is quiet…</string>
+    <string name="household_quiet_body">Invite someone to see their Choreboo here!</string>
+    <string name="household_empty_title">Join the Neighborhood</string>
+    <string name="household_empty_body">Create or join a household to see your housemates\' Choreboos and share habits together!</string>
+    <string name="household_invite_housemate">Invite Housemate</string>
+    <string name="household_invite_cd">Invite</string>
+    <string name="household_home_cd">Household</string>
+
+    <!-- Household Habit Card -->
+    <!-- Parameterized: "Assigned to [Alice]" -->
+    <string name="household_habit_assigned_to">Assigned to %1$s</string>
+    <string name="household_habit_unassigned">Unassigned</string>
+    <!-- Parameterized: "Profile photo of [Alice]" (reuse household_profile_photo_cd) -->
+
+    <!-- ===== SETTINGS SCREEN ===== -->
+    <string name="settings_title">Settings</string>
+    <!-- Appearance section -->
+    <string name="settings_appearance_section">Appearance</string>
+    <string name="settings_appearance_vibe">Choose your vibe</string>
+    <string name="settings_theme_system">System</string>
+    <string name="settings_theme_light">Light</string>
+    <string name="settings_theme_dark">Dark</string>
+    <!-- Subscription section -->
+    <string name="settings_subscription_section">Subscription</string>
+    <string name="settings_premium_title">Choreboo Premium</string>
+    <string name="settings_premium_active">Active — No ads, exclusive pets &amp; backgrounds</string>
+    <string name="settings_manage_subscription">Manage Subscription</string>
+    <string name="settings_upgrade_premium">Upgrade to Premium</string>
+    <string name="settings_premium_price">$1.99/month — 3-day free trial</string>
+    <string name="settings_premium_feature_1">🦎 Unlock Axolotl &amp; Capybara pets</string>
+    <string name="settings_premium_feature_2">🌌 Exclusive premium backgrounds</string>
+    <string name="settings_premium_feature_3">⚡ Bonus XP multiplier</string>
+    <string name="settings_premium_feature_4">🚫 No ads</string>
+    <string name="settings_start_free_trial">Start Free Trial</string>
+    <string name="settings_restoring">Restoring…</string>
+    <string name="settings_restore_purchases">Restore Purchases</string>
+    <!-- Household section -->
+    <string name="settings_household_section">Household</string>
+    <string name="settings_my_household_fallback">My Household</string>
+    <string name="settings_no_household">You\'re not in a household yet</string>
+    <string name="settings_no_household_body">Create or join a household…</string>
+    <string name="settings_create_household">Create a Household</string>
+    <string name="settings_join_household">Join a Household</string>
+    <string name="settings_invite_code_label">Invite to Household</string>
+    <string name="settings_invite_code_share">Share this code with your housemate:</string>
+    <string name="settings_invite_done">Done</string>
+    <string name="settings_household_members">Household Members</string>
+    <string name="settings_no_members">No members yet. Share your invite code!</string>
+    <string name="settings_leave_household">Leave Household</string>
+    <string name="settings_create_household_dialog_title">Create a Household</string>
+    <string name="settings_household_name_label">Give your household a name…</string>
+    <string name="settings_household_name_placeholder">e.g. The Smith Family</string>
+    <string name="settings_create_button">Create</string>
+    <string name="settings_join_household_dialog_title">Join Household</string>
+    <string name="settings_invite_code_input_label">Enter the 6-character invite code…</string>
+    <string name="settings_invite_code_placeholder">ABC123</string>
+    <string name="settings_join_button">Join</string>
+    <string name="settings_join_household_icon_cd">Join Household</string>
+    <string name="settings_join_with_code">Join with Invite Code</string>
+    <string name="settings_leave_household_dialog_title">Leave Household?</string>
+    <string name="settings_leave_household_body">You will no longer see your household members\' Choreboos or shared habits.</string>
+    <string name="settings_leave_button">Leave</string>
+    <!-- Sound section -->
+    <string name="settings_sound_section">Sound</string>
+    <string name="settings_sound_effects">Sound Effects</string>
+    <string name="settings_sound_effects_body">Play magic chimes on task complete</string>
+    <!-- Account section -->
+    <string name="settings_account_section">Account</string>
+    <string name="settings_profile_photo">Profile Photo</string>
+    <string name="settings_tap_to_change">Tap to change</string>
+    <string name="settings_username_label">Username</string>
+    <string name="settings_tap_to_set_username">Tap to set username</string>
+    <string name="settings_email_label">Email</string>
+    <string name="settings_sign_out_button">Sign Out</string>
+    <string name="settings_reset_account_button">Reset Account (Dev)</string>
+    <string name="settings_resetting">Resetting…</string>
+    <string name="settings_edit_username_cd">Edit username</string>
+    <!-- Edit name dialog -->
+    <string name="settings_change_username_title">Change Username</string>
+    <string name="settings_saving">Saving…</string>
+    <string name="settings_save_button">Save</string>
+    <!-- Photo options dialog -->
+    <string name="settings_change_profile_photo">Change Profile Photo</string>
+    <string name="settings_choose_from_gallery">Choose Photo from Gallery</string>
+    <string name="settings_remove_custom_photo">Remove Custom Photo</string>
+    <!-- Sign-out dialog -->
+    <string name="settings_sign_out_dialog_title">Sign Out?</string>
+    <string name="settings_sign_out_dialog_body">You\'ll need to sign back in to access your Choreboo.</string>
+    <!-- Reset account dialog -->
+    <string name="settings_reset_dialog_title">Reset Account?</string>
+    <string name="settings_reset_dialog_body">This will permanently delete all your habits, logs, your Choreboo, and your account. This cannot be undone.</string>
+    <string name="settings_reset_dialog_password_label">Enter your password to confirm</string>
+    <string name="settings_reset_everything">Reset Everything</string>
+    <string name="settings_hide_password">Hide password</string>
+    <string name="settings_show_password">Show password</string>
+    <!-- SettingsViewModel messages -->
+    <string name="settings_msg_premium_restored">Premium subscription restored!</string>
+    <string name="settings_msg_no_subscription">No active subscription found.</string>
+    <string name="settings_msg_restore_failed">Failed to restore purchases. Please try again.</string>
+    <string name="settings_msg_purchase_error">Could not open the purchase screen. Please try again.</string>
+    <!-- Parameterized: "Household \"The Smith Family\" created!" -->
+    <string name="settings_msg_household_created">Household \"%1$s\" created!</string>
+    <!-- Parameterized: "Joined \"The Smith Family\"!" -->
+    <string name="settings_msg_household_joined">Joined \"%1$s\"!</string>
+    <string name="settings_msg_household_left">Left household.</string>
+    <string name="settings_msg_username_updated">Username updated!</string>
+    <string name="settings_msg_invalid_username">Invalid username</string>
+    <string name="settings_msg_username_update_failed">Failed to update username. Please try again.</string>
+    <string name="settings_msg_photo_saved">Photo saved</string>
+    <string name="settings_msg_photo_synced">Profile photo synced to cloud!</string>
+    <string name="settings_msg_photo_sync_failed">Photo saved locally but failed to sync to cloud. It will sync when you check your connection.</string>
+    <string name="settings_msg_photo_save_failed">Failed to save profile photo</string>
+    <string name="settings_msg_photo_removed">Profile photo removed!</string>
+    <string name="settings_msg_photo_remove_sync_failed">Photo removed locally but failed to sync to cloud. It will sync when you check your connection.</string>
+    <string name="settings_msg_photo_clear_failed">Failed to clear profile photo</string>
+    <string name="settings_msg_not_authenticated">Not authenticated</string>
+    <string name="settings_msg_no_account_email">Could not determine account email</string>
+    <string name="settings_msg_provide_password">Please provide your password to confirm account deletion</string>
+    <string name="settings_msg_google_signin_failed">Google sign-in failed. Please try again.</string>
+
+    <!-- Missing UI strings -->
+    <string name="settings_points_cd">Points</string>
+    <string name="settings_manage_housemates">Manage Housemates</string>
+    <string name="settings_invite_household_cd">Invite to Household</string>
+    <string name="settings_manage_housemates_cd">Manage Housemates</string>
+    <string name="settings_create_household_cd">Create Household</string>
+    <string name="settings_no_household_body_full">Create or join a household to share habits with family &amp; friends.</string>
+    <string name="settings_create_household_body">Give your household a name. You\'ll get an invite code to share.</string>
+    <string name="settings_join_code_body">Enter the 6-character invite code from your housemate.</string>
+    <string name="settings_reset_dialog_body_header">This will permanently delete ALL your data:</string>
+    <string name="settings_reset_dialog_data_list">• All habits and habit logs\n• Your Choreboo\n• Household membership\n• Your account (Firebase Auth user)</string>
+    <string name="settings_reset_reregister_note">You will be able to re-register with the same email afterwards.</string>
+    <string name="settings_reset_google_note">Your google account will be unlinked from app storage.</string>
+    <string name="settings_password_label">Password</string>
+    <string name="settings_premium_features_list">• No ads\n• Exclusive Axolotl &amp; Capybara pets\n• Premium backgrounds (Galaxy, Underwater, Aurora)</string>
+
+    <!-- ===== BACKGROUND PICKER SHEET ===== -->
+    <string name="bg_picker_title">Choose Background</string>
+    <string name="bg_picker_points_cd">Points</string>
+    <string name="bg_picker_selected_cd">Selected</string>
+    <string name="bg_picker_premium_label">Premium</string>
+    <string name="bg_picker_tap_to_use">Tap to use</string>
+    <string name="bg_picker_premium_only_cd">Premium only</string>
+    <string name="bg_picker_not_enough_points_cd">Not enough points</string>
+
+    <!-- Background item labels -->
+    <string name="bg_label_default">Default</string>
+    <string name="bg_label_meadow">Meadow</string>
+    <string name="bg_label_sunset">Sunset</string>
+    <string name="bg_label_ocean">Ocean</string>
+    <string name="bg_label_night_sky">Night Sky</string>
+    <string name="bg_label_autumn">Autumn</string>
+    <string name="bg_label_cherry_blossom">Cherry Blossom</string>
+    <string name="bg_label_galaxy">Galaxy</string>
+    <string name="bg_label_underwater">Underwater</string>
+    <string name="bg_label_aurora">Aurora</string>
+
+    <!-- ===== DOMAIN MODEL DISPLAY NAMES ===== -->
+    <!-- ChorebooMood display names -->
+    <string name="mood_happy">Happy</string>
+    <string name="mood_content">Content</string>
+    <string name="mood_hungry">Hungry</string>
+    <string name="mood_tired">Tired</string>
+    <string name="mood_sad">Sad</string>
+    <string name="mood_idle">Idle</string>
+
+    <!-- ChorebooStage display names -->
+    <string name="stage_egg">Egg</string>
+    <string name="stage_baby">Baby</string>
+    <string name="stage_child">Child</string>
+    <string name="stage_teen">Teen</string>
+    <string name="stage_adult">Adult</string>
+    <string name="stage_legendary">Legendary</string>
+
+    <!-- PetType display names -->
+    <string name="pet_type_fox">Fox</string>
+    <string name="pet_type_axolotl">Axolotl</string>
+    <string name="pet_type_capybara">Capybara</string>
+    <string name="pet_type_panda">Panda</string>
+
+    <!-- BadgeDefinition display names -->
+    <string name="badge_first_step">First Step</string>
+    <string name="badge_on_fire">On Fire</string>
+    <string name="badge_week_warrior">Week Warrior</string>
+    <string name="badge_fortnight_force">Fortnight Force</string>
+    <string name="badge_monthly_master">Monthly Master</string>
+    <string name="badge_habit_starter">Habit Starter</string>
+    <string name="badge_habit_collector">Habit Collector</string>
+    <string name="badge_centurion">Centurion</string>
+    <string name="badge_xp_machine">XP Machine</string>
+    <string name="badge_legendary_grinder">Legendary Grinder</string>
+
+    <!-- BadgeDefinition descriptions -->
+    <string name="badge_first_step_desc">Complete your first habit</string>
+    <string name="badge_on_fire_desc">Reach a 3-day streak</string>
+    <string name="badge_week_warrior_desc">Reach a 7-day streak</string>
+    <string name="badge_fortnight_force_desc">Reach a 14-day streak</string>
+    <string name="badge_monthly_master_desc">Reach a 30-day streak</string>
+    <string name="badge_habit_starter_desc">Create 3 habits</string>
+    <string name="badge_habit_collector_desc">Create 5 habits</string>
+    <string name="badge_centurion_desc">Earn 100 total XP</string>
+    <string name="badge_xp_machine_desc">Earn 500 total XP</string>
+    <string name="badge_legendary_grinder_desc">Earn 1000 total XP</string>
+
+    <!-- ===== NOTIFICATIONS ===== -->
+    <!-- HabitReminderReceiver -->
+    <string name="notif_pet_name_fallback">Your Choreboo</string>
+    <string name="notif_habit_name_fallback">Habit</string>
+    <string name="notif_mark_complete">Mark Complete</string>
+    <!-- Reminder cute messages (parameterized with habitTitle and petName) -->
+    <string name="notif_msg_time_to">Time to %1$s!</string>
+    <string name="notif_msg_believes_in_you">%2$s believes in you! Complete %1$s!</string>
+    <string name="notif_msg_dont_forget">Don\'t forget about %2$s!</string>
+    <string name="notif_msg_feeling_neglected">%2$s is feeling neglected! Complete %1$s!</string>
+    <string name="notif_msg_cheering_you_on">%2$s is cheering you on!</string>
+    <string name="notif_msg_buddy_waiting">Your buddy %2$s is waiting!</string>
+    <string name="notif_msg_crush_it">%2$s wants to see you crush %1$s!</string>
+    <string name="notif_msg_keep_pet_happy">Keep %2$s happy—time to %1$s!</string>
+    <string name="notif_msg_misses_you">%2$s misses you! Let\'s do this!</string>
+    <string name="notif_msg_rooting_for_you">Let\'s go, champ! %2$s is rooting for you!</string>
+    <!-- HabitCompleteReceiver confirmation messages -->
+    <string name="notif_already_completed">Already completed today!</string>
+    <string name="notif_complete_failed">Failed to complete. Try in the app.</string>
+
+    <!-- ===== COMMON / SHARED ===== -->
+    <string name="common_ok">OK</string>
+    <string name="common_cancel">Cancel</string>
+    <string name="common_save">Save</string>
+    <string name="common_delete">Delete</string>
+    <string name="common_done">Done</string>
+    <string name="common_close">Close</string>
+    <string name="common_edit">Edit</string>
+    <string name="common_leave">Leave</string>
+    <string name="common_join">Join</string>
+    <string name="common_create">Create</string>
+
+     <!-- ===== EMOJI ICON LABELS (Habit icons) ===== -->
+     <string name="emoji_icon_healthy">Healthy</string>
+     <string name="emoji_icon_water">Water</string>
+     <string name="emoji_icon_running">Running</string>
+     <string name="emoji_icon_reading">Reading</string>
+     <string name="emoji_icon_meditate">Meditate</string>
+     <string name="emoji_icon_cleaning">Cleaning</string>
+     <string name="emoji_icon_cooking">Cooking</string>
+     <string name="emoji_icon_music">Music</string>
+     <string name="emoji_icon_sleep">Sleep</string>
+     <string name="emoji_icon_coding">Coding</string>
+     <string name="emoji_icon_art">Art</string>
+     <string name="emoji_icon_strength">Strength</string>
+     <string name="emoji_icon_yoga">Yoga</string>
+     <string name="emoji_icon_walk">Walk</string>
+     <string name="emoji_icon_study">Study</string>
+
+     <!-- ===== ADDITIONAL ADD/EDIT HABIT STRINGS ===== -->
+     <string name="add_habit_name_counter_format">%1$d/100</string>
+     <string name="add_habit_assignee_anyone_emoji">👥</string>
+     <string name="add_habit_ok_button">OK</string>
+     <string name="add_habit_emoji_cancel">Cancel</string>
+     <string name="add_habit_lightning_emoji">⚡</string>
+
+     <!-- ===== PLURALS ===== -->
+
+     <plurals name="plural_day_streak">
+         <item quantity="one">%d day streak</item>
+         <item quantity="other">%d day streak</item>
+     </plurals>
+     <plurals name="plural_habits_completed">
+         <item quantity="one">%1$d of %2$d Completed</item>
+         <item quantity="other">%1$d of %2$d Completed</item>
+     </plurals>
+     <plurals name="plural_badges_earned">
+         <item quantity="one">%1$d of %2$d earned</item>
+         <item quantity="other">%1$d of %2$d earned</item>
+     </plurals>
+
+        <!-- ===== MISSING AUDIT FIXES ===== -->
+        <!-- HouseholdScreen -->
+        <string name="household_chores_title">%1$s\'s Chores</string>
+
+        <!-- CalendarScreen -->
+        <string name="calendar_total_xp">+%1$d XP Total</string>
+        <string name="calendar_day_streak">🔥 %1$d Day Streak</string>
+
+        <!-- HabitCard frequency labels -->
+        <string name="habit_frequency_monthly">Monthly</string>
+        <string name="habit_frequency_daily">Daily</string>
+        <string name="habit_frequency_weekdays">Weekdays</string>
+        <string name="habit_frequency_weekends">Weekends</string>
+        <string name="habit_frequency_not_today">Not today</string>
+        <string name="habit_frequency_custom">Custom</string>
+
+        <!-- StatsScreen -->
+        <string name="stats_feeling_loved">Feeling Loved</string>
+        <string name="stats_feeling_good">Feeling Good</string>
+        <string name="stats_feeling_hungry">Feeling Hungry</string>
+        <string name="stats_feeling_tired">Feeling Tired</string>
+        <string name="stats_feeling_sad">Feeling Sad</string>
+        <string name="stats_feeling_idle">Feeling Idle</string>
+
+        <!-- HouseholdHabitCard -->
+        <string name="household_done_by_short">✓ %1$s</string>
+
+        <!-- AddEditHabitScreen -->
+        <string name="add_habit_mode_weekly">Weekly</string>
+        <string name="add_habit_mode_monthly">Monthly</string>
+
+        <!-- Day labels (used in StatsScreen weekly streak) -->
+        <string name="day_abbreviation_monday">M</string>
+        <string name="day_abbreviation_tuesday">T</string>
+        <string name="day_abbreviation_wednesday">W</string>
+        <string name="day_abbreviation_thursday">T</string>
+        <string name="day_abbreviation_friday">F</string>
+        <string name="day_abbreviation_saturday">S</string>
+        <string name="day_abbreviation_sunday">S</string>
+
+        <!-- ===== FINAL LOCALIZATION PASS ===== -->
+
+        <!-- Level badge -->
+        <string name="level_badge">Lv.%1$d</string>
+
+        <!-- AddEditHabitViewModel validation -->
+        <string name="validation_title_required">Title is required</string>
+        <string name="validation_select_day">Select at least one day</string>
+        <string name="validation_join_household">Join a household first to create shared habits</string>
+
+        <!-- Day abbreviations (data-key display labels for habit schedule chips) -->
+        <string name="day_chip_mon">MON</string>
+        <string name="day_chip_tue">TUE</string>
+        <string name="day_chip_wed">WED</string>
+        <string name="day_chip_thu">THU</string>
+        <string name="day_chip_fri">FRI</string>
+        <string name="day_chip_sat">SAT</string>
+        <string name="day_chip_sun">SUN</string>
+
+        <!-- Onboarding pricing -->
+        <string name="pricing_per_month">%1$s / month</string>
+        <string name="pricing_fallback">$1.99 / month</string>
+        <string name="pricing_trial">3-day free trial, then %1$s</string>
+
+        <!-- StitchSnackbar headers -->
+        <string name="snackbar_achievement">Achievement</string>
+        <string name="snackbar_success">Success</string>
+        <string name="snackbar_error">Error</string>
+        <string name="snackbar_info">Info</string>
+
+        <!-- PremiumBadge -->
+        <string name="premium_badge">Premium</string>
+        <string name="premium_subscriber_cd">Premium subscriber</string>
+
+        <!-- ProfileAvatar -->
+        <string name="profile_photo_cd">User profile photo</string>
+        <string name="profile_default_cd">User profile</string>
+
+        <!-- StatBar accessibility -->
+        <string name="stat_bar_cd">%1$s: %2$d out of %3$d</string>
+
+        <!-- PetScreen stat accessibility -->
+        <string name="stat_bento_cd">%1$s: %2$d%%, %3$s</string>
+        <string name="energy_bento_cd">Energy levels: %1$d%%, %2$s</string>
+
+        <!-- BackgroundPickerSheet tier badges -->
+        <string name="tier_common">C</string>
+        <string name="tier_rare">R</string>
+        <string name="tier_premium">P</string>
+ </resources>

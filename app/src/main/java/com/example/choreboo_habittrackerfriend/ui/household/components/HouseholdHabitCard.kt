@@ -32,7 +32,9 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import coil3.compose.AsyncImage
+import com.example.choreboo_habittrackerfriend.R
 import com.example.choreboo_habittrackerfriend.domain.model.HouseholdHabitStatus
+import androidx.compose.ui.res.stringResource
 
 /**
  * Card showing a single household habit and its today-completion status.
@@ -75,7 +77,7 @@ fun HouseholdHabitCard(
                 if (!photoFailed.value) {
                     AsyncImage(
                         model = assignedToPhotoUrl,
-                        contentDescription = "Profile photo of ${habit.assignedToName}",
+                        contentDescription = stringResource(R.string.household_profile_photo_cd, habit.assignedToName ?: ""),
                         contentScale = ContentScale.Crop,
                         modifier = Modifier
                             .size(44.dp)
@@ -93,7 +95,7 @@ fun HouseholdHabitCard(
                     ) {
                         Icon(
                             imageVector = Icons.Default.AccountCircle,
-                            contentDescription = "Profile photo of ${habit.assignedToName}",
+                            contentDescription = stringResource(R.string.household_profile_photo_cd, habit.assignedToName ?: ""),
                             tint = MaterialTheme.colorScheme.onSurfaceVariant,
                             modifier = Modifier.size(32.dp),
                         )
@@ -132,9 +134,9 @@ fun HouseholdHabitCard(
                 )
                 Text(
                     text = if (habit.assignedToName != null) {
-                        "Assigned to ${habit.assignedToName}"
+                        stringResource(R.string.household_habit_assigned_to, habit.assignedToName)
                     } else {
-                        "Unassigned"
+                        stringResource(R.string.household_habit_unassigned)
                     },
                     style = MaterialTheme.typography.bodySmall,
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
@@ -146,16 +148,16 @@ fun HouseholdHabitCard(
             // XP badge
             Box(
                 modifier = Modifier
-                    .clip(RoundedCornerShape(50.dp))
-                    .background(MaterialTheme.colorScheme.tertiaryContainer.copy(alpha = 0.5f))
-                    .padding(horizontal = 6.dp, vertical = 2.dp),
-            ) {
-                Text(
-                    text = "+${habit.baseXp} XP",
-                    style = MaterialTheme.typography.labelSmall,
-                    fontWeight = FontWeight.Bold,
-                    color = MaterialTheme.colorScheme.onTertiaryContainer,
-                    fontSize = 10.sp,
+                     .clip(RoundedCornerShape(50.dp))
+                     .background(MaterialTheme.colorScheme.tertiaryContainer.copy(alpha = 0.5f))
+                     .padding(horizontal = 6.dp, vertical = 2.dp),
+             ) {
+                 Text(
+                     text = stringResource(R.string.habit_xp_badge, habit.baseXp),
+                     style = MaterialTheme.typography.labelSmall,
+                     fontWeight = FontWeight.Bold,
+                     color = MaterialTheme.colorScheme.onTertiaryContainer,
+                     fontSize = 10.sp,
                 )
             }
 
@@ -164,13 +166,13 @@ fun HouseholdHabitCard(
             // Status chip
             if (isCompleted) {
                 StatusChip(
-                    label = "\u2713 ${habit.completedByName}",
+                    label = stringResource(R.string.household_done_by_short, habit.completedByName),
                     containerColor = MaterialTheme.colorScheme.primary,
                     contentColor = MaterialTheme.colorScheme.onPrimary,
                 )
             } else {
                 StatusChip(
-                    label = "Pending",
+                    label = stringResource(R.string.household_pending),
                     containerColor = MaterialTheme.colorScheme.tertiaryContainer,
                     contentColor = MaterialTheme.colorScheme.onTertiaryContainer,
                 )

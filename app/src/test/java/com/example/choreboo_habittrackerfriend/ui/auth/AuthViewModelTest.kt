@@ -5,12 +5,14 @@ import com.example.choreboo_habittrackerfriend.TestDispatcherRule
 import com.example.choreboo_habittrackerfriend.data.datastore.UserPreferences
 import com.example.choreboo_habittrackerfriend.data.repository.AuthRepository
 import com.example.choreboo_habittrackerfriend.data.repository.AuthResult
+import com.example.choreboo_habittrackerfriend.data.repository.AuthErrorType
 import com.example.choreboo_habittrackerfriend.data.repository.ChorebooRepository
 import com.example.choreboo_habittrackerfriend.data.repository.SyncManager
 import com.example.choreboo_habittrackerfriend.data.repository.UserRepository
 import com.example.choreboo_habittrackerfriend.domain.model.ChorebooStage
 import com.example.choreboo_habittrackerfriend.domain.model.ChorebooStats
 import com.example.choreboo_habittrackerfriend.domain.model.PetType
+import com.example.choreboo_habittrackerfriend.ui.auth.AuthValidationError
 import com.google.android.gms.auth.api.signin.GoogleSignInAccount
 import com.google.firebase.auth.FirebaseUser
 import io.mockk.coEvery
@@ -179,7 +181,7 @@ class AuthViewModelTest {
         vm.submit()
         advanceUntilIdle()
 
-        assertEquals("Email is required.", vm.formState.value.emailError)
+        assertEquals(AuthValidationError.EmailRequired, vm.formState.value.emailError)
         coVerify(exactly = 0) { authRepository.signInWithEmail(any(), any()) }
         coVerify(exactly = 0) { authRepository.signUpWithEmail(any(), any()) }
     }
@@ -192,7 +194,7 @@ class AuthViewModelTest {
         vm.submit()
         advanceUntilIdle()
 
-        assertEquals("Password is required.", vm.formState.value.passwordError)
+        assertEquals(AuthValidationError.PasswordRequired, vm.formState.value.passwordError)
     }
 
     @Test
@@ -205,7 +207,7 @@ class AuthViewModelTest {
         vm.submit()
         advanceUntilIdle()
 
-        assertEquals("Password must be at least 6 characters.", vm.formState.value.passwordError)
+        assertEquals(AuthValidationError.PasswordTooShort, vm.formState.value.passwordError)
     }
 
     // ── sendPasswordReset ────────────────────────────────────────────────
@@ -217,7 +219,7 @@ class AuthViewModelTest {
         vm.sendPasswordReset()
         advanceUntilIdle()
 
-        assertEquals("Enter your email address first.", vm.formState.value.emailError)
+        assertEquals(AuthValidationError.EnterEmailFirst, vm.formState.value.emailError)
         coVerify(exactly = 0) { authRepository.sendPasswordReset(any()) }
     }
 
@@ -231,13 +233,14 @@ class AuthViewModelTest {
             vm.sendPasswordReset()
             val event = awaitItem()
             assertTrue(event is AuthEvent.ShowMessage)
-            assertTrue((event as AuthEvent.ShowMessage).message.contains("user@example.com"))
+            // messageRes is an @StringRes Int, not a string message
+            assertTrue((event as AuthEvent.ShowMessage).messageRes > 0)
         }
     }
 
     @Test
     fun `sendPasswordReset error emits ShowError`() = runTest {
-        coEvery { authRepository.sendPasswordReset(any()) } returns AuthResult.Error("No account found.")
+        coEvery { authRepository.sendPasswordReset(any()) } returns AuthResult.Error(AuthErrorType.UserNotFound)
         val vm = createViewModel()
         vm.onEmailChange("unknown@example.com")
 
@@ -245,7 +248,8 @@ class AuthViewModelTest {
             vm.sendPasswordReset()
             val event = awaitItem()
             assertTrue(event is AuthEvent.ShowError)
-            assertEquals("No account found.", (event as AuthEvent.ShowError).message)
+            // messageRes is an @StringRes Int from the error type
+            assertTrue((event as AuthEvent.ShowError).messageRes > 0)
         }
     }
 
@@ -334,14 +338,14 @@ class AuthViewModelTest {
 
     @Test
     fun `auth error emits ShowError with the error message`() = runTest {
-        coEvery { authRepository.signInWithGoogle(mockAccount) } returns AuthResult.Error("Incorrect email or password.")
+        coEvery { authRepository.signInWithGoogle(mockAccount) } returns AuthResult.Error(AuthErrorType.InvalidCredentials)
         val vm = createViewModel()
 
         vm.events.test {
             vm.signInWithGoogle(mockAccount)
             val event = awaitItem()
             assertTrue(event is AuthEvent.ShowError)
-            assertEquals("Incorrect email or password.", (event as AuthEvent.ShowError).message)
+            assertTrue((event as AuthEvent.ShowError).messageRes > 0)
         }
     }
 

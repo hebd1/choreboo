@@ -1,6 +1,7 @@
 package com.example.choreboo_habittrackerfriend.ui.settings
 
 import android.app.Activity
+import android.content.Intent
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.PickVisualMediaRequest
 import androidx.activity.result.contract.ActivityResultContracts
@@ -40,6 +41,7 @@ import androidx.compose.material.icons.filled.Stars
 import androidx.compose.material.icons.filled.Visibility
 import androidx.compose.material.icons.filled.VisibilityOff
 import androidx.compose.material.icons.filled.VolumeUp
+import androidx.compose.material.icons.filled.WorkspacePremium
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
@@ -85,7 +87,11 @@ import androidx.compose.ui.text.input.VisualTransformation
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import androidx.compose.ui.res.stringResource
 import androidx.hilt.navigation.compose.hiltViewModel
+import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import com.example.choreboo_habittrackerfriend.R
+import com.example.choreboo_habittrackerfriend.ui.components.PremiumBadge
 import com.example.choreboo_habittrackerfriend.ui.components.ProfileAvatar
 import com.google.android.gms.auth.api.signin.GoogleSignIn
 import com.google.android.gms.auth.api.signin.GoogleSignInOptions
@@ -136,7 +142,7 @@ fun SettingsScreen(
             } catch (e: ApiException) {
                 scope.launch {
                     snackbarHostState.showSnackbar(
-                        message = "Google sign-in failed. Please try again.",
+                        message = context.getString(R.string.settings_msg_google_signin_failed),
                         actionLabel = "error",
                         duration = SnackbarDuration.Short,
                     )
@@ -151,6 +157,8 @@ fun SettingsScreen(
     val isCreatingHousehold by viewModel.isCreatingHousehold.collectAsState()
     val isJoiningHousehold by viewModel.isJoiningHousehold.collectAsState()
     val isLeavingHousehold by viewModel.isLeavingHousehold.collectAsState()
+    val isPremium by viewModel.isPremium.collectAsStateWithLifecycle()
+    val isRestoringPurchases by viewModel.isRestoringPurchases.collectAsStateWithLifecycle()
     LaunchedEffect(Unit) {
         viewModel.events.collect { event ->
             when (event) {
@@ -158,13 +166,26 @@ fun SettingsScreen(
                 is SettingsEvent.AccountReset -> onSignOut()
                 is SettingsEvent.ShowError -> {
                     scope.launch {
-                        snackbarHostState.showSnackbar(message = event.message, actionLabel = "error", duration = SnackbarDuration.Short)
+                        val msg = if (event.formatArg != null)
+                            context.getString(event.messageRes, event.formatArg)
+                        else
+                            context.getString(event.messageRes)
+                        snackbarHostState.showSnackbar(message = msg, actionLabel = "error", duration = SnackbarDuration.Short)
                     }
                 }
                 is SettingsEvent.ShowSuccess -> {
                     showEditNameDialog = false
                     scope.launch {
-                        snackbarHostState.showSnackbar(message = event.message, actionLabel = "success", duration = SnackbarDuration.Short)
+                        val msg = if (event.formatArg != null)
+                            context.getString(event.messageRes, event.formatArg)
+                        else
+                            context.getString(event.messageRes)
+                        snackbarHostState.showSnackbar(message = msg, actionLabel = "success", duration = SnackbarDuration.Short)
+                    }
+                }
+                is SettingsEvent.ShowRawError -> {
+                    scope.launch {
+                        snackbarHostState.showSnackbar(message = event.message, actionLabel = "error", duration = SnackbarDuration.Short)
                     }
                 }
             }
@@ -182,13 +203,13 @@ fun SettingsScreen(
     if (showEditNameDialog) {
         AlertDialog(
             onDismissRequest = { if (!isUpdatingName) showEditNameDialog = false },
-            title = { Text("Change Username") },
+            title = { Text(stringResource(R.string.settings_change_username_title)) },
             text = {
                 Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
                     OutlinedTextField(
                         value = editNameText,
                         onValueChange = { if (it.length <= 30) editNameText = it },
-                        label = { Text("Username") },
+                        label = { Text(stringResource(R.string.settings_username_label)) },
                         singleLine = true,
                         enabled = !isUpdatingName,
                         modifier = Modifier.fillMaxWidth(),
@@ -223,9 +244,9 @@ fun SettingsScreen(
                             color = MaterialTheme.colorScheme.onPrimary,
                         )
                         Spacer(modifier = Modifier.width(8.dp))
-                        Text("Saving…")
+                        Text(stringResource(R.string.settings_saving))
                     } else {
-                        Text("Save")
+                        Text(stringResource(R.string.settings_save_button))
                     }
                 }
             },
@@ -234,7 +255,7 @@ fun SettingsScreen(
                     onClick = { showEditNameDialog = false },
                     enabled = !isUpdatingName,
                 ) {
-                    Text("Cancel")
+                    Text(stringResource(R.string.common_cancel))
                 }
             },
         )
@@ -243,10 +264,10 @@ fun SettingsScreen(
     if (showSignOutDialog) {
         AlertDialog(
             onDismissRequest = { showSignOutDialog = false },
-            title = { Text("Sign Out?") },
+            title = { Text(stringResource(R.string.settings_sign_out_dialog_title)) },
             text = {
                 Text(
-                    "You'll need to sign back in to access your account.",
+                    stringResource(R.string.settings_sign_out_dialog_body),
                     style = MaterialTheme.typography.bodyMedium,
                 )
             },
@@ -260,12 +281,12 @@ fun SettingsScreen(
                         containerColor = MaterialTheme.colorScheme.error,
                     ),
                 ) {
-                    Text("Sign Out")
+                    Text(stringResource(R.string.settings_sign_out_button))
                 }
             },
             dismissButton = {
                 TextButton(onClick = { showSignOutDialog = false }) {
-                    Text("Cancel")
+                    Text(stringResource(R.string.common_cancel))
                 }
             },
         )
@@ -279,31 +300,28 @@ fun SettingsScreen(
                 resetPassword = ""
                 resetPasswordVisible = false
             },
-            title = { Text("Reset Account?") },
+            title = { Text(stringResource(R.string.settings_reset_dialog_title)) },
             text = {
                 Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
                     Text(
-                        "This will permanently delete ALL your data:",
+                        stringResource(R.string.settings_reset_dialog_body_header),
                         style = MaterialTheme.typography.bodyMedium,
                         fontWeight = FontWeight.SemiBold,
                     )
                     Text(
-                        "• All habits and habit logs\n" +
-                            "• Your Choreboo\n" +
-                            "• Household membership\n" +
-                            "• Your account (Firebase Auth user)",
+                        stringResource(R.string.settings_reset_dialog_data_list),
                         style = MaterialTheme.typography.bodySmall,
                         color = MaterialTheme.colorScheme.onSurfaceVariant,
                     )
                     Text(
-                        "You will be able to re-register with the same email afterwards.",
+                        stringResource(R.string.settings_reset_reregister_note),
                         style = MaterialTheme.typography.bodySmall,
                         color = MaterialTheme.colorScheme.onSurfaceVariant,
                     )
                     Spacer(modifier = Modifier.height(4.dp))
                     if (isGoogleUser) {
                         Text(
-                            "Your google account will be unlinked from app storage.",
+                            stringResource(R.string.settings_reset_google_note),
                             style = MaterialTheme.typography.bodySmall,
                             fontWeight = FontWeight.SemiBold,
                             color = MaterialTheme.colorScheme.error,
@@ -312,8 +330,8 @@ fun SettingsScreen(
                         OutlinedTextField(
                             value = resetPassword,
                             onValueChange = { resetPassword = it },
-                            label = { Text("Password") },
-                            placeholder = { Text("Enter your password to confirm") },
+                            label = { Text(stringResource(R.string.settings_password_label)) },
+                            placeholder = { Text(stringResource(R.string.settings_reset_dialog_password_label)) },
                             leadingIcon = {
                                 Icon(
                                     Icons.Default.Lock,
@@ -325,7 +343,10 @@ fun SettingsScreen(
                                 IconButton(onClick = { resetPasswordVisible = !resetPasswordVisible }) {
                                     Icon(
                                         if (resetPasswordVisible) Icons.Default.VisibilityOff else Icons.Default.Visibility,
-                                        contentDescription = if (resetPasswordVisible) "Hide password" else "Show password",
+                                        contentDescription = if (resetPasswordVisible)
+                                            stringResource(R.string.settings_hide_password)
+                                        else
+                                            stringResource(R.string.settings_show_password),
                                     )
                                 }
                             },
@@ -373,7 +394,7 @@ fun SettingsScreen(
                         modifier = Modifier.size(18.dp),
                     )
                     Spacer(modifier = Modifier.width(6.dp))
-                    Text("Reset Everything")
+                    Text(stringResource(R.string.settings_reset_everything))
                 }
             },
             dismissButton = {
@@ -382,7 +403,7 @@ fun SettingsScreen(
                     resetPassword = ""
                     resetPasswordVisible = false
                 }) {
-                    Text("Cancel")
+                    Text(stringResource(R.string.common_cancel))
                 }
             },
         )
@@ -391,7 +412,7 @@ fun SettingsScreen(
     if (showPhotoOptionsDialog) {
         AlertDialog(
             onDismissRequest = { showPhotoOptionsDialog = false },
-            title = { Text("Change Profile Photo") },
+            title = { Text(stringResource(R.string.settings_change_profile_photo)) },
             text = {
                 Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
                     TextButton(
@@ -407,7 +428,7 @@ fun SettingsScreen(
                     ) {
                         Icon(Icons.Default.PhotoCamera, contentDescription = null)
                         Spacer(modifier = Modifier.width(8.dp))
-                        Text("Choose Photo from Gallery", modifier = Modifier.weight(1f), textAlign = TextAlign.Start)
+                        Text(stringResource(R.string.settings_choose_from_gallery), modifier = Modifier.weight(1f), textAlign = TextAlign.Start)
                     }
                     if (!profilePhotoUri.isNullOrBlank()) {
                         TextButton(
@@ -419,14 +440,14 @@ fun SettingsScreen(
                         ) {
                             Icon(Icons.Default.Clear, contentDescription = null)
                             Spacer(modifier = Modifier.width(8.dp))
-                            Text("Remove Custom Photo", modifier = Modifier.weight(1f), textAlign = TextAlign.Start)
+                            Text(stringResource(R.string.settings_remove_custom_photo), modifier = Modifier.weight(1f), textAlign = TextAlign.Start)
                         }
                     }
                 }
             },
             confirmButton = {
                 TextButton(onClick = { showPhotoOptionsDialog = false }) {
-                    Text("Cancel")
+                    Text(stringResource(R.string.common_cancel))
                 }
             },
         )
@@ -437,17 +458,17 @@ fun SettingsScreen(
         var householdName by remember { mutableStateOf("") }
         AlertDialog(
             onDismissRequest = { showCreateHouseholdDialog = false },
-            title = { Text("Create Household") },
+            title = { Text(stringResource(R.string.settings_create_household_dialog_title)) },
             text = {
                 Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
                     Text(
-                        "Give your household a name. You'll get an invite code to share.",
+                        stringResource(R.string.settings_create_household_body),
                         style = MaterialTheme.typography.bodyMedium,
                     )
                     OutlinedTextField(
                         value = householdName,
                         onValueChange = { if (it.length <= 50) householdName = it },
-                        placeholder = { Text("e.g. The Smith Family") },
+                        placeholder = { Text(stringResource(R.string.settings_household_name_placeholder)) },
                         singleLine = true,
                         shape = RoundedCornerShape(12.dp),
                         modifier = Modifier.fillMaxWidth(),
@@ -490,13 +511,13 @@ fun SettingsScreen(
                             color = MaterialTheme.colorScheme.onPrimary,
                         )
                     } else {
-                        Text("Create")
+                        Text(stringResource(R.string.settings_create_button))
                     }
                 }
             },
             dismissButton = {
                 TextButton(onClick = { showCreateHouseholdDialog = false }) {
-                    Text("Cancel")
+                    Text(stringResource(R.string.common_cancel))
                 }
             },
         )
@@ -507,17 +528,17 @@ fun SettingsScreen(
         var inviteCode by remember { mutableStateOf("") }
         AlertDialog(
             onDismissRequest = { showJoinDialog = false },
-            title = { Text("Join Household") },
+            title = { Text(stringResource(R.string.settings_join_household_dialog_title)) },
             text = {
                 Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
                     Text(
-                        "Enter the 6-character invite code from your housemate.",
+                        stringResource(R.string.settings_join_code_body),
                         style = MaterialTheme.typography.bodyMedium,
                     )
                     OutlinedTextField(
                         value = inviteCode,
                         onValueChange = { if (it.length <= 6) inviteCode = it.uppercase() },
-                        placeholder = { Text("ABC123") },
+                        placeholder = { Text(stringResource(R.string.settings_invite_code_placeholder)) },
                         singleLine = true,
                         shape = RoundedCornerShape(12.dp),
                         modifier = Modifier.fillMaxWidth(),
@@ -547,13 +568,13 @@ fun SettingsScreen(
                             color = MaterialTheme.colorScheme.onPrimary,
                         )
                     } else {
-                        Text("Join")
+                        Text(stringResource(R.string.settings_join_button))
                     }
                 }
             },
             dismissButton = {
                 TextButton(onClick = { showJoinDialog = false }) {
-                    Text("Cancel")
+                    Text(stringResource(R.string.common_cancel))
                 }
             },
         )
@@ -563,7 +584,7 @@ fun SettingsScreen(
     if (showInviteDialog) {
         AlertDialog(
             onDismissRequest = { showInviteDialog = false },
-            title = { Text("Invite to Household") },
+            title = { Text(stringResource(R.string.settings_invite_code_label)) },
             text = {
                 Column(
                     verticalArrangement = Arrangement.spacedBy(12.dp),
@@ -571,7 +592,7 @@ fun SettingsScreen(
                     modifier = Modifier.fillMaxWidth(),
                 ) {
                     Text(
-                        "Share this code with your housemate:",
+                        stringResource(R.string.settings_invite_code_share),
                         style = MaterialTheme.typography.bodyMedium,
                     )
                     Box(
@@ -592,7 +613,7 @@ fun SettingsScreen(
             },
             confirmButton = {
                 TextButton(onClick = { showInviteDialog = false }) {
-                    Text("Done")
+                    Text(stringResource(R.string.common_done))
                 }
             },
         )
@@ -602,12 +623,12 @@ fun SettingsScreen(
     if (showManageMembersDialog) {
         AlertDialog(
             onDismissRequest = { showManageMembersDialog = false },
-            title = { Text("Household Members") },
+            title = { Text(stringResource(R.string.settings_household_members)) },
             text = {
                 Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
                     if (householdMembers.isEmpty()) {
                         Text(
-                            "No members yet. Share your invite code!",
+                            stringResource(R.string.settings_no_members),
                             style = MaterialTheme.typography.bodyMedium,
                             color = MaterialTheme.colorScheme.onSurfaceVariant,
                         )
@@ -657,7 +678,7 @@ fun SettingsScreen(
             },
             confirmButton = {
                 TextButton(onClick = { showManageMembersDialog = false }) {
-                    Text("Done")
+                    Text(stringResource(R.string.common_done))
                 }
             },
             dismissButton = {
@@ -668,7 +689,7 @@ fun SettingsScreen(
                     },
                 ) {
                     Text(
-                        "Leave Household",
+                        stringResource(R.string.settings_leave_household),
                         color = MaterialTheme.colorScheme.error,
                     )
                 }
@@ -680,10 +701,10 @@ fun SettingsScreen(
     if (showLeaveHouseholdDialog) {
         AlertDialog(
             onDismissRequest = { showLeaveHouseholdDialog = false },
-            title = { Text("Leave Household?") },
+            title = { Text(stringResource(R.string.settings_leave_household_dialog_title)) },
             text = {
                 Text(
-                    "You will no longer see household members' pets or shared habits.",
+                    stringResource(R.string.settings_leave_household_body),
                     style = MaterialTheme.typography.bodyMedium,
                 )
             },
@@ -705,13 +726,13 @@ fun SettingsScreen(
                             color = MaterialTheme.colorScheme.onError,
                         )
                     } else {
-                        Text("Leave")
+                        Text(stringResource(R.string.settings_leave_button))
                     }
                 }
             },
             dismissButton = {
                 TextButton(onClick = { showLeaveHouseholdDialog = false }) {
-                    Text("Cancel")
+                    Text(stringResource(R.string.common_cancel))
                 }
             },
         )
@@ -731,11 +752,13 @@ fun SettingsScreen(
                             size = 40.dp,
                         )
                         Text(
-                            "Settings",
+                            stringResource(R.string.settings_title),
                             style = MaterialTheme.typography.headlineMedium,
                             fontWeight = FontWeight.ExtraBold,
                             color = MaterialTheme.colorScheme.primary,
                         )
+                        Spacer(modifier = Modifier.width(8.dp))
+                        PremiumBadge(isPremium = isPremium)
                     }
                 },
                 actions = {
@@ -749,7 +772,7 @@ fun SettingsScreen(
                     ) {
                         Icon(
                             Icons.Default.Stars,
-                            contentDescription = "Points",
+                            contentDescription = stringResource(R.string.settings_points_cd),
                             tint = MaterialTheme.colorScheme.secondaryContainer,
                             modifier = Modifier.size(18.dp),
                         )
@@ -779,7 +802,7 @@ fun SettingsScreen(
             // Appearance section
             SettingsSectionHeader(
                 icon = { Icon(Icons.Default.Palette, contentDescription = null, tint = MaterialTheme.colorScheme.primary) },
-                label = "Appearance",
+                label = stringResource(R.string.settings_appearance_section),
             )
             Card(
                 shape = RoundedCornerShape(16.dp),
@@ -788,7 +811,7 @@ fun SettingsScreen(
             ) {
                 Column(modifier = Modifier.padding(20.dp)) {
                     Text(
-                        "Choose your vibe",
+                        stringResource(R.string.settings_appearance_vibe),
                         style = MaterialTheme.typography.titleSmall,
                         fontWeight = FontWeight.SemiBold,
                     )
@@ -796,7 +819,11 @@ fun SettingsScreen(
 
                     // Custom pill segmented control
                     val options = listOf("system", "light", "dark")
-                    val labels = listOf("System", "Light", "Dark")
+                    val labels = listOf(
+                        stringResource(R.string.settings_theme_system),
+                        stringResource(R.string.settings_theme_light),
+                        stringResource(R.string.settings_theme_dark),
+                    )
                     Box(
                         modifier = Modifier
                             .fillMaxWidth()
@@ -830,10 +857,117 @@ fun SettingsScreen(
                 }
             }
 
+            // Subscription section
+            SettingsSectionHeader(
+                icon = { Icon(Icons.Default.WorkspacePremium, contentDescription = null, tint = MaterialTheme.colorScheme.primary) },
+                label = stringResource(R.string.settings_subscription_section),
+            )
+            Card(
+                shape = RoundedCornerShape(16.dp),
+                colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceContainerLowest),
+                modifier = Modifier.fillMaxWidth(),
+            ) {
+                Column(modifier = Modifier.padding(20.dp)) {
+                    if (isPremium) {
+                        // Premium active state
+                        Row(
+                            verticalAlignment = Alignment.CenterVertically,
+                            horizontalArrangement = Arrangement.spacedBy(10.dp),
+                        ) {
+                            Icon(
+                                Icons.Default.WorkspacePremium,
+                                contentDescription = null,
+                                tint = MaterialTheme.colorScheme.tertiary,
+                                modifier = Modifier.size(28.dp),
+                            )
+                            Column(modifier = Modifier.weight(1f)) {
+                                Text(
+                                    stringResource(R.string.settings_premium_title),
+                                    style = MaterialTheme.typography.titleSmall,
+                                    fontWeight = FontWeight.SemiBold,
+                                )
+                                Text(
+                                    stringResource(R.string.settings_premium_active),
+                                    style = MaterialTheme.typography.bodySmall,
+                                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                )
+                            }
+                        }
+                        Spacer(modifier = Modifier.height(16.dp))
+                        TextButton(
+                            onClick = {
+                                val intent = Intent(
+                                    Intent.ACTION_VIEW,
+                                    android.net.Uri.parse("https://play.google.com/store/account/subscriptions"),
+                                )
+                                context.startActivity(intent)
+                            },
+                            modifier = Modifier.fillMaxWidth(),
+                        ) {
+                            Text(stringResource(R.string.settings_manage_subscription))
+                        }
+                    } else {
+                        // Free tier — upgrade CTA
+                        Row(
+                            verticalAlignment = Alignment.CenterVertically,
+                            horizontalArrangement = Arrangement.spacedBy(10.dp),
+                        ) {
+                            Text("✨", style = MaterialTheme.typography.titleLarge)
+                            Column(modifier = Modifier.weight(1f)) {
+                                Text(
+                                    stringResource(R.string.settings_upgrade_premium),
+                                    style = MaterialTheme.typography.titleSmall,
+                                    fontWeight = FontWeight.SemiBold,
+                                )
+                                Text(
+                                    stringResource(R.string.settings_premium_price),
+                                    style = MaterialTheme.typography.bodySmall,
+                                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                )
+                            }
+                        }
+                        Spacer(modifier = Modifier.height(4.dp))
+                        Text(
+                            stringResource(R.string.settings_premium_features_list),
+                            style = MaterialTheme.typography.bodySmall,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        )
+                        Spacer(modifier = Modifier.height(16.dp))
+                        Button(
+                            onClick = {
+                                val activity = context as? Activity
+                                if (activity != null) {
+                                    viewModel.launchPremiumPurchase(activity)
+                                }
+                            },
+                            modifier = Modifier.fillMaxWidth(),
+                        ) {
+                            Icon(Icons.Default.WorkspacePremium, contentDescription = null, modifier = Modifier.size(18.dp))
+                            Spacer(modifier = Modifier.width(8.dp))
+                            Text(stringResource(R.string.settings_start_free_trial))
+                        }
+                        Spacer(modifier = Modifier.height(4.dp))
+                        TextButton(
+                            onClick = { viewModel.restorePurchases() },
+                            enabled = !isRestoringPurchases,
+                            modifier = Modifier.fillMaxWidth(),
+                        ) {
+                            if (isRestoringPurchases) {
+                                CircularProgressIndicator(modifier = Modifier.size(16.dp), strokeWidth = 2.dp)
+                                Spacer(modifier = Modifier.width(8.dp))
+                                Text(stringResource(R.string.settings_restoring))
+                            } else {
+                                Text(stringResource(R.string.settings_restore_purchases))
+                            }
+                        }
+                    }
+                }
+            }
+
             // Household section
             SettingsSectionHeader(
                 icon = { Icon(Icons.Default.Home, contentDescription = null, tint = MaterialTheme.colorScheme.primary) },
-                label = "Household",
+                label = stringResource(R.string.settings_household_section),
             )
             Card(
                 shape = RoundedCornerShape(16.dp),
@@ -844,7 +978,7 @@ fun SettingsScreen(
                     if (currentHousehold != null) {
                         // Household name header
                         Text(
-                            text = currentHousehold?.name ?: "My Household",
+                            text = currentHousehold?.name ?: stringResource(R.string.settings_my_household_fallback),
                             style = MaterialTheme.typography.titleSmall,
                             fontWeight = FontWeight.SemiBold,
                         )
@@ -863,12 +997,12 @@ fun SettingsScreen(
                         ) {
                             Icon(
                                 Icons.Default.PersonAdd,
-                                contentDescription = "Invite to Household",
+                                contentDescription = stringResource(R.string.settings_invite_household_cd),
                                 tint = MaterialTheme.colorScheme.secondary,
                                 modifier = Modifier.size(20.dp),
                             )
                             Text(
-                                "Invite to Household",
+                                stringResource(R.string.settings_invite_code_label),
                                 style = MaterialTheme.typography.labelMedium,
                                 fontWeight = FontWeight.SemiBold,
                                 modifier = Modifier.weight(1f),
@@ -890,12 +1024,12 @@ fun SettingsScreen(
                         ) {
                             Icon(
                                 Icons.Default.Groups,
-                                contentDescription = "Manage Housemates",
+                                contentDescription = stringResource(R.string.settings_manage_housemates_cd),
                                 tint = MaterialTheme.colorScheme.secondary,
                                 modifier = Modifier.size(20.dp),
                             )
                             Text(
-                                "Manage Housemates",
+                                stringResource(R.string.settings_manage_housemates),
                                 style = MaterialTheme.typography.labelMedium,
                                 fontWeight = FontWeight.SemiBold,
                                 modifier = Modifier.weight(1f),
@@ -905,13 +1039,13 @@ fun SettingsScreen(
                     } else {
                         // No household — show create/join options
                         Text(
-                            text = "You're not in a household yet",
+                            text = stringResource(R.string.settings_no_household),
                             style = MaterialTheme.typography.titleSmall,
                             fontWeight = FontWeight.SemiBold,
                         )
                         Spacer(modifier = Modifier.height(4.dp))
                         Text(
-                            text = "Create or join a household to share habits with family & friends.",
+                            text = stringResource(R.string.settings_no_household_body_full),
                             style = MaterialTheme.typography.bodySmall,
                             color = MaterialTheme.colorScheme.onSurfaceVariant,
                         )
@@ -938,13 +1072,13 @@ fun SettingsScreen(
                             } else {
                                 Icon(
                                     Icons.Default.Home,
-                                    contentDescription = "Create Household",
+                                    contentDescription = stringResource(R.string.settings_create_household_cd),
                                     tint = MaterialTheme.colorScheme.secondary,
                                     modifier = Modifier.size(20.dp),
                                 )
                             }
                             Text(
-                                "Create a Household",
+                                stringResource(R.string.settings_create_household),
                                 style = MaterialTheme.typography.labelMedium,
                                 fontWeight = FontWeight.SemiBold,
                                 modifier = Modifier.weight(1f),
@@ -974,13 +1108,13 @@ fun SettingsScreen(
                             } else {
                                 Icon(
                                     Icons.Default.PersonAdd,
-                                    contentDescription = "Join Household",
+                                    contentDescription = stringResource(R.string.settings_join_household_icon_cd),
                                     tint = MaterialTheme.colorScheme.secondary,
                                     modifier = Modifier.size(20.dp),
                                 )
                             }
                             Text(
-                                "Join with Invite Code",
+                                stringResource(R.string.settings_join_with_code),
                                 style = MaterialTheme.typography.labelMedium,
                                 fontWeight = FontWeight.SemiBold,
                                 modifier = Modifier.weight(1f),
@@ -993,7 +1127,7 @@ fun SettingsScreen(
             // Sound section
             SettingsSectionHeader(
                 icon = { Icon(Icons.Default.VolumeUp, contentDescription = null, tint = MaterialTheme.colorScheme.primary) },
-                label = "Sound",
+                label = stringResource(R.string.settings_sound_section),
             )
             Card(
                 shape = RoundedCornerShape(16.dp),
@@ -1007,9 +1141,9 @@ fun SettingsScreen(
                     verticalAlignment = Alignment.CenterVertically,
                 ) {
                     Column(modifier = Modifier.weight(1f)) {
-                        Text("Sound Effects", style = MaterialTheme.typography.titleSmall, fontWeight = FontWeight.SemiBold)
+                        Text(stringResource(R.string.settings_sound_effects), style = MaterialTheme.typography.titleSmall, fontWeight = FontWeight.SemiBold)
                         Text(
-                            "Play magic chimes on task complete",
+                            stringResource(R.string.settings_sound_effects_body),
                             style = MaterialTheme.typography.bodySmall,
                             color = MaterialTheme.colorScheme.onSurfaceVariant,
                         )
@@ -1021,7 +1155,7 @@ fun SettingsScreen(
             // Account section
             SettingsSectionHeader(
                 icon = { Icon(Icons.Default.Person, contentDescription = null, tint = MaterialTheme.colorScheme.primary) },
-                label = "Account",
+                label = stringResource(R.string.settings_account_section),
             )
             Card(
                 shape = RoundedCornerShape(16.dp),
@@ -1047,13 +1181,13 @@ fun SettingsScreen(
                         )
                         Column(modifier = Modifier.weight(1f)) {
                             Text(
-                                "Profile Photo",
+                                stringResource(R.string.settings_profile_photo),
                                 style = MaterialTheme.typography.labelSmall,
                                 fontWeight = FontWeight.SemiBold,
                                 color = MaterialTheme.colorScheme.onSurface,
                             )
                             Text(
-                                "Tap to change",
+                                stringResource(R.string.settings_tap_to_change),
                                 style = MaterialTheme.typography.bodySmall,
                                 color = MaterialTheme.colorScheme.onSurfaceVariant,
                             )
@@ -1084,13 +1218,13 @@ fun SettingsScreen(
                     ) {
                         Column(modifier = Modifier.weight(1f)) {
                             Text(
-                                "Username",
+                                stringResource(R.string.settings_username_label),
                                 style = MaterialTheme.typography.labelSmall,
                                 fontWeight = FontWeight.SemiBold,
                                 color = MaterialTheme.colorScheme.onSurface,
                             )
                             Text(
-                                currentDisplayName.ifBlank { "Tap to set username" },
+                                currentDisplayName.ifBlank { stringResource(R.string.settings_tap_to_set_username) },
                                 style = MaterialTheme.typography.bodySmall,
                                 color = if (currentDisplayName.isBlank()) {
                                     MaterialTheme.colorScheme.onSurfaceVariant
@@ -1101,7 +1235,7 @@ fun SettingsScreen(
                         }
                         Icon(
                             Icons.Default.Edit,
-                            contentDescription = "Edit username",
+                            contentDescription = stringResource(R.string.settings_edit_username_cd),
                             tint = MaterialTheme.colorScheme.secondary,
                             modifier = Modifier.size(20.dp),
                         )
@@ -1113,7 +1247,7 @@ fun SettingsScreen(
                     if (viewModel.currentUserEmail != null) {
                         Column {
                             Text(
-                                "Email",
+                                stringResource(R.string.settings_email_label),
                                 style = MaterialTheme.typography.labelSmall,
                                 fontWeight = FontWeight.SemiBold,
                                 color = MaterialTheme.colorScheme.onSurface,
@@ -1139,7 +1273,7 @@ fun SettingsScreen(
                     ) {
                         Icon(Icons.Default.ExitToApp, contentDescription = null, modifier = Modifier.size(18.dp))
                         Spacer(modifier = Modifier.width(8.dp))
-                        Text("Sign Out")
+                        Text(stringResource(R.string.settings_sign_out_button))
                     }
 
                     Spacer(modifier = Modifier.height(8.dp))
@@ -1161,11 +1295,11 @@ fun SettingsScreen(
                                 color = MaterialTheme.colorScheme.onErrorContainer,
                             )
                             Spacer(modifier = Modifier.width(8.dp))
-                            Text("Resetting...")
+                            Text(stringResource(R.string.settings_resetting))
                         } else {
                             Icon(Icons.Default.DeleteForever, contentDescription = null, modifier = Modifier.size(18.dp))
                             Spacer(modifier = Modifier.width(8.dp))
-                            Text("Reset Account (Dev)")
+                            Text(stringResource(R.string.settings_reset_account_button))
                         }
                     }
                 }

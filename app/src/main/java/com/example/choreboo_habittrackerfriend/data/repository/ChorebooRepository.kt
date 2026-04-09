@@ -61,6 +61,9 @@ class ChorebooRepository @Inject constructor(
 
     suspend fun getChorebooSync(): ChorebooStats? = chorebooDao.getChorebooSync()?.toDomain()
 
+    /** Returns just the name of the local choreboo, or null if none exists. */
+    suspend fun getChorebooNameSync(): String? = chorebooDao.getChorebooSync()?.name
+
     suspend fun getOrCreateChoreboo(name: String = "Choreboo", petType: PetType = PetType.FOX): ChorebooEntity {
         require(name.isNotBlank()) { "Choreboo name must not be blank" }
         require(name.length <= 20) { "Choreboo name must be 20 characters or fewer, was ${name.length}" }
@@ -303,10 +306,38 @@ class ChorebooRepository @Inject constructor(
                         lastInteractionAt = Timestamp(Date(updated.lastInteractionAt)),
                     ) {
                         sleepUntil = if (updated.sleepUntil > 0) Timestamp(Date(updated.sleepUntil)) else null
+                        backgroundId = updated.backgroundId
                     }
                     Log.d(TAG, "Synced name update to cloud")
                 } catch (e: Exception) {
                     Log.e(TAG, "Failed to sync name update to cloud", e)
+                }
+            }
+        }
+    }
+
+    /**
+     * Update the background for this user's Choreboo locally and write-through to cloud.
+     * Pass null (or [BACKGROUND_DEFAULT_ID]) to revert to the free mood-gradient default.
+     */
+    suspend fun updateBackground(backgroundId: String?) {
+        val choreboo = chorebooDao.getChorebooSync() ?: return
+        // Store null for "default" so cloud schema stays clean
+        val cloudId = if (backgroundId == com.example.choreboo_habittrackerfriend.domain.model.BACKGROUND_DEFAULT_ID) null else backgroundId
+        val updated = choreboo.copy(backgroundId = cloudId)
+        chorebooDao.updateChoreboo(updated)
+
+        updated.remoteId?.let { remoteId ->
+            writeScope.launch {
+                try {
+                    connector.updateChorebooBackground.execute(
+                        chorebooId = UUID.fromString(remoteId),
+                    ) {
+                        this.backgroundId = cloudId
+                    }
+                    Log.d(TAG, "Synced background update to cloud: $cloudId")
+                } catch (e: Exception) {
+                    Log.e(TAG, "Failed to sync background update to cloud", e)
                 }
             }
         }
@@ -388,6 +419,7 @@ class ChorebooRepository @Inject constructor(
                 sleepUntil = sleepUntilMs,
                 ownerUid = cloudPet.owner.id,
                 remoteId = remoteId,
+                backgroundId = cloudPet.backgroundId,
             )
 
             if (existing != null) {
@@ -423,4 +455,5 @@ private fun ChorebooEntity.toDomain() = ChorebooStats(
     lastInteractionAt = lastInteractionAt,
     createdAt = createdAt,
     sleepUntil = sleepUntil,
+    backgroundId = backgroundId,
 )

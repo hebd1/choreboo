@@ -53,11 +53,11 @@ interface HouseholdMemberDao {
            (uid, displayName, photoUrl, email,
             chorebooId, chorebooName, chorebooStage, chorebooLevel,
             chorebooXp, chorebooHunger, chorebooHappiness, chorebooEnergy,
-            chorebooPetType, lastSyncedAt)
+            chorebooPetType, chorebooBackgroundId, lastSyncedAt)
            VALUES (:uid, :displayName, :photoUrl, NULL,
                    :chorebooId, :chorebooName, :chorebooStage, :chorebooLevel,
                    :chorebooXp, :chorebooHunger, :chorebooHappiness, :chorebooEnergy,
-                   :chorebooPetType, :lastSyncedAt)""",
+                   :chorebooPetType, :chorebooBackgroundId, :lastSyncedAt)""",
     )
     suspend fun insertIgnorePet(
         uid: String,
@@ -72,23 +72,25 @@ interface HouseholdMemberDao {
         chorebooHappiness: Int,
         chorebooEnergy: Int,
         chorebooPetType: String,
+        chorebooBackgroundId: String?,
         lastSyncedAt: Long,
     )
 
     @Query(
         """UPDATE household_members
-           SET displayName      = :displayName,
-               photoUrl         = :photoUrl,
-               chorebooId       = :chorebooId,
-               chorebooName     = :chorebooName,
-               chorebooStage    = :chorebooStage,
-               chorebooLevel    = :chorebooLevel,
-               chorebooXp       = :chorebooXp,
-               chorebooHunger   = :chorebooHunger,
-               chorebooHappiness = :chorebooHappiness,
-               chorebooEnergy   = :chorebooEnergy,
-               chorebooPetType  = :chorebooPetType,
-               lastSyncedAt     = :lastSyncedAt
+           SET displayName         = :displayName,
+               photoUrl            = :photoUrl,
+               chorebooId          = :chorebooId,
+               chorebooName        = :chorebooName,
+               chorebooStage       = :chorebooStage,
+               chorebooLevel       = :chorebooLevel,
+               chorebooXp          = :chorebooXp,
+               chorebooHunger      = :chorebooHunger,
+               chorebooHappiness   = :chorebooHappiness,
+               chorebooEnergy      = :chorebooEnergy,
+               chorebooPetType     = :chorebooPetType,
+               chorebooBackgroundId = :chorebooBackgroundId,
+               lastSyncedAt        = :lastSyncedAt
            WHERE uid = :uid""",
     )
     suspend fun updatePetColumns(
@@ -104,6 +106,7 @@ interface HouseholdMemberDao {
         chorebooHappiness: Int,
         chorebooEnergy: Int,
         chorebooPetType: String,
+        chorebooBackgroundId: String?,
         lastSyncedAt: Long,
     )
 
@@ -146,19 +149,20 @@ interface HouseholdMemberDao {
         chorebooHappiness: Int,
         chorebooEnergy: Int,
         chorebooPetType: String,
+        chorebooBackgroundId: String?,
         lastSyncedAt: Long,
     ) {
         insertIgnorePet(
             uid, displayName, photoUrl,
             chorebooId, chorebooName, chorebooStage, chorebooLevel,
             chorebooXp, chorebooHunger, chorebooHappiness, chorebooEnergy,
-            chorebooPetType, lastSyncedAt,
+            chorebooPetType, chorebooBackgroundId, lastSyncedAt,
         )
         updatePetColumns(
             uid, displayName, photoUrl,
             chorebooId, chorebooName, chorebooStage, chorebooLevel,
             chorebooXp, chorebooHunger, chorebooHappiness, chorebooEnergy,
-            chorebooPetType, lastSyncedAt,
+            chorebooPetType, chorebooBackgroundId, lastSyncedAt,
         )
     }
 

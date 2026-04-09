@@ -95,7 +95,8 @@ mutation UpdateChorebooFull(
   $energy: Int!,
   $petType: String!,
   $lastInteractionAt: Timestamp!,
-  $sleepUntil: Timestamp
+  $sleepUntil: Timestamp,
+  $backgroundId: String
 ) @auth(level: USER) {
   choreboo_updateMany(
     where: { id: { eq: $chorebooId }, ownerId: { eq_expr: "auth.uid" } }
@@ -110,6 +111,7 @@ mutation UpdateChorebooFull(
       petType: $petType
       lastInteractionAt: $lastInteractionAt
       sleepUntil: $sleepUntil
+      backgroundId: $backgroundId
     }
   )
 }
@@ -163,6 +165,37 @@ mutation UpdateChorebooSleep(
   )
 }
 
+# Only the owning user can update their choreboo's selected background.
+mutation UpdateChorebooBackground(
+  $chorebooId: UUID!,
+  $backgroundId: String
+) @auth(level: USER) {
+  choreboo_updateMany(
+    where: { id: { eq: $chorebooId }, ownerId: { eq_expr: "auth.uid" } }
+    data: {
+      backgroundId: $backgroundId
+    }
+  )
+}
+
+# ---- PurchasedBackground Mutations ----
+
+# Record that the current user has purchased a background. The composite key
+# (ownerId, backgroundId) prevents duplicate purchase rows.
+mutation PurchaseBackground($backgroundId: String!) @auth(level: USER) {
+  purchasedBackground_insert(
+    data: {
+      ownerId_expr: "auth.uid"
+      backgroundId: $backgroundId
+    }
+  )
+}
+
+# Delete all purchased backgrounds for the current user — used by the dev reset flow.
+mutation DeleteAllMyPurchasedBackgrounds @auth(level: USER) {
+  purchasedBackground_deleteMany(where: { ownerId: { eq_expr: "auth.uid" } })
+}
+
 # ---- Habit Mutations ----
 
 mutation CreateHabit(
@@ -197,7 +230,10 @@ mutation CreateHabit(
   )
 }
 
-# Only the owner can update their habit.
+# The owner or the assigned user can update the habit.
+# Sensitive fields (isHouseholdHabit, householdId, assignedToId) are included but the
+# client is responsible for preserving them when the editor is not the owner (enforced in
+# AddEditHabitViewModel via the isOwner flag).
 mutation UpdateHabit(
   $habitId: UUID!,
   $title: String!,
@@ -213,7 +249,17 @@ mutation UpdateHabit(
   $assignedToId: String
 ) @auth(level: USER) {
   habit_updateMany(
-    where: { id: { eq: $habitId }, ownerId: { eq_expr: "auth.uid" } }
+    where: {
+      _and: [
+        { id: { eq: $habitId } }
+        {
+          _or: [
+            { ownerId: { eq_expr: "auth.uid" } }
+            { assignedToId: { eq_expr: "auth.uid" } }
+          ]
+        }
+      ]
+    }
     data: {
       title: $title
       description: $description
@@ -230,18 +276,38 @@ mutation UpdateHabit(
   )
 }
 
-# Only the owner can archive their habit.
+# The owner or the assigned user can archive the habit.
 mutation ArchiveHabit($habitId: UUID!) @auth(level: USER) {
   habit_updateMany(
-    where: { id: { eq: $habitId }, ownerId: { eq_expr: "auth.uid" } }
+    where: {
+      _and: [
+        { id: { eq: $habitId } }
+        {
+          _or: [
+            { ownerId: { eq_expr: "auth.uid" } }
+            { assignedToId: { eq_expr: "auth.uid" } }
+          ]
+        }
+      ]
+    }
     data: { isArchived: true }
   )
 }
 
-# Only the owner can delete their habit.
+# The owner or the assigned user can delete the habit.
 mutation DeleteHabit($habitId: UUID!) @auth(level: USER) {
   habit_deleteMany(
-    where: { id: { eq: $habitId }, ownerId: { eq_expr: "auth.uid" } }
+    where: {
+      _and: [
+        { id: { eq: $habitId } }
+        {
+          _or: [
+            { ownerId: { eq_expr: "auth.uid" } }
+            { assignedToId: { eq_expr: "auth.uid" } }
+          ]
+        }
+      ]
+    }
   )
 }
 

@@ -4,14 +4,20 @@ import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.example.choreboo_habittrackerfriend.data.datastore.UserPreferences
 import com.example.choreboo_habittrackerfriend.data.repository.AuthRepository
+import com.example.choreboo_habittrackerfriend.data.repository.BackgroundRepository
+import com.example.choreboo_habittrackerfriend.data.repository.BillingRepository
 import com.example.choreboo_habittrackerfriend.data.repository.ChorebooRepository
 import com.example.choreboo_habittrackerfriend.data.repository.HabitRepository
 import com.example.choreboo_habittrackerfriend.data.repository.HouseholdRepository
 import com.example.choreboo_habittrackerfriend.data.repository.SyncManager
 import com.example.choreboo_habittrackerfriend.data.repository.UserRepository
 import com.example.choreboo_habittrackerfriend.domain.model.ChorebooMood
+import com.example.choreboo_habittrackerfriend.domain.model.ChorebooStage
 import com.example.choreboo_habittrackerfriend.domain.model.ChorebooStats
 import com.example.choreboo_habittrackerfriend.domain.model.Habit
+import com.example.choreboo_habittrackerfriend.domain.model.BACKGROUND_DEFAULT_ID
+import com.example.choreboo_habittrackerfriend.domain.model.BackgroundItem
+import com.example.choreboo_habittrackerfriend.domain.model.BACKGROUND_REGISTRY
 import com.example.choreboo_habittrackerfriend.domain.model.PetType
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.flow.MutableSharedFlow
@@ -41,6 +47,8 @@ class PetViewModel @Inject constructor(
     private val householdRepository: HouseholdRepository,
     private val syncManager: SyncManager,
     private val userRepository: UserRepository,
+    private val backgroundRepository: BackgroundRepository,
+    private val billingRepository: BillingRepository,
 ) : ViewModel() {
 
     // -----------------------------------------------------------------------
@@ -134,6 +142,38 @@ class PetViewModel @Inject constructor(
     /** UID of the currently authenticated user — used to distinguish own vs. other-member habits. */
     val currentUserUid: String?
         get() = authRepository.currentFirebaseUser?.uid
+
+    // -----------------------------------------------------------------------
+    // Background state
+    // -----------------------------------------------------------------------
+
+    /**
+     * The current background ID for this user's Choreboo.
+     * Null / "default" both mean the free mood-gradient should be shown.
+     */
+    val backgroundId: StateFlow<String?> = chorebooFlow
+        .map { it?.backgroundId }
+        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), null)
+
+    /**
+     * Set of background IDs that the current user has unlocked (default always included).
+     */
+    val unlockedBackgroundIds: StateFlow<Set<String>> = backgroundRepository
+        .getPurchasedBackgrounds()
+        .map { entities ->
+            val ids = entities.map { it.backgroundId }.toMutableSet()
+            ids.add(BACKGROUND_DEFAULT_ID) // default is always unlocked
+            ids
+        }
+        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), setOf(BACKGROUND_DEFAULT_ID))
+
+    /** The full background catalogue enriched with unlock state — drives the picker UI. */
+    val backgroundCatalogue: StateFlow<List<BackgroundItem>> = MutableStateFlow(BACKGROUND_REGISTRY)
+        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), BACKGROUND_REGISTRY)
+
+    /** True when the user has an active Choreboo Premium subscription. */
+    val isPremium: StateFlow<Boolean> = billingRepository.isPremium
+        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), false)
 
     /**
      * Maps local habit ID → display name of the household member who completed it today
@@ -249,11 +289,11 @@ class PetViewModel @Inject constructor(
                         leveledUp = xpResult.levelsGained > 0,
                         newLevel = xpResult.newLevel,
                         evolved = xpResult.evolved,
-                        newStageName = xpResult.newStage?.displayName,
+                        newStage = xpResult.newStage,
                     ),
                 )
             } catch (e: Exception) {
-                _events.emit(PetEvent.CompletionError(e.message ?: "Failed to complete habit"))
+                _events.emit(PetEvent.CompletionError)
             }
         }
     }
@@ -265,8 +305,51 @@ class PetViewModel @Inject constructor(
     }
 
     // -----------------------------------------------------------------------
+    // Background actions
+    // -----------------------------------------------------------------------
+
+    /**
+     * Purchase a background: deduct points and record the unlock.
+     * Emits [PetEvent.BackgroundPurchased] on success or [PetEvent.InsufficientPoints] if
+     * the user doesn't have enough points.
+     */
+    fun purchaseBackground(item: BackgroundItem) {
+        viewModelScope.launch {
+            val cost = item.cost
+            if (cost > 0) {
+                val deducted = userPreferences.deductPoints(cost)
+                if (!deducted) {
+                    _events.emit(PetEvent.InsufficientPoints)
+                    return@launch
+                }
+                // Write-through deducted points
+                val newPoints = userPreferences.totalPoints.first()
+                val newLifetimeXp = userPreferences.totalLifetimeXp.first()
+                userRepository.syncPointsToCloud(newPoints, newLifetimeXp)
+            }
+            backgroundRepository.purchaseBackground(item.id)
+            _events.emit(PetEvent.BackgroundPurchased(item))
+        }
+    }
+
+    /**
+     * Apply a background that the user already owns (or revert to default).
+     * No point cost — just update the choreboo's backgroundId.
+     */
+    fun selectBackground(backgroundId: String?) {
+        viewModelScope.launch {
+            chorebooRepository.updateBackground(backgroundId)
+        }
+    }
+
+    // -----------------------------------------------------------------------
     // Private helpers
     // -----------------------------------------------------------------------
+
+    /** Launches the Google Play subscription purchase flow from the given Activity. */
+    fun launchPremiumPurchase(activity: android.app.Activity) {
+        billingRepository.launchPurchaseFlow(activity)
+    }
 }
 
 sealed class PetEvent {
@@ -280,8 +363,9 @@ sealed class PetEvent {
         val leveledUp: Boolean = false,
         val newLevel: Int = 0,
         val evolved: Boolean = false,
-        val newStageName: String? = null,
+        val newStage: ChorebooStage? = null,
     ) : PetEvent()
     data object AlreadyComplete : PetEvent()
-    data class CompletionError(val message: String) : PetEvent()
+    data object CompletionError : PetEvent()
+    data class BackgroundPurchased(val item: BackgroundItem) : PetEvent()
 }

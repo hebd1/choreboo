@@ -5,6 +5,8 @@ import com.example.choreboo_habittrackerfriend.TestDispatcherRule
 import com.example.choreboo_habittrackerfriend.data.datastore.UserPreferences
 import com.example.choreboo_habittrackerfriend.data.local.entity.HabitLogEntity
 import com.example.choreboo_habittrackerfriend.data.repository.AuthRepository
+import com.example.choreboo_habittrackerfriend.data.repository.BackgroundRepository
+import com.example.choreboo_habittrackerfriend.data.repository.BillingRepository
 import com.example.choreboo_habittrackerfriend.data.repository.ChorebooRepository
 import com.example.choreboo_habittrackerfriend.data.repository.CompletionResult
 import com.example.choreboo_habittrackerfriend.data.repository.HabitRepository
@@ -55,6 +57,8 @@ class PetViewModelTest {
     private lateinit var householdRepository: HouseholdRepository
     private lateinit var syncManager: SyncManager
     private lateinit var userRepository: UserRepository
+    private lateinit var backgroundRepository: BackgroundRepository
+    private lateinit var billingRepository: BillingRepository
 
     private val chorebooFlow = MutableStateFlow<ChorebooStats?>(null)
     private val habitsFlow = MutableStateFlow<List<Habit>>(emptyList())
@@ -84,6 +88,8 @@ class PetViewModelTest {
         householdRepository = mockk(relaxed = true)
         syncManager = mockk(relaxed = true)
         userRepository = mockk(relaxed = true)
+        backgroundRepository = mockk(relaxed = true)
+        billingRepository = mockk(relaxed = true)
 
         // Default stubs
         every { chorebooRepository.getChoreboo() } returns chorebooFlow
@@ -95,6 +101,8 @@ class PetViewModelTest {
         every { userPreferences.profilePhotoUri } returns flowOf(null)
         every { authRepository.currentFirebaseUser } returns null
         every { householdRepository.householdMembers } returns flowOf(emptyList())
+        every { backgroundRepository.getPurchasedBackgrounds() } returns flowOf(emptyList())
+        every { billingRepository.isPremium } returns MutableStateFlow(false)
 
         // Mock current user for habits filtering
         val currentUser = mockk<FirebaseUser>()
@@ -114,6 +122,8 @@ class PetViewModelTest {
         householdRepository = householdRepository,
         syncManager = syncManager,
         userRepository = userRepository,
+        backgroundRepository = backgroundRepository,
+        billingRepository = billingRepository,
     )
 
     // -----------------------------------------------------------------------
@@ -385,7 +395,7 @@ class PetViewModelTest {
             val event = awaitItem() as PetEvent.HabitCompleted
             assertTrue(event.leveledUp)
             assertTrue(event.evolved)
-            assertEquals("Child", event.newStageName)
+            assertEquals(ChorebooStage.CHILD, event.newStage)
         }
     }
 

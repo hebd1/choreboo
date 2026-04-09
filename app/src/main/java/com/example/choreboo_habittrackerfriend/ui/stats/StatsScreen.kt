@@ -49,11 +49,16 @@ import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import androidx.compose.ui.res.stringResource
 import androidx.hilt.navigation.compose.hiltViewModel
+import com.example.choreboo_habittrackerfriend.R
 import com.example.choreboo_habittrackerfriend.domain.model.Badge
 import com.example.choreboo_habittrackerfriend.domain.model.ChorebooMood
 import com.example.choreboo_habittrackerfriend.ui.components.ProfileAvatar
 import com.example.choreboo_habittrackerfriend.ui.theme.XpPurple
+import com.example.choreboo_habittrackerfriend.ui.util.displayNameRes
+import com.example.choreboo_habittrackerfriend.ui.util.descriptionRes
+import com.example.choreboo_habittrackerfriend.ui.util.feelingLabelRes
 import java.time.DayOfWeek
 
 @OptIn(ExperimentalMaterial3Api::class)
@@ -98,7 +103,7 @@ fun StatsScreen(
                         )
                         Spacer(modifier = Modifier.width(12.dp))
                         Text(
-                            text = "Stats",
+                            text = stringResource(R.string.stats_title),
                             style = MaterialTheme.typography.headlineMedium,
                             fontWeight = FontWeight.ExtraBold,
                             color = MaterialTheme.colorScheme.primary,
@@ -117,7 +122,7 @@ fun StatsScreen(
                     ) {
                         Icon(
                             imageVector = Icons.Default.Stars,
-                            contentDescription = "Points",
+                            contentDescription = stringResource(R.string.stats_points_cd),
                             tint = MaterialTheme.colorScheme.secondaryContainer,
                             modifier = Modifier.size(18.dp),
                         )
@@ -208,7 +213,18 @@ private val weekDays = listOf(
     DayOfWeek.SUNDAY,
 )
 
-private val dayLabels = listOf("M", "T", "W", "T", "F", "S", "S")
+@Composable
+private fun getDayLabels(): List<String> {
+    return listOf(
+        stringResource(R.string.day_abbreviation_monday),
+        stringResource(R.string.day_abbreviation_tuesday),
+        stringResource(R.string.day_abbreviation_wednesday),
+        stringResource(R.string.day_abbreviation_thursday),
+        stringResource(R.string.day_abbreviation_friday),
+        stringResource(R.string.day_abbreviation_saturday),
+        stringResource(R.string.day_abbreviation_sunday),
+    )
+}
 
 @Composable
 private fun WeeklyStreakCard(
@@ -216,6 +232,7 @@ private fun WeeklyStreakCard(
     weeklyCompletionDays: Set<DayOfWeek>,
     completionFraction: Float,
 ) {
+    val dayLabels = getDayLabels()
     Box(
         modifier = Modifier
             .fillMaxWidth()
@@ -240,7 +257,7 @@ private fun WeeklyStreakCard(
 
         Column(modifier = Modifier.padding(horizontal = 24.dp, vertical = 20.dp)) {
             Text(
-                text = "WEEKLY STREAK",
+                text = stringResource(R.string.stats_weekly_streak),
                 style = MaterialTheme.typography.labelSmall,
                 fontWeight = FontWeight.Bold,
                 color = MaterialTheme.colorScheme.primary,
@@ -256,7 +273,7 @@ private fun WeeklyStreakCard(
                 )
                 Spacer(modifier = Modifier.width(8.dp))
                 Text(
-                    text = "Total Days",
+                    text = stringResource(R.string.stats_total_days),
                     style = MaterialTheme.typography.titleMedium,
                     fontWeight = FontWeight.Bold,
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
@@ -286,7 +303,7 @@ private fun WeeklyStreakCard(
                             if (isCompleted) {
                                 Icon(
                                     imageVector = Icons.Default.Check,
-                                    contentDescription = "Completed",
+                                    contentDescription = stringResource(R.string.stats_completed_cd),
                                     tint = MaterialTheme.colorScheme.onPrimary,
                                     modifier = Modifier.size(18.dp),
                                 )
@@ -338,7 +355,7 @@ private fun StreakXpBentoGrid(
                     .padding(14.dp),
             ) {
                 Text(
-                    text = "BADGES",
+                    text = stringResource(R.string.stats_badges_section),
                     style = MaterialTheme.typography.labelSmall,
                     fontWeight = FontWeight.Bold,
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
@@ -351,10 +368,10 @@ private fun StreakXpBentoGrid(
                         horizontalAlignment = Alignment.CenterHorizontally,
                         verticalArrangement = Arrangement.Center,
                     ) {
-                        Text("\uD83C\uDFC5", fontSize = 32.sp)
+                        Text("🏆", fontSize = 32.sp)
                         Spacer(modifier = Modifier.height(6.dp))
                         Text(
-                            text = "Complete habits\nto earn badges!",
+                            text = stringResource(R.string.stats_no_badges),
                             style = MaterialTheme.typography.labelSmall,
                             color = MaterialTheme.colorScheme.onSurfaceVariant,
                             textAlign = TextAlign.Center,
@@ -383,14 +400,14 @@ private fun StreakXpBentoGrid(
                                 ) {
                                     Icon(
                                         imageVector = badge.definition.icon,
-                                        contentDescription = badge.definition.displayName,
+                                        contentDescription = stringResource(badge.definition.displayNameRes()),
                                         tint = if (isUnlocked) MaterialTheme.colorScheme.onSecondaryContainer
                                         else MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.38f),
                                         modifier = Modifier.size(16.dp),
                                     )
                                 }
                                 Text(
-                                    text = badge.definition.displayName,
+                                    text = stringResource(badge.definition.displayNameRes()),
                                     style = MaterialTheme.typography.labelSmall,
                                     fontWeight = FontWeight.Bold,
                                     color = if (isUnlocked) MaterialTheme.colorScheme.onSurface
@@ -423,7 +440,7 @@ private fun StreakXpBentoGrid(
             ) {
                 Column(horizontalAlignment = Alignment.CenterHorizontally) {
                     Row(verticalAlignment = Alignment.CenterVertically) {
-                        Text(text = "\u2728", fontSize = 16.sp)
+                        Text(text = stringResource(R.string.stats_xp_today), fontSize = 16.sp)
                         Spacer(modifier = Modifier.width(4.dp))
                         Text(
                             text = "+$todayXp",
@@ -433,7 +450,7 @@ private fun StreakXpBentoGrid(
                         )
                     }
                     Text(
-                        text = "XP TODAY",
+                        text = stringResource(R.string.stats_xp_today),
                         style = MaterialTheme.typography.labelSmall,
                         fontWeight = FontWeight.Bold,
                         color = XpPurple.copy(alpha = 0.7f),
@@ -453,7 +470,7 @@ private fun StreakXpBentoGrid(
             ) {
                 Column(horizontalAlignment = Alignment.CenterHorizontally) {
                     Row(verticalAlignment = Alignment.CenterVertically) {
-                        Text(text = "\u2B50", fontSize = 16.sp)
+                        Text(text = stringResource(R.string.stats_star_points), fontSize = 16.sp)
                         Spacer(modifier = Modifier.width(4.dp))
                         Text(
                             text = "$starPoints",
@@ -463,7 +480,7 @@ private fun StreakXpBentoGrid(
                         )
                     }
                     Text(
-                        text = "STAR POINTS",
+                        text = stringResource(R.string.stats_star_points),
                         style = MaterialTheme.typography.labelSmall,
                         fontWeight = FontWeight.Bold,
                         color = MaterialTheme.colorScheme.secondary.copy(alpha = 0.7f),
@@ -494,14 +511,7 @@ private fun PetStatusBentoGrid(
         ChorebooMood.SAD -> "\uD83D\uDE22"
         ChorebooMood.IDLE -> "\uD83D\uDE10"
     }
-    val moodLabel = when (mood) {
-        ChorebooMood.HAPPY -> "Feeling Loved"
-        ChorebooMood.CONTENT -> "Feeling Good"
-        ChorebooMood.HUNGRY -> "Feeling Hungry"
-        ChorebooMood.TIRED -> "Feeling Tired"
-        ChorebooMood.SAD -> "Feeling Sad"
-        ChorebooMood.IDLE -> "Feeling Idle"
-    }
+    val moodLabel = stringResource(mood.feelingLabelRes())
 
     Row(
         modifier = Modifier.fillMaxWidth(),
@@ -522,7 +532,7 @@ private fun PetStatusBentoGrid(
                 verticalArrangement = Arrangement.SpaceBetween,
             ) {
                 Text(
-                    text = "PET MOOD",
+                    text = stringResource(R.string.stats_pet_mood),
                     style = MaterialTheme.typography.labelSmall,
                     fontWeight = FontWeight.Bold,
                     color = MaterialTheme.colorScheme.onTertiaryContainer,
@@ -557,19 +567,19 @@ private fun PetStatusBentoGrid(
                 verticalArrangement = Arrangement.SpaceBetween,
             ) {
                 Text(
-                    text = "LEVEL $level",
+                    text = stringResource(R.string.stats_level_label, level),
                     style = MaterialTheme.typography.labelSmall,
                     fontWeight = FontWeight.Bold,
                     color = MaterialTheme.colorScheme.onPrimaryContainer,
                     letterSpacing = 1.sp,
                 )
                 Text(
-                    text = "\uD83C\uDF57",
+                    text = level.toString(),
                     fontSize = 44.sp,
                     modifier = Modifier.align(Alignment.CenterHorizontally),
                 )
                 Text(
-                    text = "$xp / $xpToNextLevel XP",
+                    text = stringResource(R.string.stats_xp_progress, xp, xpToNextLevel),
                     style = MaterialTheme.typography.titleSmall,
                     fontWeight = FontWeight.Bold,
                     color = MaterialTheme.colorScheme.onPrimaryContainer,
@@ -597,13 +607,13 @@ private fun MonthlyMasteryCard(completionRate: Int) {
             modifier = Modifier.fillMaxSize(),
             verticalArrangement = Arrangement.SpaceBetween,
         ) {
-            Text(
-                text = "MONTHLY MASTERY",
-                style = MaterialTheme.typography.labelSmall,
-                fontWeight = FontWeight.Bold,
-                color = MaterialTheme.colorScheme.onPrimary.copy(alpha = 0.8f),
-                letterSpacing = 1.sp,
-            )
+        Text(
+            text = stringResource(R.string.stats_monthly_mastery),
+            style = MaterialTheme.typography.labelSmall,
+            fontWeight = FontWeight.Bold,
+            color = MaterialTheme.colorScheme.onPrimary.copy(alpha = 0.8f),
+            letterSpacing = 1.sp,
+        )
             Column {
                 Text(
                     text = "$completionRate%",
@@ -613,10 +623,10 @@ private fun MonthlyMasteryCard(completionRate: Int) {
                 )
                 Text(
                     text = when {
-                        completionRate >= 80 -> "You're a habit warrior!"
-                        completionRate >= 50 -> "Great momentum, keep going!"
-                        completionRate >= 20 -> "Every day counts — push forward!"
-                        else -> "Your streak starts today!"
+                        completionRate >= 80 -> stringResource(R.string.stats_mastery_warrior)
+                        completionRate >= 50 -> stringResource(R.string.stats_mastery_legendary)
+                        completionRate >= 20 -> stringResource(R.string.stats_mastery_champion)
+                        else -> stringResource(R.string.stats_mastery_beginner)
                     },
                     style = MaterialTheme.typography.bodySmall,
                     color = MaterialTheme.colorScheme.onPrimary.copy(alpha = 0.9f),
@@ -652,14 +662,14 @@ private fun BadgeBottomSheet(
         ) {
             // Header
             Text(
-                text = "Badge Collection",
+                text = stringResource(R.string.stats_badge_collection),
                 style = MaterialTheme.typography.titleLarge,
                 fontWeight = FontWeight.Bold,
                 color = MaterialTheme.colorScheme.onSurface,
             )
             Spacer(modifier = Modifier.height(4.dp))
             Text(
-                text = "${badges.count { it.isUnlocked }} of ${badges.size} earned",
+                text = stringResource(R.string.stats_badges_earned_count, badges.count { it.isUnlocked }, badges.size),
                 style = MaterialTheme.typography.labelMedium,
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
             )
@@ -688,7 +698,7 @@ private fun BadgeBottomSheet(
                     ) {
                         Icon(
                             imageVector = badge.definition.icon,
-                            contentDescription = badge.definition.displayName,
+                            contentDescription = stringResource(badge.definition.displayNameRes()),
                             tint = if (isUnlocked) MaterialTheme.colorScheme.onSecondaryContainer
                             else MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.38f),
                             modifier = Modifier.size(22.dp),
@@ -698,14 +708,14 @@ private fun BadgeBottomSheet(
                     // Name + description
                     Column(modifier = Modifier.weight(1f)) {
                         Text(
-                            text = badge.definition.displayName,
+                            text = stringResource(badge.definition.displayNameRes()),
                             style = MaterialTheme.typography.bodyMedium,
                             fontWeight = FontWeight.Bold,
                             color = if (isUnlocked) MaterialTheme.colorScheme.onSurface
                             else MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.5f),
                         )
                         Text(
-                            text = badge.definition.description,
+                            text = stringResource(badge.definition.descriptionRes()),
                             style = MaterialTheme.typography.bodySmall,
                             color = if (isUnlocked) MaterialTheme.colorScheme.onSurfaceVariant
                             else MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.38f),
@@ -721,12 +731,12 @@ private fun BadgeBottomSheet(
                                 .background(MaterialTheme.colorScheme.primary),
                             contentAlignment = Alignment.Center,
                         ) {
-                            Icon(
-                                imageVector = Icons.Default.Check,
-                                contentDescription = "Earned",
-                                tint = MaterialTheme.colorScheme.onPrimary,
-                                modifier = Modifier.size(14.dp),
-                            )
+                        Icon(
+                            imageVector = Icons.Default.Check,
+                            contentDescription = stringResource(R.string.stats_badge_earned_cd),
+                            tint = MaterialTheme.colorScheme.onPrimary,
+                            modifier = Modifier.size(14.dp),
+                        )
                         }
                     } else {
                         Box(
@@ -738,7 +748,7 @@ private fun BadgeBottomSheet(
                         ) {
                             Icon(
                                 imageVector = Icons.Default.Lock,
-                                contentDescription = "Locked",
+                                contentDescription = stringResource(R.string.stats_badge_locked_cd),
                                 tint = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.38f),
                                 modifier = Modifier.size(14.dp),
                             )

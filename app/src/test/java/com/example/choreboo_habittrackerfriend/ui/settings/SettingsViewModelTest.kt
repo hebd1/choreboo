@@ -2,20 +2,25 @@ package com.example.choreboo_habittrackerfriend.ui.settings
 
 import android.app.Application
 import android.net.Uri
+import app.cash.turbine.test
 import com.example.choreboo_habittrackerfriend.TestDispatcherRule
 import com.example.choreboo_habittrackerfriend.data.datastore.UserPreferences
 import com.example.choreboo_habittrackerfriend.data.repository.AuthRepository
+import com.example.choreboo_habittrackerfriend.data.repository.BillingRepository
 import com.example.choreboo_habittrackerfriend.data.repository.ChorebooRepository
 import com.example.choreboo_habittrackerfriend.data.repository.HabitRepository
 import com.example.choreboo_habittrackerfriend.data.repository.HouseholdRepository
 import com.example.choreboo_habittrackerfriend.data.repository.ResetRepository
 import com.example.choreboo_habittrackerfriend.data.repository.UserRepository
 import io.mockk.coEvery
+import io.mockk.coVerify
 import io.mockk.every
 import io.mockk.mockk
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.test.advanceUntilIdle
 import kotlinx.coroutines.test.runTest
+import org.junit.Assert.assertFalse
+import org.junit.Assert.assertTrue
 import org.junit.Before
 import org.junit.Rule
 import org.junit.Test
@@ -39,6 +44,7 @@ class SettingsViewModelTest {
     private lateinit var chorebooRepository: ChorebooRepository
     private lateinit var resetRepository: ResetRepository
     private lateinit var userRepository: UserRepository
+    private lateinit var billingRepository: BillingRepository
     private lateinit var viewModel: SettingsViewModel
 
     @Before
@@ -51,6 +57,7 @@ class SettingsViewModelTest {
         chorebooRepository = mockk(relaxed = true)
         resetRepository = mockk(relaxed = true)
         userRepository = mockk(relaxed = true)
+        billingRepository = mockk(relaxed = true)
 
         // Mock default values for StateFlow dependencies
         every { userPreferences.themeMode } returns MutableStateFlow("system")
@@ -60,6 +67,7 @@ class SettingsViewModelTest {
         every { authRepository.currentUser } returns MutableStateFlow(null)
         every { householdRepository.currentHousehold } returns MutableStateFlow(null)
         every { householdRepository.householdMembers } returns MutableStateFlow(emptyList())
+        every { billingRepository.isPremium } returns MutableStateFlow(false)
 
         viewModel = SettingsViewModel(
             application,
@@ -70,6 +78,7 @@ class SettingsViewModelTest {
             chorebooRepository,
             resetRepository,
             userRepository,
+            billingRepository,
         )
     }
 
@@ -119,6 +128,75 @@ class SettingsViewModelTest {
         // Should not throw — errors are handled
         viewModel.clearProfilePhoto()
         advanceUntilIdle()
+    }
+
+    // ── isPremium ───────────────────────────────────────────────────────────
+
+    @Test
+    fun `isPremium defaults to false`() = runTest {
+        assertFalse(viewModel.isPremium.value)
+    }
+
+    @Test
+    fun `isPremium reflects billingRepository flow`() = runTest {
+        val premiumFlow = MutableStateFlow(false)
+        every { billingRepository.isPremium } returns premiumFlow
+
+        val vm = SettingsViewModel(
+            application, userPreferences, authRepository, householdRepository,
+            habitRepository, chorebooRepository, resetRepository, userRepository, billingRepository,
+        )
+
+        vm.isPremium.test {
+            assertFalse(awaitItem())   // initial false
+            premiumFlow.value = true
+            assertTrue(awaitItem())    // updated to true
+        }
+    }
+
+    // ── restorePurchases ────────────────────────────────────────────────────
+
+    @Test
+    fun `restorePurchases delegates to billingRepository`() = runTest {
+        coEvery { billingRepository.restorePurchases() } returns Unit
+
+        viewModel.restorePurchases()
+        advanceUntilIdle()
+
+        coVerify(exactly = 1) { billingRepository.restorePurchases() }
+    }
+
+    @Test
+    fun `restorePurchases sets isRestoringPurchases true then false`() = runTest {
+        coEvery { billingRepository.restorePurchases() } returns Unit
+
+        assertFalse(viewModel.isRestoringPurchases.value)
+        viewModel.restorePurchases()
+        advanceUntilIdle()
+        assertFalse(viewModel.isRestoringPurchases.value)
+    }
+
+    @Test
+    fun `restorePurchases handles error gracefully`() = runTest {
+        coEvery { billingRepository.restorePurchases() } throws Exception("Restore failed")
+
+        // Should not throw — errors are handled
+        viewModel.restorePurchases()
+        advanceUntilIdle()
+
+        assertFalse(viewModel.isRestoringPurchases.value)
+    }
+
+    // ── launchPremiumPurchase ───────────────────────────────────────────────
+
+    @Test
+    fun `launchPremiumPurchase delegates to billingRepository`() = runTest {
+        val activity = mockk<android.app.Activity>(relaxed = true)
+        every { billingRepository.launchPurchaseFlow(activity) } returns true
+
+        viewModel.launchPremiumPurchase(activity)
+
+        io.mockk.verify(exactly = 1) { billingRepository.launchPurchaseFlow(activity) }
     }
 }
 

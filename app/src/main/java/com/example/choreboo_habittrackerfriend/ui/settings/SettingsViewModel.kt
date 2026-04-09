@@ -2,10 +2,13 @@ package com.example.choreboo_habittrackerfriend.ui.settings
 import android.app.Application
 import android.content.Context
 import android.net.Uri
+import androidx.annotation.StringRes
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
+import com.example.choreboo_habittrackerfriend.R
 import com.example.choreboo_habittrackerfriend.data.datastore.UserPreferences
 import com.example.choreboo_habittrackerfriend.data.repository.AuthRepository
+import com.example.choreboo_habittrackerfriend.data.repository.BillingRepository
 import com.example.choreboo_habittrackerfriend.data.repository.ChorebooRepository
 import com.example.choreboo_habittrackerfriend.data.repository.HabitRepository
 import com.example.choreboo_habittrackerfriend.data.repository.HouseholdRepository
@@ -41,6 +44,7 @@ class SettingsViewModel @Inject constructor(
     private val chorebooRepository: ChorebooRepository,
     private val resetRepository: ResetRepository,
     private val userRepository: UserRepository,
+    private val billingRepository: BillingRepository,
 ) : ViewModel() {
     val themeMode: StateFlow<String> = userPreferences.themeMode
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), "system")
@@ -104,6 +108,40 @@ class SettingsViewModel @Inject constructor(
     private val _isLeavingHousehold = MutableStateFlow(false)
     val isLeavingHousehold: StateFlow<Boolean> = _isLeavingHousehold.asStateFlow()
 
+    // Premium / subscription state
+    val isPremium: StateFlow<Boolean> = billingRepository.isPremium
+        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), false)
+
+    private val _isRestoringPurchases = MutableStateFlow(false)
+    val isRestoringPurchases: StateFlow<Boolean> = _isRestoringPurchases.asStateFlow()
+
+    fun restorePurchases() {
+        viewModelScope.launch {
+            _isRestoringPurchases.value = true
+            try {
+                billingRepository.restorePurchases()
+                val active = billingRepository.isPremium.value
+                _events.emit(
+                    if (active) SettingsEvent.ShowSuccess(R.string.settings_msg_premium_restored)
+                    else SettingsEvent.ShowSuccess(R.string.settings_msg_no_subscription)
+                )
+            } catch (e: Exception) {
+                _events.emit(SettingsEvent.ShowError(R.string.settings_msg_restore_failed))
+            } finally {
+                _isRestoringPurchases.value = false
+            }
+        }
+    }
+
+    fun launchPremiumPurchase(activity: android.app.Activity) {
+        val launched = billingRepository.launchPurchaseFlow(activity)
+        if (!launched) {
+            viewModelScope.launch {
+                _events.emit(SettingsEvent.ShowError(R.string.settings_msg_purchase_error))
+            }
+        }
+    }
+
     fun setThemeMode(mode: String) {
         viewModelScope.launch { userPreferences.setThemeMode(mode) }
     }
@@ -117,10 +155,10 @@ class SettingsViewModel @Inject constructor(
             try {
                 when (val result = householdRepository.createHousehold(name)) {
                     is HouseholdResult.Success -> {
-                        _events.emit(SettingsEvent.ShowSuccess("Household \"${result.household.name}\" created!"))
+                        _events.emit(SettingsEvent.ShowSuccess(R.string.settings_msg_household_created, result.household.name))
                     }
                     is HouseholdResult.Error -> {
-                        _events.emit(SettingsEvent.ShowError(result.message))
+                        _events.emit(SettingsEvent.ShowRawError(result.message))
                     }
                 }
             } finally {
@@ -135,10 +173,10 @@ class SettingsViewModel @Inject constructor(
             try {
                 when (val result = householdRepository.joinHousehold(inviteCode)) {
                     is HouseholdResult.Success -> {
-                        _events.emit(SettingsEvent.ShowSuccess("Joined \"${result.household.name}\"!"))
+                        _events.emit(SettingsEvent.ShowSuccess(R.string.settings_msg_household_joined, result.household.name))
                     }
                     is HouseholdResult.Error -> {
-                        _events.emit(SettingsEvent.ShowError(result.message))
+                        _events.emit(SettingsEvent.ShowRawError(result.message))
                     }
                 }
             } finally {
@@ -153,10 +191,10 @@ class SettingsViewModel @Inject constructor(
             try {
                 when (val result = householdRepository.leaveHousehold()) {
                     is HouseholdResult.Success -> {
-                        _events.emit(SettingsEvent.ShowSuccess("Left household."))
+                        _events.emit(SettingsEvent.ShowSuccess(R.string.settings_msg_household_left))
                     }
                     is HouseholdResult.Error -> {
-                        _events.emit(SettingsEvent.ShowError(result.message))
+                        _events.emit(SettingsEvent.ShowRawError(result.message))
                     }
                 }
             } finally {
@@ -209,7 +247,7 @@ class SettingsViewModel @Inject constructor(
         viewModelScope.launch {
             val currentUser = authRepository.currentFirebaseUser
             if (currentUser == null) {
-                _events.emit(SettingsEvent.ShowError("Not authenticated"))
+                _events.emit(SettingsEvent.ShowError(R.string.settings_msg_not_authenticated))
                 return@launch
             }
 
@@ -219,13 +257,13 @@ class SettingsViewModel @Inject constructor(
                 password != null -> {
                     val email = currentUser.email
                     if (email == null) {
-                        _events.emit(SettingsEvent.ShowError("Could not determine account email"))
+                        _events.emit(SettingsEvent.ShowError(R.string.settings_msg_no_account_email))
                         return@launch
                     }
                     EmailAuthProvider.getCredential(email, password)
                 }
                 else -> {
-                    _events.emit(SettingsEvent.ShowError("Please provide your password to confirm account deletion"))
+                    _events.emit(SettingsEvent.ShowError(R.string.settings_msg_provide_password))
                     return@launch
                 }
             }
@@ -238,7 +276,7 @@ class SettingsViewModel @Inject constructor(
                 }
                 is ResetResult.Error -> {
                     _isResetting.value = false
-                    _events.emit(SettingsEvent.ShowError(result.message))
+                    _events.emit(SettingsEvent.ShowRawError(result.message))
                 }
             }
         }
@@ -250,13 +288,13 @@ class SettingsViewModel @Inject constructor(
             try {
                 userRepository.updateDisplayName(name)
                 _currentDisplayName.value = name.trim()
-                _events.emit(SettingsEvent.ShowSuccess("Username updated!"))
+                _events.emit(SettingsEvent.ShowSuccess(R.string.settings_msg_username_updated))
             } catch (e: Exception) {
-                val message = when {
-                    e is IllegalArgumentException -> e.message ?: "Invalid username"
-                    else -> "Failed to update username. Please try again."
+                val messageRes = when {
+                    e is IllegalArgumentException -> R.string.settings_msg_invalid_username
+                    else -> R.string.settings_msg_username_update_failed
                 }
-                _events.emit(SettingsEvent.ShowError(message))
+                _events.emit(SettingsEvent.ShowError(messageRes))
             } finally {
                 _isUpdatingName.value = false
             }
@@ -276,25 +314,20 @@ class SettingsViewModel @Inject constructor(
                 }
                 // Set local path immediately so UI shows the photo right away
                 userPreferences.setProfilePhotoUri(internalPhotoFile.absolutePath)
-                _events.emit(SettingsEvent.ShowSuccess("Photo saved"))
+                _events.emit(SettingsEvent.ShowSuccess(R.string.settings_msg_photo_saved))
 
                 // 2. Upload to Firebase Storage in background
                 _isUploadingPhoto.value = true
                 try {
                     userRepository.uploadProfilePhoto(internalPhotoFile)
-                    _events.emit(SettingsEvent.ShowSuccess("Profile photo synced to cloud!"))
+                    _events.emit(SettingsEvent.ShowSuccess(R.string.settings_msg_photo_synced))
                 } catch (e: Exception) {
-                    _events.emit(
-                        SettingsEvent.ShowError(
-                            "Photo saved locally but failed to sync to cloud. " +
-                                "It will sync when you check your connection.",
-                        ),
-                    )
+                    _events.emit(SettingsEvent.ShowError(R.string.settings_msg_photo_sync_failed))
                 } finally {
                     _isUploadingPhoto.value = false
                 }
             } catch (e: Exception) {
-                _events.emit(SettingsEvent.ShowError("Failed to save profile photo"))
+                _events.emit(SettingsEvent.ShowError(R.string.settings_msg_photo_save_failed))
             }
         }
     }
@@ -311,19 +344,14 @@ class SettingsViewModel @Inject constructor(
                 _isUploadingPhoto.value = true
                 try {
                     userRepository.deleteProfilePhoto(internalPhotoFile)
-                    _events.emit(SettingsEvent.ShowSuccess("Profile photo removed!"))
+                    _events.emit(SettingsEvent.ShowSuccess(R.string.settings_msg_photo_removed))
                 } catch (e: Exception) {
-                    _events.emit(
-                        SettingsEvent.ShowError(
-                            "Photo removed locally but failed to sync to cloud. " +
-                                "It will sync when you check your connection.",
-                        ),
-                    )
+                    _events.emit(SettingsEvent.ShowError(R.string.settings_msg_photo_remove_sync_failed))
                 } finally {
                     _isUploadingPhoto.value = false
                 }
             } catch (e: Exception) {
-                _events.emit(SettingsEvent.ShowError("Failed to clear profile photo"))
+                _events.emit(SettingsEvent.ShowError(R.string.settings_msg_photo_clear_failed))
             }
         }
     }
@@ -332,6 +360,10 @@ class SettingsViewModel @Inject constructor(
 sealed class SettingsEvent {
     data object SignedOut : SettingsEvent()
     data object AccountReset : SettingsEvent()
-    data class ShowError(val message: String) : SettingsEvent()
-    data class ShowSuccess(val message: String) : SettingsEvent()
+    /** Error with a string-resource message (optionally parameterized). */
+    data class ShowError(@StringRes val messageRes: Int, val formatArg: String? = null) : SettingsEvent()
+    /** Success with a string-resource message (optionally parameterized). */
+    data class ShowSuccess(@StringRes val messageRes: Int, val formatArg: String? = null) : SettingsEvent()
+    /** Fallback for errors from external APIs (HouseholdResult, ResetResult) that still carry raw strings. */
+    data class ShowRawError(val message: String) : SettingsEvent()
 }

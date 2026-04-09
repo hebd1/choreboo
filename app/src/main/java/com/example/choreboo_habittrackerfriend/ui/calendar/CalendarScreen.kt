@@ -50,7 +50,9 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import androidx.compose.ui.res.stringResource
 import androidx.hilt.navigation.compose.hiltViewModel
+import com.example.choreboo_habittrackerfriend.R
 import com.example.choreboo_habittrackerfriend.ui.theme.HeatmapHigh
 import com.example.choreboo_habittrackerfriend.ui.theme.HeatmapLow
 import com.example.choreboo_habittrackerfriend.ui.theme.XpPurple
@@ -104,7 +106,7 @@ fun CalendarScreen(
                             size = 40.dp,
                         )
                         Text(
-                            "History",
+                            stringResource(R.string.calendar_title),
                             style = MaterialTheme.typography.headlineMedium,
                             fontWeight = FontWeight.ExtraBold,
                             color = MaterialTheme.colorScheme.primary,
@@ -122,7 +124,7 @@ fun CalendarScreen(
                     ) {
                         Icon(
                             Icons.Default.Stars,
-                            contentDescription = "Points",
+                            contentDescription = stringResource(R.string.calendar_points_cd),
                             tint = MaterialTheme.colorScheme.secondaryContainer,
                             modifier = Modifier.size(18.dp),
                         )
@@ -171,7 +173,7 @@ fun CalendarScreen(
                                     .clip(CircleShape)
                                     .background(MaterialTheme.colorScheme.surfaceContainerHighest),
                             ) {
-                                Icon(Icons.AutoMirrored.Filled.KeyboardArrowLeft, contentDescription = "Previous month")
+                                Icon(Icons.AutoMirrored.Filled.KeyboardArrowLeft, contentDescription = stringResource(R.string.calendar_prev_month_cd))
                             }
                             Column(horizontalAlignment = Alignment.CenterHorizontally) {
                                 Text(
@@ -180,7 +182,7 @@ fun CalendarScreen(
                                     fontWeight = FontWeight.ExtraBold,
                                 )
                                 Text(
-                                    text = "$totalDaysWithAny/$daysInMonth Days Complete",
+                                    text = stringResource(R.string.calendar_days_complete, totalDaysWithAny, daysInMonth),
                                     style = MaterialTheme.typography.labelMedium,
                                     fontWeight = FontWeight.Bold,
                                     color = MaterialTheme.colorScheme.primary,
@@ -192,7 +194,7 @@ fun CalendarScreen(
                                     .clip(CircleShape)
                                     .background(MaterialTheme.colorScheme.surfaceContainerHighest),
                             ) {
-                                Icon(Icons.AutoMirrored.Filled.KeyboardArrowRight, contentDescription = "Next month")
+                                Icon(Icons.AutoMirrored.Filled.KeyboardArrowRight, contentDescription = stringResource(R.string.calendar_next_month_cd))
                             }
                         }
 
@@ -303,11 +305,11 @@ fun CalendarScreen(
                         ) {
                             LegendDot(color = HeatmapHigh)
                             Spacer(modifier = Modifier.width(4.dp))
-                            Text("4+ Tasks", style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                            Text(stringResource(R.string.calendar_legend_4_plus), style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
                             Spacer(modifier = Modifier.width(16.dp))
                             LegendDot(color = HeatmapLow)
                             Spacer(modifier = Modifier.width(4.dp))
-                            Text("1-3 Tasks", style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                            Text(stringResource(R.string.calendar_legend_1_3), style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
                             Spacer(modifier = Modifier.width(16.dp))
                             Box(
                                 modifier = Modifier
@@ -316,7 +318,7 @@ fun CalendarScreen(
                                     .border(1.dp, MaterialTheme.colorScheme.outlineVariant, CircleShape),
                             )
                             Spacer(modifier = Modifier.width(4.dp))
-                            Text("None", style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                            Text(stringResource(R.string.calendar_legend_none), style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
                         }
                     }
                 }
@@ -342,7 +344,7 @@ fun CalendarScreen(
                         )
                         if (totalXp > 0) {
                             Text(
-                                text = "+$totalXp XP Total",
+                                text = stringResource(R.string.calendar_total_xp, totalXp),
                                 style = MaterialTheme.typography.titleSmall,
                                 fontWeight = FontWeight.Bold,
                                 color = XpPurple,
@@ -362,7 +364,7 @@ fun CalendarScreen(
                             contentAlignment = Alignment.Center,
                         ) {
                             Text(
-                                "No completions on this day",
+                                stringResource(R.string.calendar_no_completions),
                                 style = MaterialTheme.typography.bodyMedium,
                                 color = MaterialTheme.colorScheme.onSurfaceVariant,
                             )
@@ -399,7 +401,7 @@ fun CalendarScreen(
                                         )
                                         if (log.streakAtCompletion > 1) {
                                             Text(
-                                                text = "🔥 ${log.streakAtCompletion} Day Streak",
+                                                text = stringResource(R.string.calendar_day_streak, log.streakAtCompletion),
                                                 style = MaterialTheme.typography.labelSmall,
                                                 fontWeight = FontWeight.Bold,
                                                 color = MaterialTheme.colorScheme.secondary,
@@ -410,16 +412,16 @@ fun CalendarScreen(
                                 // XP badge in tertiaryContainer/20
                                 Box(
                                     modifier = Modifier
-                                        .clip(CircleShape)
-                                        .background(XpPurple.copy(alpha = 0.15f))
-                                        .padding(horizontal = 10.dp, vertical = 4.dp),
-                                ) {
-                                    Text(
-                                        text = "+${log.xpEarned} XP",
-                                        style = MaterialTheme.typography.labelMedium,
-                                        fontWeight = FontWeight.Bold,
-                                        color = XpPurple,
-                                    )
+                                         .clip(CircleShape)
+                                         .background(XpPurple.copy(alpha = 0.15f))
+                                         .padding(horizontal = 10.dp, vertical = 4.dp),
+                                 ) {
+                                     Text(
+                                         text = stringResource(R.string.calendar_xp_earned, log.xpEarned),
+                                         style = MaterialTheme.typography.labelMedium,
+                                         fontWeight = FontWeight.Bold,
+                                         color = XpPurple,
+                                     )
                                 }
                             }
                         }

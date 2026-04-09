@@ -14,10 +14,12 @@ import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.clearAndSetSemantics
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
+import com.example.choreboo_habittrackerfriend.R
 
 @Composable
 fun StatBar(
@@ -29,6 +31,7 @@ fun StatBar(
     modifier: Modifier = Modifier,
 ) {
     val fraction = (value.toFloat() / maxValue).coerceIn(0f, 1f)
+    val contentDescriptionText = stringResource(R.string.stat_bar_cd, label, value, maxValue)
 
     // Stat-type color: design spec says bar color based on stat type, not value
     val barColor = when (statType.lowercase()) {
@@ -42,7 +45,7 @@ fun StatBar(
         verticalAlignment = Alignment.CenterVertically,
         modifier = modifier
             .fillMaxWidth()
-            .clearAndSetSemantics { contentDescription = "$label: $value out of $maxValue" },
+            .clearAndSetSemantics { contentDescription = contentDescriptionText },
     ) {
         if (emoji.isNotEmpty()) {
             Text(text = emoji, style = MaterialTheme.typography.titleMedium)

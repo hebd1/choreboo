@@ -24,6 +24,7 @@ class SyncManager @Inject constructor(
     private val habitRepository: HabitRepository,
     private val chorebooRepository: ChorebooRepository,
     private val userRepository: UserRepository,
+    private val backgroundRepository: BackgroundRepository,
     private val firebaseAuth: FirebaseAuth,
 ) {
     /** Guards against concurrent sync calls (e.g. rapid foreground/background cycling). */
@@ -157,9 +158,21 @@ class SyncManager @Inject constructor(
                     }
                 }
 
+                // 5. Purchased backgrounds (independent of habits)
+                val backgroundsDeferred = async {
+                    try {
+                        retryWithBackoff { backgroundRepository.syncFromCloud() }
+                        true
+                    } catch (e: Exception) {
+                        Log.e(TAG, "Background sync failed after retries", e)
+                        false
+                    }
+                }
+
                 val habitsOk = habitsDeferred.await()
                 val chorebooOk = chorebooDeferred.await()
                 val pointsOk = pointsDeferred.await()
+                backgroundsDeferred.await() // best-effort — don't gate anySuccess on it
                 anySuccess = habitsOk || chorebooOk || pointsOk
 
                 // 3. Habit logs — sequential after step 1 (needs habit remoteIds)

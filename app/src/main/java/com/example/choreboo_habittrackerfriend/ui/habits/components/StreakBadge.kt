@@ -16,9 +16,11 @@ import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import com.example.choreboo_habittrackerfriend.R
 
 @Composable
 fun StreakBadge(
@@ -34,12 +36,12 @@ fun StreakBadge(
             .padding(horizontal = 8.dp, vertical = 3.dp),
         verticalAlignment = Alignment.CenterVertically,
     ) {
-        Icon(
-            imageVector = Icons.Default.LocalFireDepartment,
-            contentDescription = "Streak",
-            tint = MaterialTheme.colorScheme.secondary,
-            modifier = Modifier.size(13.dp),
-        )
+         Icon(
+             imageVector = Icons.Default.LocalFireDepartment,
+             contentDescription = stringResource(R.string.habit_card_streak_cd),
+             tint = MaterialTheme.colorScheme.secondary,
+             modifier = Modifier.size(13.dp),
+         )
         Spacer(modifier = Modifier.width(3.dp))
         Text(
             text = "$streak",

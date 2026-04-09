@@ -118,6 +118,12 @@ dependencies {
     // Emoji Picker
     implementation(libs.emoji.picker)
 
+    // Google Play Billing
+    implementation(libs.billing.ktx)
+
+    // AdMob
+    implementation(libs.play.services.ads)
+
     // Desugaring (java.time support for minSdk 24)
     coreLibraryDesugaring(libs.desugar.jdk.libs)
 

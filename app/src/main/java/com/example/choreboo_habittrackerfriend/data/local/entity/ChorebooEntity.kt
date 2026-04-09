@@ -21,4 +21,6 @@ data class ChorebooEntity(
     val sleepUntil: Long = 0,
     val ownerUid: String? = null,
     val remoteId: String? = null,
+    /** Selected background id (matches BackgroundItem.id). Null = Default mood gradient. */
+    val backgroundId: String? = null,
 )

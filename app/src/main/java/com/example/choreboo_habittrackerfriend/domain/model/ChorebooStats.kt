@@ -16,6 +16,8 @@ data class ChorebooStats(
     val lastInteractionAt: Long = System.currentTimeMillis(),
     val createdAt: Long = System.currentTimeMillis(),
     val sleepUntil: Long = 0,
+    /** Selected background id (matches BackgroundItem.id). Null = Default mood gradient. */
+    val backgroundId: String? = null,
 ) {
     val overallMood: Int
         get() = (hunger + happiness + energy) / 3

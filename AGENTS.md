@@ -24,12 +24,12 @@ Repositories also call the **Firebase Data Connect generated SDK** for cloud wri
 - **SDK generation**: `npx firebase-tools@latest dataconnect:sdk:generate` — a `dataconnectCompile` Exec task in root `build.gradle.kts` runs it. Generated SDK goes to `app/build/generated/sources/`.
 - **Auth**: Firebase Auth (email/password + Google sign-in). `AuthRepository` wraps `FirebaseAuth`. `AuthViewModel` orchestrates login/register flows.
 - **Write-through**: All Room mutations (habit CRUD, choreboo updates, habit log inserts) also fire the corresponding Data Connect mutation. Failures are **silent** — no user-facing error for write-through.
-- **Cloud-to-local sync**: Triggered **after auth** (`force = true`, bypasses cooldown) and **on every app foreground** (`force = false`, 5-minute cooldown). `SyncManager` orchestrates all sync with a `Mutex` to prevent concurrent runs. `SyncManager.syncAll()` calls `getIdToken(false).await()` before any Data Connect calls to ensure the auth token is cached and available for the gRPC interceptor. Order: habits + choreboo + user points (parallel) → habit logs (sequential, needs habit remoteIds) → household habit logs (best-effort). Conflict resolution: **cloud wins**.
+- **Cloud-to-local sync**: Triggered **after auth** (`force = true`, bypasses cooldown) and **on every app foreground** (`force = false`, 5-minute cooldown). `SyncManager` orchestrates all sync with a `Mutex` to prevent concurrent runs. `SyncManager.syncAll()` calls `getIdToken(false).await()` before any Data Connect calls to ensure the auth token is cached and available for the gRPC interceptor. Order: habits + choreboo + user points + purchased backgrounds (parallel) → habit logs (sequential, needs habit remoteIds) → household habit logs (best-effort). Conflict resolution: **cloud wins**.
 - **App foreground sync**: `AppLifecycleObserver` (registered via `ProcessLifecycleOwner`) calls `syncManager.syncAll(force = false)` on every `onStart`. Cold-start sync is **skipped** here — `MainViewModel` handles it as part of the coordinated splash-screen startup sequence. Only subsequent warm resumes trigger the observer's sync.
 - **Error visibility**: Only the post-auth sync shows errors (snackbar). Write-through failures are silent.
-- **Security**: All 16 queries and 20 mutations have `@auth(level: USER)` directives with auth-scoped filters. `connector.yaml` has `authMode: PUBLIC` (each operation has its own auth check). 4 household queries (`GetMyHousehold`, `GetMyHouseholdMembers`, `GetMyHouseholdChoreboos`, `GetMyHouseholdHabits`) are **inherently auth-scoped** — they traverse from `auth.uid` to the user's household, so no `householdId` parameter is needed and callers can only see their own household data. 3 habit/log queries (`GetHabitById`, `GetLogsForHabit`, `GetLogsForHabitAndDate`) that allow access to household habits now require household membership verification — the `isHouseholdHabit` branch checks that the caller's `auth.uid` is a member of the habit's household.
+- **Security**: All 17 queries and 23 mutations have `@auth(level: USER)` directives with auth-scoped filters. `connector.yaml` has `authMode: PUBLIC` (each operation has its own auth check). 4 household queries (`GetMyHousehold`, `GetMyHouseholdMembers`, `GetMyHouseholdChoreboos`, `GetMyHouseholdHabits`) are **inherently auth-scoped** — they traverse from `auth.uid` to the user's household, so no `householdId` parameter is needed and callers can only see their own household data. 3 habit/log queries (`GetHabitById`, `GetLogsForHabit`, `GetLogsForHabitAndDate`) that allow access to household habits now require household membership verification — the `isHouseholdHabit` branch checks that the caller's `auth.uid` is a member of the habit's household.
 
-### Data Connect Schema (5 cloud tables)
+### Data Connect Schema (6 cloud tables)
 
 Defined in `dataconnect/schema/schema.gql`:
 
@@ -37,17 +37,18 @@ Defined in `dataconnect/schema/schema.gql`:
 |-------|------------|
 | **User** | uid (String PK from Firebase Auth), displayName, email, photoUrl, household FK, createdAt, totalPoints, totalLifetimeXp |
 | **Household** | UUID PK, name, inviteCode (unique), createdBy FK→User, createdAt |
-| **Choreboo** | UUID PK, owner FK→User (unique), name, stage, level, xp, hunger, happiness, energy, petType, lastInteractionAt, createdAt, sleepUntil |
+| **Choreboo** | UUID PK, owner FK→User (unique), name, stage, level, xp, hunger, happiness, energy, petType, lastInteractionAt, createdAt, sleepUntil, backgroundId (nullable) |
+| **PurchasedBackground** | composite PK (owner FK→User, backgroundId String), purchasedAt |
 | **Habit** | UUID PK, owner FK→User, household FK→Household (nullable), assignedTo FK→User (nullable), title, description, iconName, customDays, difficulty, baseXp, reminderEnabled, reminderTime, isHouseholdHabit, isArchived, createdAt |
 | **HabitLog** | UUID PK, habit FK→Habit, completedBy FK→User, completedAt, date, xpEarned, streakAtCompletion |
 
 ### Data Connect Files
 
 - `dataconnect/dataconnect.yaml` — project config
-- `dataconnect/schema/schema.gql` — 5 tables
+- `dataconnect/schema/schema.gql` — 6 tables
 - `dataconnect/choreboo-connector/connector.yaml` — authMode: PUBLIC
-- `dataconnect/choreboo-connector/queries.gql` — 16 queries, all auth-scoped
-- `dataconnect/choreboo-connector/mutations.gql` — 20 mutations, all auth-scoped (16 operational + 4 dev reset)
+- `dataconnect/choreboo-connector/queries.gql` — 17 queries, all auth-scoped
+- `dataconnect/choreboo-connector/mutations.gql` — 23 mutations, all auth-scoped (18 operational + 5 dev reset)
 
 ## Data Flow Patterns
 
@@ -62,18 +63,19 @@ Defined in `dataconnect/schema/schema.gql`:
 - **XP/Level-up**: `ChorebooRepository.addXp()` returns `XpResult(levelsGained, newLevel, evolved, newStage)` so callers can trigger celebration UI.
 - **Habit completion**: `HabitRepository.completeHabit()` returns `CompletionResult(xpEarned, newStreak, alreadyComplete)` with targetCount enforcement.
 - **Streaks**: `HabitRepository.getStreaksForToday()` returns `Flow<Map<Long, Int>>` for StreakBadge display.
-- **Cloud-to-local sync**: `HabitRepository.syncHabitsFromCloud()`, `HabitRepository.syncHabitLogsFromCloud()`, `ChorebooRepository.syncFromCloud()`. Called from `SyncManager.syncAll()`.
+- **Cloud-to-local sync**: `HabitRepository.syncHabitsFromCloud()`, `HabitRepository.syncHabitLogsFromCloud()`, `ChorebooRepository.syncFromCloud()`, `BackgroundRepository.syncFromCloud()`. Called from `SyncManager.syncAll()`.
 
-## Room Database (v13, 6 entities)
+## Room Database (v16, 7 entities)
 
 | Table | Columns | Indexes |
 |-------|---------|---------|
 | **habits** | id, title, description, iconName, customDays, difficulty, baseXp, reminderEnabled, reminderTime, createdAt, isArchived, isHouseholdHabit, ownerUid, householdId, assignedToUid, assignedToName, remoteId | `remoteId` |
 | **habit_logs** | id, habitId (FK→habits CASCADE), completedAt, date (ISO string), xpEarned, streakAtCompletion, completedByUid, remoteId | `remoteId`, `date`, UNIQUE(`habitId`, `date`) |
-| **choreboos** | id, name, stage, level, xp, hunger, happiness, energy, petType, lastInteractionAt, createdAt, sleepUntil, ownerUid, remoteId | `remoteId` |
-| **household_members** | uid (String PK = Firebase Auth UID), displayName, photoUrl, email, chorebooId, chorebooName, chorebooStage, chorebooLevel, chorebooXp, chorebooHunger, chorebooHappiness, chorebooEnergy, chorebooPetType, lastSyncedAt | — |
+| **choreboos** | id, name, stage, level, xp, hunger, happiness, energy, petType, lastInteractionAt, createdAt, sleepUntil, ownerUid, remoteId, backgroundId | `remoteId` |
+| **household_members** | uid (String PK = Firebase Auth UID), displayName, photoUrl, email, chorebooId, chorebooName, chorebooStage, chorebooLevel, chorebooXp, chorebooHunger, chorebooHappiness, chorebooEnergy, chorebooPetType, chorebooBackgroundId, lastSyncedAt | — |
 | **households** | id (String PK = Data Connect UUID), name, inviteCode, createdByUid, createdByName | — |
 | **household_habit_statuses** | habitId (String PK = Data Connect UUID), title, iconName, ownerName, ownerUid, baseXp, assignedToUid, assignedToName, completedByName, completedByUid, cachedDate | — |
+| **purchased_backgrounds** | ownerUid + backgroundId (composite PK), purchasedAt | — |
 
 - `remoteId` maps to the Data Connect UUID for cloud sync. Indexed on `habits`, `habit_logs`, and `choreboos`.
 - `ownerUid` / `completedByUid` / `householdId` map to Firebase Auth UIDs and household references.
@@ -200,7 +202,8 @@ Deploy the backend (Data Connect schema/connectors + Storage rules) to the `chor
 - Always handle `innerPadding` from `Scaffold`. Use `Modifier.fillMaxWidth()` over hardcoded widths.
 - Habit icons: **emoji-based** system (`EmojiIcon` data class with 15 preset emoji + custom emoji input). Not Material Icons.
 - Touch targets >= 48dp. Empty states show emoji + friendly message + CTA.
-- Use `AlertDialog` for confirmations; `ModalBottomSheet` for selection lists (feed).
+- Use `AlertDialog` for confirmations; `ModalBottomSheet` for selection lists (feed, background picker).
+- **`PetBackgroundImage`** (`ui/components/PetBackgroundImage.kt`) — renders the selected background behind the pet. If `backgroundId` is null or `"default"`, shows the mood-based color gradient. Otherwise loads the image from `assets/backgrounds/<id>.webp` via Coil's `rememberAsyncImagePainter`. Used in `PetScreen` and `HouseholdPetCard`.
 - **`ShimmerPlaceholder`** (`ui/components/ShimmerPlaceholder.kt`) — reusable loading skeleton. Renders a rounded rectangle pulsing between alpha 0.3–0.7 with a 1-second tween. Parameters: `width: Dp = 100.dp`, `height: Dp = 24.dp`, `modifier`. Used in `PetScreen` while the Choreboo name is loading.
 - **Pet animations**: Animated WebP files with alpha transparency. FOX pet type has 9 animations (mood-based + action-based). Other pet types (AXOLOTL, CAPYBARA, PANDA) use emoji placeholders until WebP assets are added. `WebmAnimationView` composable in `ui/components/` handles playback via `AnimatedImageDrawable` (API 28+); API 24–27 gets a transparent placeholder. No ExoPlayer dependency.
 - Pet size scales by `ChorebooStage`.
@@ -217,21 +220,21 @@ com.example.choreboo_habittrackerfriend/
 ├── navigation/                      # ChorebooNavGraph.kt, Screen sealed class (8 routes)
 ├── data/
 │   ├── local/
-│   │   ├── ChorebooDatabase.kt      # Room DB v13, 6 entities, fallbackToDestructiveMigration
+│   │   ├── ChorebooDatabase.kt      # Room DB v16, 7 entities, fallbackToDestructiveMigration
 │   │   ├── converter/
 │   │   │   └── Converters.kt        # Gson TypeConverter for List<String>
-│   │   ├── entity/                  # HabitEntity, HabitLogEntity, ChorebooEntity, HouseholdMemberEntity, HouseholdEntity, HouseholdHabitStatusEntity
-│   │   └── dao/                     # HabitDao, HabitLogDao, ChorebooDao, HouseholdMemberDao, HouseholdDao, HouseholdHabitStatusDao
+│   │   ├── entity/                  # HabitEntity, HabitLogEntity, ChorebooEntity, HouseholdMemberEntity, HouseholdEntity, HouseholdHabitStatusEntity, PurchasedBackgroundEntity
+│   │   └── dao/                     # HabitDao, HabitLogDao, ChorebooDao, HouseholdMemberDao, HouseholdDao, HouseholdHabitStatusDao, PurchasedBackgroundDao
 │   ├── datastore/                   # UserPreferences (theme, onboarding, sound, totalPoints, totalLifetimeXp, profilePhotoUri)
-│   └── repository/                  # HabitRepository, ChorebooRepository, AuthRepository, HouseholdRepository, UserRepository, BadgeRepository, ResetRepository, SyncManager
+│   └── repository/                  # HabitRepository, ChorebooRepository, AuthRepository, HouseholdRepository, UserRepository, BadgeRepository, BackgroundRepository, ResetRepository, SyncManager
 ├── di/                              # AppModule (DB, DAOs, DataStore, UserPreferences, FirebaseAuth), AppLifecycleObserver
-├── domain/model/                    # Habit, ChorebooStats, ChorebooMood, ChorebooStage, PetType, Household, AppUser, Badge
+├── domain/model/                    # Habit, ChorebooStats, ChorebooMood, ChorebooStage, PetType, Household, AppUser, Badge, Background
 ├── ui/
 │   ├── theme/                       # Color.kt, Theme.kt, Type.kt
-│   ├── components/                  # BottomNavBar (5 tabs with dynamic pet mood icon), ProfileAvatar, ShimmerPlaceholder, StitchSnackbar
+│   ├── components/                  # BottomNavBar (5 tabs with dynamic pet mood icon), ProfileAvatar, ShimmerPlaceholder, StitchSnackbar, PetBackgroundImage
 │   ├── auth/                        # AuthScreen, AuthViewModel (login/register/sync orchestration)
 │   ├── habits/                      # AddEditHabitScreen, AddEditHabitViewModel, components/ (HabitCard, StreakBadge)
-│   ├── pet/                         # PetScreen (habit list + feed bottom sheet), PetViewModel (absorbed HabitList functionality), components/StatBar
+│   ├── pet/                         # PetScreen (habit list + feed bottom sheet + background picker), PetViewModel (absorbed HabitList functionality), components/ (StatBar, BackgroundPickerSheet)
 │   ├── stats/                       # StatsScreen, StatsViewModel
 │   ├── household/                   # HouseholdScreen (tap pet card → member habits dialog), HouseholdViewModel (enriches pet photos), components/ (HouseholdPetCard, HouseholdHabitCard)
 │   ├── calendar/                    # CalendarScreen, CalendarViewModel
@@ -258,12 +261,13 @@ Deletes all cloud data for the currently signed-in user in FK-safe order, delete
 **Deletion order** (respects FK constraints):
 1. All `HabitLog` rows where `completedById == auth.uid`
 2. All `Habit` rows where `ownerId == auth.uid`
+2b. All `PurchasedBackground` rows where `ownerId == auth.uid`
 3. `Choreboo` row where `ownerId == auth.uid`
 4. Null out `User.household` FK (breaks circular dep with Household)
 5. `Household` row — only if the current user is its creator
 6. `User` record
 7. Firebase Auth user (`currentUser.delete()`)
-8. Local Room tables (`habits`, `habit_logs`, `choreboos`) + DataStore
+8. Local Room tables (`habits`, `habit_logs`, `choreboos`, `purchased_backgrounds`) + DataStore
 
 Cloud steps are individually try/caught — a failure at one step logs a warning and continues. Auth deletion and local cleanup always run.
 
@@ -271,8 +275,8 @@ Cloud steps are individually try/caught — a failure at one step logs a warning
 
 | File | Role |
 |------|------|
-| `dataconnect/choreboo-connector/mutations.gql` | 4 new mutations: `DeleteAllMyHabitLogs`, `DeleteAllMyHabits`, `DeleteMyChoreboo`, `DeleteMyUser` |
-| `data/repository/ResetRepository.kt` | `@Singleton` — orchestrates the full reset sequence |
+| `dataconnect/choreboo-connector/mutations.gql` | 5 dev reset mutations: `DeleteAllMyHabitLogs`, `DeleteAllMyHabits`, `DeleteAllMyPurchasedBackgrounds`, `DeleteMyChoreboo`, `DeleteMyUser` |
+| `data/repository/ResetRepository.kt` | `@Singleton` — orchestrates the full reset sequence; depends on `BackgroundRepository` |
 | `ui/settings/SettingsViewModel.kt` | `resetAccount()` + `isResetting: StateFlow<Boolean>` + `SettingsEvent.AccountReset` |
 | `ui/settings/SettingsScreen.kt` | "Reset Account (Dev)" button with spinner + two-step confirmation dialog |
 

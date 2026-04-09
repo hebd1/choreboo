@@ -7,6 +7,7 @@ import androidx.core.app.NotificationCompat
 import androidx.core.app.NotificationManagerCompat
 import com.example.choreboo_habittrackerfriend.MainActivity
 import com.example.choreboo_habittrackerfriend.ChorebooApplication
+import com.example.choreboo_habittrackerfriend.R
 import com.example.choreboo_habittrackerfriend.data.local.ChorebooDatabase
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
@@ -86,7 +87,7 @@ class HabitReminderReceiver : BroadcastReceiver() {
         val completePendingIntent = HabitCompleteReceiver.buildPendingIntent(context, habitId, habitTitle)
 
         // Generate a cute message with the pet name
-        val cuteMessage = generateCuteMessage(habitTitle, petName)
+        val cuteMessage = generateCuteMessage(context, habitTitle, petName)
 
         val notification = NotificationCompat.Builder(context, ChorebooApplication.REMINDER_CHANNEL_ID)
             .setContentTitle(habitTitle)
@@ -96,7 +97,7 @@ class HabitReminderReceiver : BroadcastReceiver() {
             .setAutoCancel(true)
             .addAction(
                 android.R.drawable.checkbox_on_background,
-                "Mark Complete",
+                context.getString(R.string.notif_mark_complete),
                 completePendingIntent,
             )
             .build()
@@ -105,18 +106,19 @@ class HabitReminderReceiver : BroadcastReceiver() {
         NotificationManagerCompat.from(context).notify(notificationId, notification)
     }
 
-    private fun generateCuteMessage(habitTitle: String, petName: String): String {
+    private fun generateCuteMessage(context: Context, habitTitle: String, petName: String): String {
+        // Use parameterized strings from strings.xml with context.getString()
         val messages = listOf(
-            "Time to $habitTitle!",
-            "$petName believes in you! Complete $habitTitle!",
-            "Don't forget about $petName!",
-            "$petName is feeling neglected! Complete $habitTitle!",
-            "$petName is cheering you on!",
-            "Your buddy $petName is waiting!",
-            "$petName wants to see you crush $habitTitle!",
-            "Keep $petName happy—time to $habitTitle!",
-            "$petName misses you! Let's do this!",
-            "Let's go, champ! $petName is rooting for you!",
+            context.getString(R.string.notif_msg_time_to, habitTitle),
+            context.getString(R.string.notif_msg_believes_in_you, habitTitle, petName),
+            context.getString(R.string.notif_msg_dont_forget, petName),
+            context.getString(R.string.notif_msg_feeling_neglected, habitTitle, petName),
+            context.getString(R.string.notif_msg_cheering_you_on, petName),
+            context.getString(R.string.notif_msg_buddy_waiting, petName),
+            context.getString(R.string.notif_msg_crush_it, habitTitle, petName),
+            context.getString(R.string.notif_msg_keep_pet_happy, habitTitle, petName),
+            context.getString(R.string.notif_msg_misses_you, petName),
+            context.getString(R.string.notif_msg_rooting_for_you, petName),
         )
         return messages.random()
     }

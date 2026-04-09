@@ -48,6 +48,8 @@ data class HouseholdPet(
     val ownerName: String,
     val ownerUid: String,
     val ownerPhotoUrl: String? = null,
+    /** Selected background id for this pet. Null = Default mood gradient. */
+    val backgroundId: String? = null,
 ) {
     val mood: ChorebooMood
         get() {

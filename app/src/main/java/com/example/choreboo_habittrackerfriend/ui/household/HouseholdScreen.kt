@@ -54,11 +54,13 @@ import androidx.compose.ui.unit.sp
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import coil3.compose.AsyncImage
+import com.example.choreboo_habittrackerfriend.R
 import com.example.choreboo_habittrackerfriend.domain.model.HouseholdHabitStatus
 import com.example.choreboo_habittrackerfriend.domain.model.HouseholdPet
 import com.example.choreboo_habittrackerfriend.ui.components.StitchSnackbar
 import com.example.choreboo_habittrackerfriend.ui.household.components.HouseholdHabitCard
 import com.example.choreboo_habittrackerfriend.ui.household.components.HouseholdPetCard
+import androidx.compose.ui.res.stringResource
 import kotlinx.coroutines.launch
 
 @OptIn(ExperimentalMaterial3Api::class)
@@ -110,7 +112,7 @@ fun HouseholdScreen(
             ) {
                 // Header
                 Text(
-                    text = household?.name ?: "Household",
+                    text = household?.name ?: stringResource(R.string.household_title_fallback),
                     style = MaterialTheme.typography.headlineMedium,
                     fontWeight = FontWeight.ExtraBold,
                     color = MaterialTheme.colorScheme.primary,
@@ -136,8 +138,10 @@ fun HouseholdScreen(
                             val displayPets = pets.take(5)
                             val rows = displayPets.chunked(2)
                             items(rows, key = { row -> "pet_row_${row[0].chorebooId}" }) { row ->
+                                val rowIndex = rows.indexOf(row)
                                 PetGridRow(
                                     row = row,
+                                    rowIndex = rowIndex,
                                     onPetClick = { viewModel.selectPet(it) },
                                 )
                                 Spacer(modifier = Modifier.height(12.dp))
@@ -154,7 +158,7 @@ fun HouseholdScreen(
                             item(key = "chores_header") {
                                 Spacer(modifier = Modifier.height(4.dp))
                                 Text(
-                                    text = "Household Chores",
+                                    text = stringResource(R.string.household_chores_section),
                                     style = MaterialTheme.typography.titleMedium,
                                     fontWeight = FontWeight.Bold,
                                     color = MaterialTheme.colorScheme.onSurface,
@@ -204,7 +208,7 @@ private fun MemberHabitsDialog(
         onDismissRequest = onDismiss,
         confirmButton = {
             TextButton(onClick = onDismiss) {
-                Text("Close")
+                Text(stringResource(R.string.household_close_button))
             }
         },
         icon = {
@@ -213,7 +217,7 @@ private fun MemberHabitsDialog(
             if (!pet.ownerPhotoUrl.isNullOrBlank() && !photoFailed) {
                 AsyncImage(
                     model = pet.ownerPhotoUrl,
-                    contentDescription = "Profile photo of ${pet.ownerName}",
+                    contentDescription = stringResource(R.string.household_profile_photo_cd, pet.ownerName),
                     contentScale = ContentScale.Crop,
                     modifier = Modifier
                         .size(48.dp)
@@ -224,7 +228,7 @@ private fun MemberHabitsDialog(
                 // Fallback: green AccountCircle icon
                 Icon(
                     imageVector = Icons.Default.AccountCircle,
-                    contentDescription = "Profile photo of ${pet.ownerName}",
+                    contentDescription = stringResource(R.string.household_profile_photo_cd, pet.ownerName),
                     tint = MaterialTheme.colorScheme.primary,
                     modifier = Modifier.size(48.dp),
                 )
@@ -232,7 +236,7 @@ private fun MemberHabitsDialog(
         },
         title = {
             Text(
-                text = "${pet.ownerName}'s Chores",
+                text = stringResource(R.string.household_chores_title, pet.ownerName),
                 style = MaterialTheme.typography.titleMedium,
                 fontWeight = FontWeight.Bold,
             )
@@ -249,7 +253,7 @@ private fun MemberHabitsDialog(
                     )
                     Spacer(modifier = Modifier.height(8.dp))
                     Text(
-                        text = "No household chores yet",
+                        text = stringResource(R.string.household_no_chores),
                         style = MaterialTheme.typography.bodyMedium,
                         color = MaterialTheme.colorScheme.onSurfaceVariant,
                         textAlign = TextAlign.Center,
@@ -312,13 +316,13 @@ private fun MemberHabitRow(
             )
             if (isCompleted) {
                 Text(
-                    text = "\u2713 Done by ${habit.completedByName}",
+                    text = stringResource(R.string.household_done_by, habit.completedByName),
                     style = MaterialTheme.typography.labelSmall,
                     color = MaterialTheme.colorScheme.primary,
                 )
             } else {
                 Text(
-                    text = "Pending",
+                    text = stringResource(R.string.household_pending),
                     style = MaterialTheme.typography.labelSmall,
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                 )
@@ -331,10 +335,13 @@ private fun MemberHabitRow(
  * A single row in the 2-column pet grid.
  * If the row has only 1 pet (last row when there's an odd number), that card
  * fills half the width to avoid a stretched single card.
+ * 
+ * Each pet gets a staggered animation offset based on its position (600ms per pet).
  */
 @Composable
 private fun PetGridRow(
     row: List<HouseholdPet>,
+    rowIndex: Int,
     onPetClick: (HouseholdPet) -> Unit,
     modifier: Modifier = Modifier,
 ) {
@@ -342,10 +349,14 @@ private fun PetGridRow(
         modifier = modifier.fillMaxWidth(),
         horizontalArrangement = Arrangement.spacedBy(12.dp),
     ) {
-        row.forEach { pet ->
+        row.forEachIndexed { itemIndex, pet ->
+            val globalIndex = rowIndex * 2 + itemIndex
+            val animationOffsetMs = globalIndex * 600L
+            
             HouseholdPetCard(
                 pet = pet,
                 onClick = { onPetClick(pet) },
+                animationOffsetMs = animationOffsetMs,
                 modifier = Modifier.weight(1f),
             )
         }
@@ -361,26 +372,26 @@ private fun QuietHouseholdState(modifier: Modifier = Modifier) {
     Box(
         modifier = modifier.fillMaxWidth(),
         contentAlignment = Alignment.Center,
-    ) {
-        Column(horizontalAlignment = Alignment.CenterHorizontally) {
-            Text(
-                text = "\uD83C\uDFE0",
-                fontSize = 48.sp,
-            )
-            Spacer(modifier = Modifier.height(12.dp))
-            Text(
-                text = "Your household is quiet...",
-                style = MaterialTheme.typography.bodyLarge,
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
-            )
-            Text(
-                text = "Invite someone to see their Choreboo here!",
-                style = MaterialTheme.typography.bodyMedium,
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
-                textAlign = TextAlign.Center,
-            )
-        }
-    }
+     ) {
+         Column(horizontalAlignment = Alignment.CenterHorizontally) {
+             Text(
+                 text = "\uD83C\uDFE0",
+                 fontSize = 48.sp,
+             )
+             Spacer(modifier = Modifier.height(12.dp))
+             Text(
+                 text = stringResource(R.string.household_quiet_title),
+                 style = MaterialTheme.typography.bodyLarge,
+                 color = MaterialTheme.colorScheme.onSurfaceVariant,
+             )
+             Text(
+                 text = stringResource(R.string.household_quiet_body),
+                 style = MaterialTheme.typography.bodyMedium,
+                 color = MaterialTheme.colorScheme.onSurfaceVariant,
+                 textAlign = TextAlign.Center,
+             )
+         }
+     }
 }
 
 @Composable
@@ -416,7 +427,7 @@ private fun EmptyHouseholdState(
                 ) {
                     Icon(
                         imageVector = Icons.Default.Home,
-                        contentDescription = "Household",
+                        contentDescription = stringResource(R.string.household_invite_cd),
                         tint = MaterialTheme.colorScheme.onPrimaryContainer,
                         modifier = Modifier.size(32.dp),
                     )
@@ -425,7 +436,7 @@ private fun EmptyHouseholdState(
                 Spacer(modifier = Modifier.height(16.dp))
 
                 Text(
-                    text = "Join the Neighborhood",
+                    text = stringResource(R.string.household_empty_title),
                     style = MaterialTheme.typography.titleLarge,
                     fontWeight = FontWeight.Bold,
                     color = MaterialTheme.colorScheme.onSurface,
@@ -434,7 +445,7 @@ private fun EmptyHouseholdState(
                 Spacer(modifier = Modifier.height(8.dp))
 
                 Text(
-                    text = "Create or join a household to see your housemates' Choreboos and share habits together!",
+                    text = stringResource(R.string.household_empty_body),
                     style = MaterialTheme.typography.bodyMedium,
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                     textAlign = TextAlign.Center,
@@ -456,11 +467,11 @@ private fun EmptyHouseholdState(
                     ) {
                         Icon(
                             imageVector = Icons.Default.PersonAdd,
-                            contentDescription = "Invite",
+                            contentDescription = stringResource(R.string.household_invite_housemate),
                             modifier = Modifier.size(18.dp),
                         )
                         Text(
-                            text = "Invite Housemate",
+                            text = stringResource(R.string.household_invite_housemate),
                             fontWeight = FontWeight.Bold,
                         )
                     }

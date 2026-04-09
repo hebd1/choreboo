@@ -46,10 +46,12 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.shadow
 import androidx.compose.ui.graphics.graphicsLayer
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextDecoration
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import com.example.choreboo_habittrackerfriend.R
 import com.example.choreboo_habittrackerfriend.domain.model.Habit
 
 @Composable
@@ -61,8 +63,8 @@ fun HabitCard(
     onComplete: () -> Unit,
     onEdit: () -> Unit,
     onDelete: () -> Unit,
-    /** True if this habit is owned by the current user (show edit/delete controls). */
-    isOwnedByCurrentUser: Boolean = true,
+    /** True if the current user can modify this habit (owner or assignee — show edit/delete controls). */
+    canModify: Boolean = true,
     /**
      * If non-null, a household member already completed this habit today.
      * The card shows "Completed by [name]" instead of the generic "✓ Completed".
@@ -109,7 +111,7 @@ fun HabitCard(
                     if (!isScheduledToday) {
                         Icon(
                             imageVector = Icons.Default.Lock,
-                            contentDescription = "Not scheduled",
+                            contentDescription = stringResource(R.string.habit_card_not_scheduled_cd),
                             tint = MaterialTheme.colorScheme.onSurfaceVariant,
                             modifier = Modifier.size(24.dp),
                         )
@@ -142,16 +144,16 @@ fun HabitCard(
                         // XP badge — tertiaryContainer pill
                         Box(
                             modifier = Modifier
-                                .clip(RoundedCornerShape(50.dp))
-                                .background(MaterialTheme.colorScheme.tertiaryContainer.copy(alpha = 0.5f))
-                                .padding(horizontal = 6.dp, vertical = 2.dp),
-                        ) {
-                            Text(
-                                text = "+${habit.baseXp} XP",
-                                style = MaterialTheme.typography.labelSmall,
-                                fontWeight = FontWeight.Bold,
-                                color = MaterialTheme.colorScheme.onTertiaryContainer,
-                                fontSize = 10.sp,
+                                 .clip(RoundedCornerShape(50.dp))
+                                 .background(MaterialTheme.colorScheme.tertiaryContainer.copy(alpha = 0.5f))
+                                 .padding(horizontal = 6.dp, vertical = 2.dp),
+                         ) {
+                             Text(
+                                 text = stringResource(R.string.habit_xp_badge, habit.baseXp),
+                                 style = MaterialTheme.typography.labelSmall,
+                                 fontWeight = FontWeight.Bold,
+                                 color = MaterialTheme.colorScheme.onTertiaryContainer,
+                                 fontSize = 10.sp,
                             )
                         }
                     }
@@ -159,26 +161,25 @@ fun HabitCard(
                     if (isComplete) {
                         Text(
                             text = if (householdCompleterName != null)
-                                "✓ Completed by $householdCompleterName"
+                                stringResource(R.string.habit_card_completed_by, householdCompleterName)
                             else
-                                "✓ Completed",
+                                stringResource(R.string.habit_card_completed),
                             style = MaterialTheme.typography.labelSmall,
                             fontWeight = FontWeight.Bold,
                             color = MaterialTheme.colorScheme.primary,
                         )
-                    } else {
                         Row(
                             verticalAlignment = Alignment.CenterVertically,
                             horizontalArrangement = Arrangement.spacedBy(8.dp),
                         ) {
                             // Frequency label
-                            val frequencyLabel = remember(habit.customDays, isScheduledToday) {
+                            val frequencyLabelResId = remember(habit.customDays, isScheduledToday) {
                                 val days = habit.customDays
 
                                 // Check for monthly pattern (days starting with "D")
                                 val monthlyDays = days.filter { it.startsWith("D") }
                                 if (monthlyDays.isNotEmpty()) {
-                                    "Monthly"
+                                    R.string.habit_frequency_monthly
                                 } else {
                                     // Handle weekly pattern
                                     val allDays = setOf("MON", "TUE", "WED", "THU", "FRI", "SAT", "SUN")
@@ -186,16 +187,16 @@ fun HabitCard(
                                     val weekends = setOf("SAT", "SUN")
                                     val daysUpper = days.map { it.uppercase() }.toSet()
                                     when {
-                                        daysUpper == allDays -> "Daily"
-                                        daysUpper == weekdays -> "Weekdays"
-                                        daysUpper == weekends -> "Weekends"
-                                        !isScheduledToday -> "Not today"
-                                        else -> "Custom"
+                                        daysUpper == allDays -> R.string.habit_frequency_daily
+                                        daysUpper == weekdays -> R.string.habit_frequency_weekdays
+                                        daysUpper == weekends -> R.string.habit_frequency_weekends
+                                        !isScheduledToday -> R.string.habit_frequency_not_today
+                                        else -> R.string.habit_frequency_custom
                                     }
                                 }
                             }
                             Text(
-                                text = frequencyLabel,
+                                text = stringResource(frequencyLabelResId),
                                 style = MaterialTheme.typography.labelSmall,
                                 color = MaterialTheme.colorScheme.onSurfaceVariant,
                             )
@@ -204,37 +205,37 @@ fun HabitCard(
                                 Row(verticalAlignment = Alignment.CenterVertically) {
                                     Icon(
                                         imageVector = Icons.Default.LocalFireDepartment,
-                                        contentDescription = "Streak",
+                                        contentDescription = stringResource(R.string.habit_card_streak_cd),
                                         tint = MaterialTheme.colorScheme.secondary,
                                         modifier = Modifier.size(13.dp),
                                     )
                                     Spacer(modifier = Modifier.width(2.dp))
                                     Text(
-                                        text = "$currentStreak day streak",
+                                        text = stringResource(R.string.habit_card_streak_label, currentStreak),
                                         style = MaterialTheme.typography.labelSmall,
                                         color = MaterialTheme.colorScheme.secondary,
                                     )
                                 }
-                            }
-                        }
-                    }
-                }
+                             }
+                         }
+                     }
+                 }
 
-                // Right side: complete button
+                 // Right side: complete button
                 Column(
                     horizontalAlignment = Alignment.End,
                     verticalArrangement = Arrangement.spacedBy(6.dp),
                 ) {
                     // Complete button — filled primary circle vs outlined
                     Row(verticalAlignment = Alignment.CenterVertically) {
-                        if (isOwnedByCurrentUser) {
+                        if (canModify) {
                             IconButton(
                                 onClick = onEdit,
                                 modifier = Modifier.size(32.dp),
                             ) {
                                 Icon(
                                     Icons.Default.Edit,
-                                    contentDescription = "Edit",
+                                    contentDescription = stringResource(R.string.habit_card_edit_cd),
                                     modifier = Modifier.size(16.dp),
                                     tint = MaterialTheme.colorScheme.onSurfaceVariant,
                                 )
@@ -245,7 +246,7 @@ fun HabitCard(
                             ) {
                                 Icon(
                                     Icons.Default.Delete,
-                                    contentDescription = "Delete",
+                                    contentDescription = stringResource(R.string.habit_card_delete_cd),
                                     modifier = Modifier.size(16.dp),
                                     tint = MaterialTheme.colorScheme.error.copy(alpha = 0.7f),
                                 )
@@ -281,14 +282,14 @@ fun HabitCard(
                             if (isComplete) {
                                 Icon(
                                     imageVector = Icons.Default.Check,
-                                    contentDescription = "Completed",
+                                    contentDescription = stringResource(R.string.habit_card_completed),
                                     tint = MaterialTheme.colorScheme.onPrimary,
                                     modifier = Modifier.size(22.dp),
                                 )
                             } else if (!isScheduledToday) {
                                 Icon(
                                     imageVector = Icons.Default.Lock,
-                                    contentDescription = "Not scheduled",
+                                    contentDescription = stringResource(R.string.habit_card_not_scheduled_cd),
                                     tint = MaterialTheme.colorScheme.outline,
                                     modifier = Modifier.size(18.dp),
                                 )

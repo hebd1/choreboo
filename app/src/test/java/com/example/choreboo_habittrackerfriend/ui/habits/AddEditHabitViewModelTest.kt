@@ -336,8 +336,8 @@ class AddEditHabitViewModelTest {
             val event = awaitItem()
             assertTrue(event is AddEditHabitEvent.ValidationError)
             assertEquals(
-                "Title is required",
-                (event as AddEditHabitEvent.ValidationError).message,
+                com.example.choreboo_habittrackerfriend.R.string.validation_title_required,
+                (event as AddEditHabitEvent.ValidationError).messageResId,
             )
         }
 
@@ -372,8 +372,8 @@ class AddEditHabitViewModelTest {
             val event = awaitItem()
             assertTrue(event is AddEditHabitEvent.ValidationError)
             assertEquals(
-                "Select at least one day",
-                (event as AddEditHabitEvent.ValidationError).message,
+                com.example.choreboo_habittrackerfriend.R.string.validation_select_day,
+                (event as AddEditHabitEvent.ValidationError).messageResId,
             )
         }
     }
@@ -390,8 +390,9 @@ class AddEditHabitViewModelTest {
             vm.saveHabit()
             val event = awaitItem()
             assertTrue(event is AddEditHabitEvent.ValidationError)
-            assertTrue(
-                (event as AddEditHabitEvent.ValidationError).message.contains("household"),
+            assertEquals(
+                com.example.choreboo_habittrackerfriend.R.string.validation_join_household,
+                (event as AddEditHabitEvent.ValidationError).messageResId,
             )
         }
     }

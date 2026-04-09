@@ -311,6 +311,7 @@ class HouseholdRepository @Inject constructor(
                             chorebooHappiness = pet.happiness,
                             chorebooEnergy = pet.energy,
                             chorebooPetType = pet.petType,
+                            chorebooBackgroundId = pet.backgroundId,
                             lastSyncedAt = now,
                         )
                     }
@@ -468,6 +469,7 @@ private fun HouseholdMemberEntity.toDomain(): HouseholdPet = HouseholdPet(
     ownerName = displayName,
     ownerUid = uid,
     ownerPhotoUrl = photoUrl,
+    backgroundId = chorebooBackgroundId,
 )
 
 private fun HouseholdHabitStatusEntity.toDomain(): HouseholdHabitStatus = HouseholdHabitStatus(

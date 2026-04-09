@@ -25,6 +25,7 @@ class ResetRepository @Inject constructor(
     private val habitRepository: HabitRepository,
     private val chorebooRepository: ChorebooRepository,
     private val householdRepository: HouseholdRepository,
+    private val backgroundRepository: BackgroundRepository,
     private val userPreferences: UserPreferences,
     private val firebaseAuth: FirebaseAuth,
     private val syncManager: SyncManager,
@@ -69,6 +70,15 @@ class ResetRepository @Inject constructor(
             Log.d(TAG, "Deleted all habits")
         } catch (e: Exception) {
             Log.w(TAG, "Failed to delete habits (continuing)", e)
+        }
+
+        // Step 2b: Delete all purchased backgrounds (references User)
+        try {
+            withTimeoutOrNull(CLOUD_TIMEOUT_MS) { connector.deleteAllMyPurchasedBackgrounds.execute() }
+                ?: Log.w(TAG, "deleteAllMyPurchasedBackgrounds timed out")
+            Log.d(TAG, "Deleted all purchased backgrounds")
+        } catch (e: Exception) {
+            Log.w(TAG, "Failed to delete purchased backgrounds (continuing)", e)
         }
 
         // Step 3: Delete the Choreboo (references User)
@@ -149,6 +159,7 @@ class ResetRepository @Inject constructor(
             habitRepository.clearLocalData()
             chorebooRepository.clearLocalData()
             householdRepository.clearState()
+            backgroundRepository.clearLocalData()
             userPreferences.clearAllData()
             Log.d(TAG, "Cleared all local data")
         } catch (e: Exception) {

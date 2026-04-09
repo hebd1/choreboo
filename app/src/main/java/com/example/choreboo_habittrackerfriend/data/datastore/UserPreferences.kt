@@ -26,6 +26,7 @@ class UserPreferences @Inject constructor(
          val ONBOARDING_COMPLETE = booleanPreferencesKey("onboarding_complete")
          val SOUND_ENABLED = booleanPreferencesKey("sound_enabled")
          val PROFILE_PHOTO_URI = stringPreferencesKey("profile_photo_uri") // Custom profile photo path, null = use Google photo
+         val IS_PREMIUM = booleanPreferencesKey("is_premium") // Local cache of Play Billing subscription status
      }
 
      val totalPoints: Flow<Int> = dataStore.data.map { it[TOTAL_POINTS] ?: 0 }
@@ -39,6 +40,9 @@ class UserPreferences @Inject constructor(
     val soundEnabled: Flow<Boolean> = dataStore.data.map { it[SOUND_ENABLED] ?: true }
 
     val profilePhotoUri: Flow<String?> = dataStore.data.map { it[PROFILE_PHOTO_URI] }
+
+    /** Local cache of Play Billing subscription status — written by BillingRepository on every verification. */
+    val isPremium: Flow<Boolean> = dataStore.data.map { it[IS_PREMIUM] ?: false }
 
     suspend fun addPoints(amount: Int) {
         dataStore.edit { prefs ->
@@ -96,6 +100,11 @@ class UserPreferences @Inject constructor(
                 prefs[PROFILE_PHOTO_URI] = uri
             }
         }
+    }
+
+    /** Update cached premium status — called by BillingRepository after every subscription verification. */
+    suspend fun setIsPremium(premium: Boolean) {
+        dataStore.edit { it[IS_PREMIUM] = premium }
     }
 
     /** Clear all preferences — used for sign-out data cleanup. */

@@ -18,9 +18,11 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.layout.ContentScale
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import coil3.compose.AsyncImage
+import com.example.choreboo_habittrackerfriend.R
 
 @Composable
 fun ProfileAvatar(
@@ -63,25 +65,25 @@ private fun ProfileImage(url: String, size: Dp) {
     if (loadFailed) {
         DefaultAvatarIcon(size = size)
     } else {
-        AsyncImage(
-            model = url,
-            contentDescription = "User profile photo",
-            modifier = Modifier
-                .size(size)
-                .clip(CircleShape),
-            contentScale = ContentScale.Crop,
-            onError = { loadFailed = true },
-        )
+         AsyncImage(
+             model = url,
+             contentDescription = stringResource(R.string.profile_photo_cd),
+             modifier = Modifier
+                 .size(size)
+                 .clip(CircleShape),
+             contentScale = ContentScale.Crop,
+             onError = { loadFailed = true },
+         )
     }
 }
 
 /** AccountCircle icon tinted with the theme primary color, sized to fill the avatar container. */
 @Composable
 private fun DefaultAvatarIcon(size: Dp) {
-    Icon(
-        Icons.Default.AccountCircle,
-        contentDescription = "User profile",
-        tint = MaterialTheme.colorScheme.primary,
-        modifier = Modifier.size(size),
-    )
+     Icon(
+         Icons.Default.AccountCircle,
+         contentDescription = stringResource(R.string.profile_default_cd),
+         tint = MaterialTheme.colorScheme.primary,
+         modifier = Modifier.size(size),
+     )
 }

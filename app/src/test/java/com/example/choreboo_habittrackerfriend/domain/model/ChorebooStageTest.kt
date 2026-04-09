@@ -108,16 +108,6 @@ class ChorebooStageTest {
     // ── enum metadata ───────────────────────────────────────────────────
 
     @Test
-    fun `stage displayNames are human-readable`() {
-        assertEquals("Egg", ChorebooStage.EGG.displayName)
-        assertEquals("Baby", ChorebooStage.BABY.displayName)
-        assertEquals("Child", ChorebooStage.CHILD.displayName)
-        assertEquals("Teen", ChorebooStage.TEEN.displayName)
-        assertEquals("Adult", ChorebooStage.ADULT.displayName)
-        assertEquals("Legendary", ChorebooStage.LEGENDARY.displayName)
-    }
-
-    @Test
     fun `thresholds are monotonically increasing`() {
         val thresholds = ChorebooStage.entries.map { it.xpThreshold }
         assertEquals(thresholds, thresholds.sorted())

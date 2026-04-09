@@ -95,6 +95,7 @@ query GetMyChoreboo @auth(level: USER) {
     lastInteractionAt
     createdAt
     sleepUntil
+    backgroundId
     owner {
       id
       displayName
@@ -123,9 +124,19 @@ query GetMyHouseholdChoreboos @auth(level: USER) {
           petType
           lastInteractionAt
           sleepUntil
+          backgroundId
         }
       }
     }
+  }
+}
+
+# Returns all backgrounds purchased by the current user.
+# Scoped to auth.uid — callers can only read their own purchases.
+query GetMyPurchasedBackgrounds @auth(level: USER) {
+  purchasedBackgrounds(where: { ownerId: { eq_expr: "auth.uid" } }) {
+    backgroundId
+    purchasedAt
   }
 }
 

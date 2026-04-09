@@ -40,10 +40,18 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import coil3.compose.AsyncImage
+import com.example.choreboo_habittrackerfriend.R
 import com.example.choreboo_habittrackerfriend.domain.model.ChorebooMood
 import com.example.choreboo_habittrackerfriend.domain.model.HouseholdPet
 import com.example.choreboo_habittrackerfriend.domain.model.PetType
+import com.example.choreboo_habittrackerfriend.ui.components.PetBackgroundImage
 import com.example.choreboo_habittrackerfriend.ui.components.WebmAnimationView
+import com.example.choreboo_habittrackerfriend.ui.theme.PetMoodContentStart
+import com.example.choreboo_habittrackerfriend.ui.theme.PetMoodHappyStart
+import com.example.choreboo_habittrackerfriend.ui.theme.PetMoodHungryStart
+import com.example.choreboo_habittrackerfriend.ui.theme.PetMoodSadStart
+import com.example.choreboo_habittrackerfriend.ui.theme.PetMoodTiredStart
+import androidx.compose.ui.res.stringResource
 
 private enum class HouseholdAnimPhase { MOOD, IDLE }
 
@@ -57,6 +65,7 @@ private enum class HouseholdAnimPhase { MOOD, IDLE }
 fun HouseholdPetCard(
     pet: HouseholdPet,
     onClick: (() -> Unit)? = null,
+    animationOffsetMs: Long = 0L,
     modifier: Modifier = Modifier,
 ) {
     // Outer Box allows the owner avatar badge to be overlaid on the card's top-left.
@@ -78,11 +87,32 @@ fun HouseholdPetCard(
             ) {
                 // ── Animation area + level badge ─────────────────────────
                 Box(contentAlignment = Alignment.BottomEnd) {
-                    HouseholdPetAnimation(
-                        petType = pet.petType,
-                        mood = pet.mood,
-                        modifier = Modifier.size(88.dp),
-                    )
+                    // Background + animation stacked in a clipped rounded box
+                    Box(
+                        modifier = Modifier
+                            .size(88.dp)
+                            .clip(RoundedCornerShape(12.dp)),
+                        contentAlignment = Alignment.Center,
+                    ) {
+                        val moodBg = when (pet.mood) {
+                            ChorebooMood.HAPPY, ChorebooMood.CONTENT -> PetMoodHappyStart
+                            ChorebooMood.HUNGRY -> PetMoodHungryStart
+                            ChorebooMood.TIRED -> PetMoodTiredStart
+                            ChorebooMood.SAD -> PetMoodSadStart
+                            else -> PetMoodContentStart
+                        }
+                        PetBackgroundImage(
+                            backgroundId = pet.backgroundId,
+                            mood = pet.mood,
+                            moodColor = moodBg,
+                        )
+                        HouseholdPetAnimation(
+                            petType = pet.petType,
+                            mood = pet.mood,
+                            animationOffsetMs = animationOffsetMs,
+                            modifier = Modifier.size(88.dp),
+                        )
+                    }
                     // Level badge overlaid on bottom-end of the animation area
                     Box(
                         contentAlignment = Alignment.Center,
@@ -92,7 +122,7 @@ fun HouseholdPetCard(
                             .padding(horizontal = 4.dp, vertical = 1.dp),
                     ) {
                         Text(
-                            text = "Lv.${pet.level}",
+                            text = stringResource(R.string.stats_level_label, pet.level),
                             style = MaterialTheme.typography.labelSmall,
                             color = MaterialTheme.colorScheme.onPrimary,
                             fontWeight = FontWeight.Bold,
@@ -139,7 +169,7 @@ fun HouseholdPetCard(
         if (!pet.ownerPhotoUrl.isNullOrBlank() && !avatarPhotoFailed) {
             AsyncImage(
                 model = pet.ownerPhotoUrl,
-                contentDescription = "Profile photo of ${pet.ownerName}",
+                contentDescription = stringResource(R.string.household_profile_photo_cd, pet.ownerName),
                 contentScale = ContentScale.Crop,
                 modifier = Modifier
                     .align(Alignment.TopStart)
@@ -153,7 +183,7 @@ fun HouseholdPetCard(
             // Fallback: green AccountCircle icon with border
             Icon(
                 imageVector = Icons.Default.AccountCircle,
-                contentDescription = "Profile photo of ${pet.ownerName}",
+                contentDescription = stringResource(R.string.household_profile_photo_cd, pet.ownerName),
                 tint = MaterialTheme.colorScheme.primary,
                 modifier = Modifier
                     .align(Alignment.TopStart)
@@ -178,10 +208,20 @@ fun HouseholdPetCard(
 private fun HouseholdPetAnimation(
     petType: PetType,
     mood: ChorebooMood,
+    animationOffsetMs: Long = 0L,
     modifier: Modifier = Modifier,
 ) {
     if (petType == PetType.FOX) {
         var phase by remember { mutableStateOf(HouseholdAnimPhase.MOOD) }
+        var started by remember { mutableStateOf(animationOffsetMs == 0L) }
+
+        // If an offset is specified, delay before starting animations
+        LaunchedEffect(Unit) {
+            if (animationOffsetMs > 0) {
+                kotlinx.coroutines.delay(animationOffsetMs)
+                started = true
+            }
+        }
 
         val (assetPath, iterations) = when (phase) {
             HouseholdAnimPhase.MOOD -> {
@@ -214,17 +254,22 @@ private fun HouseholdPetAnimation(
                 HouseholdAnimPhase.IDLE -> "animations/fox/fox_idle.webp" to 3
             }
 
-            WebmAnimationView(
-                assetPath = currentAsset,
-                iterations = currentIterations,
-                onComplete = {
-                    phase = when (phase) {
-                        HouseholdAnimPhase.MOOD -> HouseholdAnimPhase.IDLE
-                        HouseholdAnimPhase.IDLE -> HouseholdAnimPhase.MOOD
-                    }
-                },
-                modifier = modifier,
-            )
+            if (started) {
+                WebmAnimationView(
+                    assetPath = currentAsset,
+                    iterations = currentIterations,
+                    onComplete = {
+                        phase = when (phase) {
+                            HouseholdAnimPhase.MOOD -> HouseholdAnimPhase.IDLE
+                            HouseholdAnimPhase.IDLE -> HouseholdAnimPhase.MOOD
+                        }
+                    },
+                    modifier = modifier,
+                )
+            } else {
+                // Show a blank box while waiting for the animation to start
+                Box(modifier = modifier)
+            }
         }
     } else {
         // Emoji placeholder for AXOLOTL, CAPYBARA, PANDA until their WebM

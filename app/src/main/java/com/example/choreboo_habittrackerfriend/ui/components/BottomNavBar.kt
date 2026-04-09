@@ -36,15 +36,18 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.vector.ImageVector
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import androidx.navigation.NavController
 import androidx.navigation.compose.currentBackStackEntryAsState
+import androidx.annotation.StringRes
+import com.example.choreboo_habittrackerfriend.R
 import com.example.choreboo_habittrackerfriend.domain.model.ChorebooMood
 import com.example.choreboo_habittrackerfriend.navigation.Screen
 
 data class BottomNavItem(
-    val label: String,
+    @StringRes val labelRes: Int,
     val icon: ImageVector,
     val route: String,
 )
@@ -65,11 +68,11 @@ fun BottomNavBar(
             ChorebooMood.IDLE -> Icons.Default.Pets
         }
         listOf(
-            BottomNavItem("Choreboo", petIcon, Screen.Pet.route),
-            BottomNavItem("Stats", Icons.Default.BarChart, Screen.Stats.route),
-            BottomNavItem("House", Icons.Default.OtherHouses, Screen.Household.route),
-            BottomNavItem("History", Icons.Default.CalendarMonth, Screen.Calendar.route),
-            BottomNavItem("Settings", Icons.Default.Settings, Screen.Settings.route),
+            BottomNavItem(R.string.nav_choreboo, petIcon, Screen.Pet.route),
+            BottomNavItem(R.string.nav_stats, Icons.Default.BarChart, Screen.Stats.route),
+            BottomNavItem(R.string.nav_house, Icons.Default.OtherHouses, Screen.Household.route),
+            BottomNavItem(R.string.nav_history, Icons.Default.CalendarMonth, Screen.Calendar.route),
+            BottomNavItem(R.string.nav_settings, Icons.Default.Settings, Screen.Settings.route),
         )
     }
 
@@ -146,7 +149,7 @@ private fun NavBarTab(
     ) {
         Icon(
             imageVector = item.icon,
-            contentDescription = item.label,
+            contentDescription = stringResource(item.labelRes),
             tint = if (selected)
                 MaterialTheme.colorScheme.onPrimaryContainer
             else

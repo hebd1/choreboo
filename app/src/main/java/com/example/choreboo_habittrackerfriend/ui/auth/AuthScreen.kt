@@ -69,10 +69,12 @@ import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.text.input.PasswordVisualTransformation
 import androidx.compose.ui.text.input.VisualTransformation
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.hilt.navigation.compose.hiltViewModel
+import com.example.choreboo_habittrackerfriend.R
 import com.google.android.gms.auth.api.signin.GoogleSignIn
 import com.google.android.gms.auth.api.signin.GoogleSignInOptions
 import com.google.android.gms.common.api.ApiException
@@ -107,8 +109,12 @@ fun AuthScreen(
         viewModel.events.collect { event ->
             when (event) {
                 is AuthEvent.AuthSuccess -> onAuthSuccess(event.onboardingComplete)
-                is AuthEvent.ShowError -> snackbarHostState.showSnackbar(message = event.message, actionLabel = "error", duration = SnackbarDuration.Short)
-                is AuthEvent.ShowMessage -> snackbarHostState.showSnackbar(message = event.message, actionLabel = "info", duration = SnackbarDuration.Short)
+                is AuthEvent.ShowError -> snackbarHostState.showSnackbar(message = context.getString(event.messageRes), actionLabel = "error", duration = SnackbarDuration.Short)
+                is AuthEvent.ShowMessage -> {
+                    val msg = if (event.formatArg != null) context.getString(event.messageRes, event.formatArg)
+                              else context.getString(event.messageRes)
+                    snackbarHostState.showSnackbar(message = msg, actionLabel = "info", duration = SnackbarDuration.Short)
+                }
             }
         }
     }
@@ -117,21 +123,24 @@ fun AuthScreen(
     if (formState.showForgotPassword) {
         AlertDialog(
             onDismissRequest = { viewModel.toggleForgotPassword(false) },
-            title = { Text("Reset Password") },
+            title = { Text(stringResource(R.string.auth_reset_password_title)) },
             text = {
                 Text(
-                    "We'll send a password reset link to:\n${formState.email.ifBlank { "(enter your email first)" }}",
+                    stringResource(
+                        R.string.auth_reset_email_body,
+                        formState.email.ifBlank { stringResource(R.string.auth_reset_email_placeholder) },
+                    ),
                     style = MaterialTheme.typography.bodyMedium,
                 )
             },
             confirmButton = {
                 Button(onClick = { viewModel.sendPasswordReset() }) {
-                    Text("Send Reset Email")
+                    Text(stringResource(R.string.auth_send_reset_email))
                 }
             },
             dismissButton = {
                 TextButton(onClick = { viewModel.toggleForgotPassword(false) }) {
-                    Text("Cancel")
+                    Text(stringResource(R.string.auth_cancel))
                 }
             },
         )
@@ -170,7 +179,7 @@ fun AuthScreen(
                 Spacer(modifier = Modifier.height(16.dp))
 
                 Text(
-                    "Choreboo",
+                    stringResource(R.string.app_name).substringBefore(" -"),
                     style = MaterialTheme.typography.headlineLarge,
                     fontWeight = FontWeight.ExtraBold,
                     color = MaterialTheme.colorScheme.primary,
@@ -187,7 +196,7 @@ fun AuthScreen(
                     label = "auth_subtitle",
                 ) { isSignUp ->
                     Text(
-                        if (isSignUp) "Create your account" else "Welcome back!",
+                        if (isSignUp) stringResource(R.string.auth_create_account) else stringResource(R.string.auth_welcome_back),
                         style = MaterialTheme.typography.bodyLarge,
                         color = MaterialTheme.colorScheme.onSurfaceVariant,
                     )
@@ -208,12 +217,12 @@ fun AuthScreen(
                         OutlinedTextField(
                             value = formState.email,
                             onValueChange = viewModel::onEmailChange,
-                            label = { Text("Email") },
+                            label = { Text(stringResource(R.string.auth_email_label)) },
                             leadingIcon = {
                                 Icon(Icons.Default.Email, contentDescription = null)
                             },
                             isError = formState.emailError != null,
-                            supportingText = formState.emailError?.let { { Text(it) } },
+                            supportingText = formState.emailError?.let { err -> { Text(stringResource(err.messageRes)) } },
                             keyboardOptions = KeyboardOptions(
                                 keyboardType = KeyboardType.Email,
                                 imeAction = ImeAction.Next,
@@ -233,7 +242,7 @@ fun AuthScreen(
                         OutlinedTextField(
                             value = formState.password,
                             onValueChange = viewModel::onPasswordChange,
-                            label = { Text("Password") },
+                            label = { Text(stringResource(R.string.auth_password_label)) },
                             leadingIcon = {
                                 Icon(Icons.Default.Lock, contentDescription = null)
                             },
@@ -242,14 +251,14 @@ fun AuthScreen(
                                     Icon(
                                         if (passwordVisible) Icons.Default.VisibilityOff
                                         else Icons.Default.Visibility,
-                                        contentDescription = if (passwordVisible) "Hide password" else "Show password",
+                                        contentDescription = if (passwordVisible) stringResource(R.string.auth_hide_password) else stringResource(R.string.auth_show_password),
                                     )
                                 }
                             },
                             visualTransformation = if (passwordVisible) VisualTransformation.None
                             else PasswordVisualTransformation(),
                             isError = formState.passwordError != null,
-                            supportingText = formState.passwordError?.let { { Text(it) } },
+                            supportingText = formState.passwordError?.let { err -> { Text(stringResource(err.messageRes)) } },
                             keyboardOptions = KeyboardOptions(
                                 keyboardType = KeyboardType.Password,
                                 imeAction = ImeAction.Done,
@@ -273,7 +282,7 @@ fun AuthScreen(
                                     modifier = Modifier.align(Alignment.CenterEnd),
                                 ) {
                                     Text(
-                                        "Forgot password?",
+                                        stringResource(R.string.auth_forgot_password),
                                         style = MaterialTheme.typography.labelMedium,
                                         color = MaterialTheme.colorScheme.primary,
                                     )
@@ -304,7 +313,7 @@ fun AuthScreen(
                                     label = "submit_label",
                                 ) { isSignUp ->
                                     Text(
-                                        if (isSignUp) "Create Account" else "Sign In",
+                                        if (isSignUp) stringResource(R.string.auth_create_account_button) else stringResource(R.string.auth_sign_in_button),
                                         style = MaterialTheme.typography.labelLarge,
                                         fontWeight = FontWeight.Bold,
                                     )
@@ -323,7 +332,7 @@ fun AuthScreen(
                 ) {
                     HorizontalDivider(modifier = Modifier.weight(1f))
                     Text(
-                        "  or  ",
+                        "  ${stringResource(R.string.auth_or_divider)}  ",
                         style = MaterialTheme.typography.labelSmall,
                         color = MaterialTheme.colorScheme.onSurfaceVariant,
                     )
@@ -357,7 +366,7 @@ fun AuthScreen(
                     Text("G", fontWeight = FontWeight.ExtraBold, fontSize = 18.sp)
                     Spacer(modifier = Modifier.width(10.dp))
                     Text(
-                        "Continue with Google",
+                        stringResource(R.string.auth_continue_with_google),
                         style = MaterialTheme.typography.labelLarge,
                         fontWeight = FontWeight.SemiBold,
                     )
@@ -374,7 +383,7 @@ fun AuthScreen(
                     contentPadding = androidx.compose.foundation.layout.PaddingValues(0.dp),
                 ) {
                     Text(
-                        "Privacy Policy",
+                        stringResource(R.string.auth_privacy_policy),
                         style = MaterialTheme.typography.labelSmall,
                         color = MaterialTheme.colorScheme.primary.copy(alpha = 0.7f),
                     )
@@ -392,7 +401,7 @@ fun AuthScreen(
                         label = "toggle_label",
                     ) { isSignUp ->
                         Text(
-                            if (isSignUp) "Already have an account? " else "Don't have an account? ",
+                            if (isSignUp) stringResource(R.string.auth_already_have_account) else stringResource(R.string.auth_dont_have_account),
                             style = MaterialTheme.typography.bodyMedium,
                             color = MaterialTheme.colorScheme.onSurfaceVariant,
                         )
@@ -406,7 +415,7 @@ fun AuthScreen(
                             label = "toggle_action",
                         ) { isSignUp ->
                             Text(
-                                if (isSignUp) "Sign In" else "Sign Up",
+                                if (isSignUp) stringResource(R.string.auth_sign_in_button) else stringResource(R.string.auth_sign_up_button),
                                 style = MaterialTheme.typography.bodyMedium,
                                 fontWeight = FontWeight.Bold,
                                 color = MaterialTheme.colorScheme.primary,
@@ -438,7 +447,7 @@ fun AuthScreen(
                         )
                         Spacer(modifier = Modifier.height(16.dp))
                         Text(
-                            "Syncing your data...",
+                            stringResource(R.string.auth_syncing_data),
                             style = MaterialTheme.typography.bodyLarge,
                             color = MaterialTheme.colorScheme.onSurfaceVariant,
                         )

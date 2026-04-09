@@ -12,6 +12,7 @@ import com.example.choreboo_habittrackerfriend.data.local.dao.ChorebooDao
 import com.example.choreboo_habittrackerfriend.data.local.dao.HouseholdMemberDao
 import com.example.choreboo_habittrackerfriend.data.local.dao.HouseholdDao
 import com.example.choreboo_habittrackerfriend.data.local.dao.HouseholdHabitStatusDao
+import com.example.choreboo_habittrackerfriend.data.local.dao.PurchasedBackgroundDao
 import com.google.firebase.auth.FirebaseAuth
 import com.google.firebase.storage.FirebaseStorage
 
@@ -51,6 +52,9 @@ object AppModule {
     fun provideHouseholdHabitStatusDao(db: ChorebooDatabase): HouseholdHabitStatusDao = db.householdHabitStatusDao()
 
     @Provides
+    fun providePurchasedBackgroundDao(db: ChorebooDatabase): PurchasedBackgroundDao = db.purchasedBackgroundDao()
+
+    @Provides
     @Singleton
     fun provideDataStore(@ApplicationContext context: Context): DataStore<Preferences> {
         return context.dataStore
@@ -70,5 +74,4 @@ object AppModule {
     @Singleton
     fun provideFirebaseStorage(): FirebaseStorage = FirebaseStorage.getInstance()
 }
-
 

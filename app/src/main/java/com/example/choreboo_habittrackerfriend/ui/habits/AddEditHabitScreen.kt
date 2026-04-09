@@ -78,8 +78,10 @@ import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.compose.ui.viewinterop.AndroidView
+import androidx.compose.ui.res.stringResource
 import androidx.emoji2.emojipicker.EmojiPickerView
 import androidx.hilt.navigation.compose.hiltViewModel
+import com.example.choreboo_habittrackerfriend.R
 import coil3.compose.AsyncImage
 import com.example.choreboo_habittrackerfriend.domain.model.HouseholdMember
 import com.example.choreboo_habittrackerfriend.ui.components.ProfileAvatar
@@ -88,25 +90,36 @@ import java.time.LocalTime
 
 private data class EmojiIcon(val id: String, val emoji: String, val label: String)
 
-private val emojiIcons = listOf(
-    EmojiIcon("emoji_salad", "🥗", "Healthy"),
-    EmojiIcon("emoji_water", "💧", "Water"),
-    EmojiIcon("emoji_running", "🏃", "Running"),
-    EmojiIcon("emoji_book", "📚", "Reading"),
-    EmojiIcon("emoji_meditate", "🧘", "Meditate"),
-    EmojiIcon("emoji_cleaning", "🧹", "Cleaning"),
-    EmojiIcon("emoji_cooking", "🍳", "Cooking"),
-    EmojiIcon("emoji_music", "🎵", "Music"),
-    EmojiIcon("emoji_sleep", "😴", "Sleep"),
-    EmojiIcon("emoji_code", "💻", "Coding"),
-    EmojiIcon("emoji_art", "🎨", "Art"),
-    EmojiIcon("emoji_strength", "💪", "Strength"),
-    EmojiIcon("emoji_yoga", "🧘", "Yoga"),
-    EmojiIcon("emoji_walk", "🚶", "Walk"),
-    EmojiIcon("emoji_study", "📖", "Study"),
+// Note: emoji icon labels are loaded inside the composable to use stringResource()
+private val emojiIconIds = listOf(
+    "emoji_salad" to "🥗" to R.string.emoji_icon_healthy,
+    "emoji_water" to "💧" to R.string.emoji_icon_water,
+    "emoji_running" to "🏃" to R.string.emoji_icon_running,
+    "emoji_book" to "📚" to R.string.emoji_icon_reading,
+    "emoji_meditate" to "🧘" to R.string.emoji_icon_meditate,
+    "emoji_cleaning" to "🧹" to R.string.emoji_icon_cleaning,
+    "emoji_cooking" to "🍳" to R.string.emoji_icon_cooking,
+    "emoji_music" to "🎵" to R.string.emoji_icon_music,
+    "emoji_sleep" to "😴" to R.string.emoji_icon_sleep,
+    "emoji_code" to "💻" to R.string.emoji_icon_coding,
+    "emoji_art" to "🎨" to R.string.emoji_icon_art,
+    "emoji_strength" to "💪" to R.string.emoji_icon_strength,
+    "emoji_yoga" to "🧘" to R.string.emoji_icon_yoga,
+    "emoji_walk" to "🚶" to R.string.emoji_icon_walk,
+    "emoji_study" to "📖" to R.string.emoji_icon_study,
 )
 
 private val daysOfWeek = listOf("MON", "TUE", "WED", "THU", "FRI", "SAT", "SUN")
+
+private val dayDisplayLabels = mapOf(
+    "MON" to R.string.day_chip_mon,
+    "TUE" to R.string.day_chip_tue,
+    "WED" to R.string.day_chip_wed,
+    "THU" to R.string.day_chip_thu,
+    "FRI" to R.string.day_chip_fri,
+    "SAT" to R.string.day_chip_sat,
+    "SUN" to R.string.day_chip_sun,
+)
 
 @OptIn(ExperimentalLayoutApi::class, ExperimentalMaterial3Api::class)
 @Composable
@@ -116,12 +129,19 @@ fun AddEditHabitScreen(
     viewModel: AddEditHabitViewModel = hiltViewModel(),
 ) {
     val formState by viewModel.formState.collectAsState()
+    val isOwner by viewModel.isOwner.collectAsState()
     val profilePhotoUri by viewModel.profilePhotoUri.collectAsState()
     val googlePhotoUrl by viewModel.googlePhotoUrl.collectAsState()
     val householdMembers by viewModel.householdMembers.collectAsState()
     val snackbarHostState = remember { SnackbarHostState() }
     var showTimePicker by remember { mutableStateOf(false) }
     var showEmojiPicker by remember { mutableStateOf(false) }
+    val context = LocalContext.current
+    
+    val emojiIcons = emojiIconIds.map { (idAndEmoji, labelRes) ->
+        val (id, emoji) = idAndEmoji
+        EmojiIcon(id, emoji, stringResource(labelRes))
+     }
 
     LaunchedEffect(Unit) {
         viewModel.events.collect { event ->
@@ -129,7 +149,7 @@ fun AddEditHabitScreen(
                 is AddEditHabitEvent.Saved -> onSavedBack(event.isNew)
                 is AddEditHabitEvent.ValidationError -> {
                     snackbarHostState.showSnackbar(
-                        message = event.message,
+                        message = context.getString(event.messageResId),
                         actionLabel = "error",
                         duration = SnackbarDuration.Short,
                     )
@@ -163,14 +183,14 @@ fun AddEditHabitScreen(
 
                 // Title Section
                 Text(
-                    text = if (formState.isEditing) "Edit Habit" else "New Habit",
+                    text = if (formState.isEditing) stringResource(R.string.add_habit_title_edit) else stringResource(R.string.add_habit_title_new),
                     style = MaterialTheme.typography.displaySmall,
                     fontWeight = FontWeight.ExtraBold,
                     color = MaterialTheme.colorScheme.onSurface,
                 )
                 Spacer(modifier = Modifier.height(4.dp))
                 Text(
-                    text = "Every great journey starts with a small step.",
+                    text = stringResource(R.string.add_habit_motivational),
                     style = MaterialTheme.typography.bodyLarge,
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                 )
@@ -210,7 +230,7 @@ fun AddEditHabitScreen(
                             .fillMaxWidth(),
                     ) {
                         Text(
-                            text = "HABIT NAME",
+                            text = stringResource(R.string.add_habit_name_label),
                             style = MaterialTheme.typography.labelSmall,
                             fontWeight = FontWeight.Bold,
                             color = MaterialTheme.colorScheme.primary,
@@ -220,7 +240,7 @@ fun AddEditHabitScreen(
                         OutlinedTextField(
                             value = formState.title,
                             onValueChange = { if (it.length <= 100) viewModel.updateTitle(it) },
-                            placeholder = { Text("Drink more water...") },
+                            placeholder = { Text(stringResource(R.string.add_habit_name_placeholder)) },
                             singleLine = true,
                             shape = RoundedCornerShape(12.dp),
                             modifier = Modifier.fillMaxWidth(),
@@ -228,7 +248,7 @@ fun AddEditHabitScreen(
                             trailingIcon = if (formState.title.length > 80) {
                                 {
                                     Text(
-                                        text = "${formState.title.length}/100",
+                                        text = stringResource(R.string.add_habit_name_counter_format, formState.title.length),
                                         style = MaterialTheme.typography.labelSmall,
                                         color = if (formState.title.length >= 100)
                                             MaterialTheme.colorScheme.error
@@ -252,7 +272,7 @@ fun AddEditHabitScreen(
 
                 // Icon Picker — horizontal scroll
                 Text(
-                    text = "Pick an icon",
+                    text = stringResource(R.string.add_habit_pick_icon),
                     style = MaterialTheme.typography.labelSmall,
                     fontWeight = FontWeight.Bold,
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
@@ -266,9 +286,11 @@ fun AddEditHabitScreen(
                     horizontalArrangement = Arrangement.spacedBy(12.dp),
                 ) {
                     Spacer(modifier = Modifier.width(4.dp))
-                    emojiIcons.forEach { option ->
-                        val selected = formState.iconName == option.id
-                        Box(
+                    emojiIconIds.forEach { (idAndEmoji, stringId) ->
+                        val (id, emoji) = idAndEmoji
+                        val label = stringResource(stringId)
+                        val selected = formState.iconName == id
+                         Box(
                             modifier = Modifier
                                 .size(56.dp)
                                 .clip(CircleShape)
@@ -284,17 +306,17 @@ fun AddEditHabitScreen(
                                     )
                                     else Modifier,
                                 )
-                                .clickable { viewModel.updateIconName(option.id) },
+                                .clickable { viewModel.updateIconName(id) },
                             contentAlignment = Alignment.Center,
                         ) {
                             Text(
-                                text = option.emoji,
+                                text = emoji,
                                 fontSize = 28.sp,
                             )
                         }
                     }
                     // Custom emoji "+" button
-                    val isCustomEmoji = emojiIcons.none { it.id == formState.iconName }
+                    val isCustomEmoji = emojiIconIds.none { (idAndEmoji, _) -> idAndEmoji.first == formState.iconName }
                     Box(
                         modifier = Modifier
                             .size(56.dp)
@@ -322,7 +344,7 @@ fun AddEditHabitScreen(
                         } else {
                             Icon(
                                 imageVector = Icons.Default.Add,
-                                contentDescription = "Add custom emoji",
+                                contentDescription = stringResource(R.string.add_habit_custom_emoji_cd),
                                 tint = MaterialTheme.colorScheme.onSurfaceVariant,
                                 modifier = Modifier.size(24.dp),
                             )
@@ -354,7 +376,7 @@ fun AddEditHabitScreen(
                 ) {
                     Column {
                         Text(
-                            text = "DIFFICULTY",
+                            text = stringResource(R.string.add_habit_difficulty_label),
                             style = MaterialTheme.typography.labelSmall,
                             fontWeight = FontWeight.Bold,
                             color = MaterialTheme.colorScheme.outline,
@@ -368,7 +390,7 @@ fun AddEditHabitScreen(
                         ) {
                             Column {
                                 Text(
-                                    text = "⚡",
+                                    text = stringResource(R.string.add_habit_lightning_emoji),
                                     fontSize = 24.sp,
                                 )
                             }
@@ -394,7 +416,7 @@ fun AddEditHabitScreen(
                                     )
                                     Spacer(modifier = Modifier.width(4.dp))
                                     Text(
-                                        text = "XP",
+                                        text = stringResource(R.string.add_habit_xp_label),
                                         style = MaterialTheme.typography.labelSmall,
                                         fontWeight = FontWeight.SemiBold,
                                         color = MaterialTheme.colorScheme.tertiary,
@@ -448,78 +470,83 @@ fun AddEditHabitScreen(
 
                 Spacer(modifier = Modifier.height(28.dp))
 
-                // Household Habit toggle
-                Box(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .clip(RoundedCornerShape(16.dp))
-                        .background(MaterialTheme.colorScheme.surfaceContainerLow)
-                        .border(
-                            width = 0.dp,
-                            color = Color.Transparent,
-                            shape = RoundedCornerShape(16.dp),
-                        ),
-                ) {
-                    // Secondary-container left border accent
+                // Household Habit toggle — only the owner can change this setting.
+                // Assignees see the habit as-is and cannot promote/demote it.
+                if (isOwner) {
                     Box(
                         modifier = Modifier
-                            .align(Alignment.CenterStart)
-                            .width(4.dp)
-                            .height(56.dp)
-                            .background(
-                                MaterialTheme.colorScheme.secondaryContainer,
-                                RoundedCornerShape(topStart = 16.dp, bottomStart = 16.dp),
-                            ),
-                    )
-                    Row(
-                        modifier = Modifier
                             .fillMaxWidth()
-                            .padding(start = 12.dp, end = 12.dp, top = 12.dp, bottom = 12.dp),
-                        verticalAlignment = Alignment.CenterVertically,
+                            .clip(RoundedCornerShape(16.dp))
+                            .background(MaterialTheme.colorScheme.surfaceContainerLow)
+                            .border(
+                                width = 0.dp,
+                                color = Color.Transparent,
+                                shape = RoundedCornerShape(16.dp),
+                            ),
                     ) {
-                        Icon(
-                            imageVector = Icons.Default.Groups,
-                            contentDescription = "Household Habit",
-                            tint = MaterialTheme.colorScheme.secondary,
-                            modifier = Modifier.size(24.dp),
+                        // Secondary-container left border accent
+                        Box(
+                            modifier = Modifier
+                                .align(Alignment.CenterStart)
+                                .width(4.dp)
+                                .height(56.dp)
+                                .background(
+                                    MaterialTheme.colorScheme.secondaryContainer,
+                                    RoundedCornerShape(topStart = 16.dp, bottomStart = 16.dp),
+                                ),
                         )
-                        Spacer(modifier = Modifier.width(12.dp))
-                        Column(modifier = Modifier.weight(1f)) {
-                            Text(
-                                text = "Household Habit",
-                                style = MaterialTheme.typography.labelMedium,
-                                fontWeight = FontWeight.Bold,
-                                color = MaterialTheme.colorScheme.onSurface,
+                        Row(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .padding(start = 12.dp, end = 12.dp, top = 12.dp, bottom = 12.dp),
+                            verticalAlignment = Alignment.CenterVertically,
+                        ) {
+                            Icon(
+                                imageVector = Icons.Default.Groups,
+                                contentDescription = stringResource(R.string.add_habit_household_habit),
+                                tint = MaterialTheme.colorScheme.secondary,
+                                modifier = Modifier.size(24.dp),
                             )
-                            Text(
-                                text = "Visible to all household members",
-                                style = MaterialTheme.typography.bodySmall,
-                                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                            Spacer(modifier = Modifier.width(12.dp))
+                            Column(modifier = Modifier.weight(1f)) {
+                                Text(
+                                    text = stringResource(R.string.add_habit_household_habit),
+                                    style = MaterialTheme.typography.labelMedium,
+                                    fontWeight = FontWeight.Bold,
+                                    color = MaterialTheme.colorScheme.onSurface,
+                                )
+                                Text(
+                                    text = stringResource(R.string.add_habit_household_visible),
+                                    style = MaterialTheme.typography.bodySmall,
+                                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                )
+                            }
+                            Switch(
+                                checked = formState.isHouseholdHabit,
+                                onCheckedChange = viewModel::updateIsHouseholdHabit,
                             )
                         }
-                        Switch(
-                            checked = formState.isHouseholdHabit,
-                            onCheckedChange = viewModel::updateIsHouseholdHabit,
-                        )
                     }
-                }
 
-                Spacer(modifier = Modifier.height(28.dp))
+                    Spacer(modifier = Modifier.height(28.dp))
 
-                // Assignee picker — shown when Household Habit is on
-                AnimatedVisibility(
-                    visible = formState.isHouseholdHabit,
-                    enter = expandVertically(),
-                    exit = shrinkVertically(),
-                ) {
-                    Column {
-                        AssigneePicker(
-                            members = householdMembers,
-                            selectedUid = formState.assignedToUid,
-                            onSelect = { uid, name -> viewModel.updateAssignedTo(uid, name) },
-                        )
-                        Spacer(modifier = Modifier.height(28.dp))
+                    // Assignee picker — shown when Household Habit is on (owner only)
+                    AnimatedVisibility(
+                        visible = formState.isHouseholdHabit,
+                        enter = expandVertically(),
+                        exit = shrinkVertically(),
+                    ) {
+                        Column {
+                            AssigneePicker(
+                                members = householdMembers,
+                                selectedUid = formState.assignedToUid,
+                                onSelect = { uid, name -> viewModel.updateAssignedTo(uid, name) },
+                            )
+                            Spacer(modifier = Modifier.height(28.dp))
+                        }
                     }
+                } else {
+                    Spacer(modifier = Modifier.height(28.dp))
                 }
 
                 // CTA buttons
@@ -543,7 +570,7 @@ fun AddEditHabitScreen(
                             modifier = Modifier.size(20.dp),
                         )
                         Text(
-                            text = if (formState.isEditing) "Update Habit" else "Create Habit",
+                            text = if (formState.isEditing) stringResource(R.string.add_habit_save_update) else stringResource(R.string.add_habit_save_create),
                             style = MaterialTheme.typography.titleMedium,
                             fontWeight = FontWeight.ExtraBold,
                             color = MaterialTheme.colorScheme.onPrimary,
@@ -562,7 +589,7 @@ fun AddEditHabitScreen(
                     contentAlignment = Alignment.Center,
                 ) {
                     Text(
-                        text = "Cancel & Go Back",
+                        text = stringResource(R.string.add_habit_cancel_back),
                         style = MaterialTheme.typography.labelLarge,
                         color = MaterialTheme.colorScheme.onSurfaceVariant,
                     )
@@ -613,8 +640,8 @@ private fun ChorebooTopBar(
             )
 
             // Logo text
-            Text(
-                text = "Choreboo",
+             Text(
+                text = stringResource(R.string.app_name),
                 style = MaterialTheme.typography.headlineSmall,
                 fontWeight = FontWeight.Black,
                 color = MaterialTheme.colorScheme.primary,
@@ -626,7 +653,7 @@ private fun ChorebooTopBar(
         IconButton(onClick = {}) {
             Icon(
                 Icons.Default.NotificationsNone,
-                contentDescription = "Notifications",
+                contentDescription = stringResource(R.string.add_habit_notifications_cd),
                 tint = MaterialTheme.colorScheme.onSurfaceVariant,
             )
         }
@@ -655,7 +682,7 @@ private fun FrequencyCard(
     ) {
         Column {
             Text(
-                text = "Frequency",
+                text = stringResource(R.string.add_habit_frequency_label),
                 style = MaterialTheme.typography.labelMedium,
                 fontWeight = FontWeight.Bold,
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
@@ -685,7 +712,12 @@ private fun FrequencyCard(
                         contentAlignment = Alignment.Center,
                     ) {
                         Text(
-                            text = mode.name,
+                            text = stringResource(
+                                when (mode) {
+                                    FrequencyMode.WEEKLY -> R.string.add_habit_mode_weekly
+                                    FrequencyMode.MONTHLY -> R.string.add_habit_mode_monthly
+                                }
+                            ),
                             style = MaterialTheme.typography.labelSmall,
                             fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Medium,
                             color = if (isSelected) MaterialTheme.colorScheme.onPrimary
@@ -711,23 +743,23 @@ private fun FrequencyCard(
                                     .clip(RoundedCornerShape(50.dp))
                                     .background(
                                         if (selected) MaterialTheme.colorScheme.primary
-                                        else MaterialTheme.colorScheme.surfaceContainerHighest,
-                                    )
-                                    .clickable { onDayToggle(day) }
-                                    .padding(horizontal = 12.dp, vertical = 8.dp),
-                                contentAlignment = Alignment.Center,
-                            ) {
-                                Text(
-                                    text = day,
-                                    style = MaterialTheme.typography.labelSmall,
-                                    fontWeight = if (selected) FontWeight.Bold else FontWeight.Medium,
-                                    color = if (selected) MaterialTheme.colorScheme.onPrimary
-                                    else MaterialTheme.colorScheme.onSurfaceVariant,
-                                )
-                            }
-                        }
-                    }
-                }
+                                         else MaterialTheme.colorScheme.surfaceContainerHighest,
+                                     )
+                                     .clickable { onDayToggle(day) }
+                                     .padding(horizontal = 12.dp, vertical = 8.dp),
+                                 contentAlignment = Alignment.Center,
+                             ) {
+                                 Text(
+                                     text = stringResource(dayDisplayLabels[day] ?: R.string.day_chip_mon),
+                                     style = MaterialTheme.typography.labelSmall,
+                                     fontWeight = if (selected) FontWeight.Bold else FontWeight.Medium,
+                                     color = if (selected) MaterialTheme.colorScheme.onPrimary
+                                     else MaterialTheme.colorScheme.onSurfaceVariant,
+                                 )
+                             }
+                         }
+                     }
+                 }
                 FrequencyMode.MONTHLY -> {
                     MonthlyDaySelector(
                         selectedDays = selectedDays,
@@ -749,7 +781,7 @@ private fun MonthlyDaySelector(
     ) {
         // Preset options
         Text(
-            text = "Quick select:",
+            text = stringResource(R.string.add_habit_quick_select),
             style = MaterialTheme.typography.labelSmall,
             fontWeight = FontWeight.Bold,
             color = MaterialTheme.colorScheme.onSurfaceVariant,
@@ -760,7 +792,7 @@ private fun MonthlyDaySelector(
             modifier = Modifier.fillMaxWidth(),
             horizontalArrangement = Arrangement.spacedBy(8.dp),
         ) {
-            listOf("1st" to 1, "15th" to 15, "Last" to 31).forEach { (label, day) ->
+            listOf(stringResource(R.string.add_habit_monthly_1st) to 1, stringResource(R.string.add_habit_monthly_15th) to 15, stringResource(R.string.add_habit_monthly_last) to 31).forEach { (label, day) ->
                 val selected = "D$day" in selectedDays
                 Box(
                     modifier = Modifier
@@ -789,7 +821,7 @@ private fun MonthlyDaySelector(
 
         // Full day grid
         Text(
-            text = "Or pick specific days:",
+            text = stringResource(R.string.add_habit_pick_days),
             style = MaterialTheme.typography.labelSmall,
             fontWeight = FontWeight.Bold,
             color = MaterialTheme.colorScheme.onSurfaceVariant,
@@ -861,11 +893,11 @@ private fun ReminderCard(
     if (showPermissionDialog) {
         AlertDialog(
             onDismissRequest = { showPermissionDialog = false },
-            title = { Text("Notification Permission") },
-            text = { Text("We need permission to send you habit reminders. Please enable notifications in settings.") },
+            title = { Text(stringResource(R.string.add_habit_notification_permission_title)) },
+            text = { Text(stringResource(R.string.add_habit_notification_permission_body)) },
             confirmButton = {
                 Button(onClick = { showPermissionDialog = false }) {
-                    Text("OK")
+                    Text(stringResource(R.string.add_habit_ok_button))
                 }
             },
         )
@@ -908,14 +940,14 @@ private fun ReminderCard(
                 // Text
                 Column {
                     Text(
-                        text = "Daily Reminder",
+                        text = stringResource(R.string.add_habit_daily_reminder),
                         style = MaterialTheme.typography.labelMedium,
                         fontWeight = FontWeight.Bold,
                         color = MaterialTheme.colorScheme.onSurface,
                     )
                     Spacer(modifier = Modifier.height(2.dp))
                     Text(
-                        text = if (reminderEnabled) "Enabled" else "Not set",
+                        text = if (reminderEnabled) stringResource(R.string.add_habit_reminder_enabled) else stringResource(R.string.add_habit_reminder_not_set),
                         style = MaterialTheme.typography.labelSmall,
                         color = MaterialTheme.colorScheme.onSurfaceVariant,
                     )
@@ -969,7 +1001,7 @@ private fun ReminderCard(
                             modifier = Modifier.size(18.dp),
                         )
                         Text(
-                            text = "Remind me at",
+                            text = stringResource(R.string.add_habit_remind_at),
                             style = MaterialTheme.typography.labelMedium,
                             color = MaterialTheme.colorScheme.onSurface,
                         )
@@ -988,7 +1020,7 @@ private fun ReminderCard(
                         )
                         Icon(
                             Icons.Default.ChevronRight,
-                            contentDescription = "Change time",
+                            contentDescription = stringResource(R.string.add_habit_change_time_cd),
                             tint = MaterialTheme.colorScheme.onSurfaceVariant,
                             modifier = Modifier.size(18.dp),
                         )
@@ -999,12 +1031,13 @@ private fun ReminderCard(
     }
 }
 
+@Composable
 private fun getDifficultyLabel(difficulty: Int): String {
     return when (difficulty) {
-        1 -> "Easy"
-        2 -> "Medium"
-        3 -> "Hard"
-        else -> "Easy"
+        1 -> stringResource(R.string.add_habit_difficulty_easy)
+        2 -> stringResource(R.string.add_habit_difficulty_medium)
+        3 -> stringResource(R.string.add_habit_difficulty_hard)
+        else -> stringResource(R.string.add_habit_difficulty_easy)
     }
 }
 
@@ -1022,7 +1055,7 @@ private fun TimePickerDialog(
 
     AlertDialog(
         onDismissRequest = onDismiss,
-        title = { Text("Select Time") },
+        title = { Text(stringResource(R.string.add_habit_select_time)) },
         text = {
             TimePicker(state = state)
         },
@@ -1032,12 +1065,12 @@ private fun TimePickerDialog(
                     onTimeSelected(LocalTime.of(state.hour, state.minute))
                 },
             ) {
-                Text("OK")
+                Text(stringResource(R.string.add_habit_ok_button))
             }
         },
         dismissButton = {
             Button(onClick = onDismiss) {
-                Text("Cancel")
+                Text(stringResource(R.string.add_habit_cancel_time))
             }
         },
     )
@@ -1051,7 +1084,7 @@ private fun EmojiPickerDialog(    onEmojiSelected: (String) -> Unit,
 
     AlertDialog(
         onDismissRequest = onDismiss,
-        title = { Text("Pick a custom emoji") },
+        title = { Text(stringResource(R.string.add_habit_custom_emoji_dialog)) },
         text = {
             Box(
                 modifier = Modifier
@@ -1077,7 +1110,7 @@ private fun EmojiPickerDialog(    onEmojiSelected: (String) -> Unit,
         },
         confirmButton = {
             TextButton(onClick = onDismiss) {
-                Text("Cancel")
+                Text(stringResource(R.string.add_habit_emoji_cancel))
             }
         },
     )
@@ -1111,27 +1144,27 @@ private fun AssigneePicker(
                     tint = MaterialTheme.colorScheme.secondary,
                     modifier = Modifier.size(20.dp),
                 )
-                Text(
-                    text = "ASSIGN TO",
-                    style = MaterialTheme.typography.labelSmall,
-                    fontWeight = FontWeight.Bold,
-                    color = MaterialTheme.colorScheme.outline,
-                    letterSpacing = 1.sp,
-                )
-            }
-            Spacer(modifier = Modifier.height(4.dp))
             Text(
-                text = "Who is responsible for this habit? Leave as Anyone for all members.",
-                style = MaterialTheme.typography.bodySmall,
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                text = stringResource(R.string.add_habit_assign_to_label),
+                style = MaterialTheme.typography.labelSmall,
+                fontWeight = FontWeight.Bold,
+                color = MaterialTheme.colorScheme.outline,
+                letterSpacing = 1.sp,
             )
+        }
+        Spacer(modifier = Modifier.height(4.dp))
+        Text(
+            text = stringResource(R.string.add_habit_assign_to_body),
+            style = MaterialTheme.typography.bodySmall,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+        )
             Spacer(modifier = Modifier.height(12.dp))
 
             // "Anyone" chip
             val anyoneSelected = selectedUid == null
             AssigneeChip(
-                label = "Anyone",
-                emoji = "👥",
+                label = stringResource(R.string.add_habit_assign_anyone),
+                emoji = stringResource(R.string.add_habit_assignee_anyone_emoji),
                 isSelected = anyoneSelected,
                 onClick = { onSelect(null, null) },
             )

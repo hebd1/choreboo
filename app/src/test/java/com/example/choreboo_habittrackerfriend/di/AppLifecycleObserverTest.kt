@@ -1,5 +1,6 @@
 package com.example.choreboo_habittrackerfriend.di
 
+import com.example.choreboo_habittrackerfriend.data.repository.BillingRepository
 import com.example.choreboo_habittrackerfriend.data.repository.SyncManager
 import io.mockk.coEvery
 import io.mockk.coVerify
@@ -19,13 +20,15 @@ import org.junit.Test
 class AppLifecycleObserverTest {
 
     private lateinit var syncManager: SyncManager
+    private lateinit var billingRepository: BillingRepository
     private lateinit var observer: AppLifecycleObserver
     private val owner = mockk<androidx.lifecycle.LifecycleOwner>(relaxed = true)
 
     @Before
     fun setUp() {
         syncManager = mockk(relaxed = true)
-        observer = AppLifecycleObserver(syncManager)
+        billingRepository = mockk(relaxed = true)
+        observer = AppLifecycleObserver(syncManager, billingRepository)
     }
 
     // ── Cold start ───────────────────────────────────────────────────────
@@ -51,6 +54,16 @@ class AppLifecycleObserverTest {
         Thread.sleep(200)
 
         coVerify(exactly = 1) { syncManager.syncAll(force = false) }
+    }
+
+    @Test
+    fun `second onStart triggers billing verification`() {
+        observer.onStart(owner)
+        observer.onStart(owner)
+
+        Thread.sleep(200)
+
+        coVerify(exactly = 1) { billingRepository.verifyPremiumStatus() }
     }
 
     @Test

@@ -8,9 +8,11 @@ import android.util.Log
 import androidx.core.app.NotificationCompat
 import androidx.core.app.NotificationManagerCompat
 import com.example.choreboo_habittrackerfriend.ChorebooApplication
+import com.example.choreboo_habittrackerfriend.R
 import com.example.choreboo_habittrackerfriend.data.datastore.UserPreferences
 import com.example.choreboo_habittrackerfriend.data.repository.ChorebooRepository
 import com.example.choreboo_habittrackerfriend.data.repository.HabitRepository
+import com.example.choreboo_habittrackerfriend.ui.util.displayNameRes
 import dagger.hilt.android.AndroidEntryPoint
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
@@ -48,7 +50,7 @@ class HabitCompleteReceiver : BroadcastReceiver() {
                         context = context,
                         notificationId = notificationId,
                         habitTitle = habitTitle,
-                        message = "Already completed today!",
+                        message = context.getString(R.string.notif_already_completed),
                     )
                     return@launch
                 }
@@ -62,7 +64,7 @@ class HabitCompleteReceiver : BroadcastReceiver() {
                 // Build confirmation message
                 val streakText = if (result.newStreak > 1) " | ${result.newStreak} day streak!" else ""
                 val evolvedHint = if (xpResult.evolved && xpResult.newStage != null) {
-                    " ✦ ${xpResult.newStage.displayName}!"
+                    " ✦ ${context.getString(xpResult.newStage.displayNameRes())}!"
                 } else {
                     ""
                 }
@@ -85,7 +87,7 @@ class HabitCompleteReceiver : BroadcastReceiver() {
                     context = context,
                     notificationId = notificationId,
                     habitTitle = habitTitle,
-                    message = "Failed to complete. Try in the app.",
+                    message = context.getString(R.string.notif_complete_failed),
                 )
             } finally {
                 pendingResult.finish()

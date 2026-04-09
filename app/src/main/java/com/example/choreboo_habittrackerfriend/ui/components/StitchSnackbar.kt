@@ -1,5 +1,6 @@
 package com.example.choreboo_habittrackerfriend.ui.components
 
+import androidx.annotation.StringRes
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -19,9 +20,11 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import com.example.choreboo_habittrackerfriend.R
 
 private data class SnackbarStyle(
     val header: String,
@@ -34,25 +37,25 @@ private data class SnackbarStyle(
 fun StitchSnackbar(data: SnackbarData) {
     val style = when (data.visuals.actionLabel) {
         "achievement" -> SnackbarStyle(
-            header = "Achievement",
+            header = stringResource(R.string.snackbar_achievement),
             emoji = "\uD83C\uDF89",
             background = MaterialTheme.colorScheme.secondary,
             contentColor = MaterialTheme.colorScheme.onSecondary,
         )
         "success" -> SnackbarStyle(
-            header = "Success",
+            header = stringResource(R.string.snackbar_success),
             emoji = "\u2705",
             background = MaterialTheme.colorScheme.primary,
             contentColor = MaterialTheme.colorScheme.onPrimary,
         )
         "error" -> SnackbarStyle(
-            header = "Error",
+            header = stringResource(R.string.snackbar_error),
             emoji = "\u26A0\uFE0F",
             background = MaterialTheme.colorScheme.error,
             contentColor = MaterialTheme.colorScheme.onError,
         )
         else -> SnackbarStyle(
-            header = "Info",
+            header = stringResource(R.string.snackbar_info),
             emoji = "\u2139\uFE0F",
             background = MaterialTheme.colorScheme.surfaceVariant,
             contentColor = MaterialTheme.colorScheme.onSurfaceVariant,

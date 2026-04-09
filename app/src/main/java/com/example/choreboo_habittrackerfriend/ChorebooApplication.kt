@@ -8,6 +8,7 @@ import androidx.hilt.work.HiltWorkerFactory
 import androidx.lifecycle.ProcessLifecycleOwner
 import androidx.work.Configuration
 import com.example.choreboo_habittrackerfriend.di.AppLifecycleObserver
+import com.google.android.gms.ads.MobileAds
 import dagger.hilt.android.HiltAndroidApp
 import javax.inject.Inject
 
@@ -24,6 +25,8 @@ class ChorebooApplication : Application(), Configuration.Provider {
         super.onCreate()
         createNotificationChannels()
         ProcessLifecycleOwner.get().lifecycle.addObserver(appLifecycleObserver)
+        // Initialize AdMob — must be called before loading any ads.
+        MobileAds.initialize(this)
     }
 
     override val workManagerConfiguration: Configuration

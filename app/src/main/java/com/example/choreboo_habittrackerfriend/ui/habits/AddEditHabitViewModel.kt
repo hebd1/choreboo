@@ -1,9 +1,11 @@
 package com.example.choreboo_habittrackerfriend.ui.habits
 
 import android.content.Context
+import androidx.annotation.StringRes
 import androidx.lifecycle.SavedStateHandle
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
+import com.example.choreboo_habittrackerfriend.R
 import com.example.choreboo_habittrackerfriend.data.repository.HabitRepository
 import com.example.choreboo_habittrackerfriend.data.repository.HouseholdRepository
 import com.example.choreboo_habittrackerfriend.data.datastore.UserPreferences
@@ -73,6 +75,14 @@ class AddEditHabitViewModel @Inject constructor(
     private val _isSaving = MutableStateFlow(false)
     val isSaving: StateFlow<Boolean> = _isSaving.asStateFlow()
 
+    /**
+     * True when the current user is the owner of the habit being edited (or when creating a new
+     * habit). False when the user is editing a habit that was assigned to them by someone else.
+     * Assignees can edit most fields but not the household/assignment metadata.
+     */
+    private val _isOwner = MutableStateFlow(true)
+    val isOwner: StateFlow<Boolean> = _isOwner.asStateFlow()
+
     private val _events = MutableSharedFlow<AddEditHabitEvent>()
     val events = _events.asSharedFlow()
 
@@ -101,6 +111,9 @@ class AddEditHabitViewModel @Inject constructor(
                 val habit = habitRepository.getHabitById(habitId).firstOrNull()
                 if (habit != null) {
                     existingHabit = habit
+                    // Determine whether the current user is the owner or merely an assignee.
+                    val currentUid = authRepository.currentFirebaseUser?.uid
+                    _isOwner.value = habit.ownerUid == null || habit.ownerUid == currentUid
                     _formState.value = HabitFormState(
                         title = habit.title,
                         description = habit.description ?: "",
@@ -234,13 +247,13 @@ class AddEditHabitViewModel @Inject constructor(
     fun saveHabit() {
         val state = _formState.value
         if (state.title.isBlank()) {
-            viewModelScope.launch { _events.emit(AddEditHabitEvent.ValidationError("Title is required")) }
+            viewModelScope.launch { _events.emit(AddEditHabitEvent.ValidationError(R.string.validation_title_required)) }
             return
         }
 
         // Validate that at least one day is selected
         if (state.customDays.isEmpty()) {
-            viewModelScope.launch { _events.emit(AddEditHabitEvent.ValidationError("Select at least one day")) }
+            viewModelScope.launch { _events.emit(AddEditHabitEvent.ValidationError(R.string.validation_select_day)) }
             return
         }
 
@@ -249,7 +262,7 @@ class AddEditHabitViewModel @Inject constructor(
             try {
                 // Validate: household habit requires the user to be in a household
                 if (state.isHouseholdHabit && existingHabit?.householdId == null && currentHousehold.value == null) {
-                    _events.emit(AddEditHabitEvent.ValidationError("Join a household first to create shared habits"))
+                    _events.emit(AddEditHabitEvent.ValidationError(R.string.validation_join_household))
                     return@launch
                 }
 
@@ -270,14 +283,24 @@ class AddEditHabitViewModel @Inject constructor(
                     baseXp = state.baseXp,
                     reminderEnabled = state.reminderEnabled,
                     reminderTime = if (state.reminderEnabled) state.reminderTime else null,
-                    isHouseholdHabit = state.isHouseholdHabit,
+                    // Non-owners (assignees) cannot change household/assignment metadata —
+                    // always preserve the existing values for those fields.
+                    isHouseholdHabit = if (_isOwner.value) state.isHouseholdHabit else (existingHabit?.isHouseholdHabit ?: state.isHouseholdHabit),
                     remoteId = existingHabit?.remoteId,
                     ownerUid = existingHabit?.ownerUid,
-                    householdId = resolvedHouseholdId,
+                    householdId = if (_isOwner.value) resolvedHouseholdId else existingHabit?.householdId,
                     createdAt = existingHabit?.createdAt ?: System.currentTimeMillis(),
                     isArchived = existingHabit?.isArchived ?: false,
-                    assignedToUid = if (state.isHouseholdHabit) state.assignedToUid else null,
-                    assignedToName = if (state.isHouseholdHabit) state.assignedToName else null,
+                    assignedToUid = if (_isOwner.value) {
+                        if (state.isHouseholdHabit) state.assignedToUid else null
+                    } else {
+                        existingHabit?.assignedToUid
+                    },
+                    assignedToName = if (_isOwner.value) {
+                        if (state.isHouseholdHabit) state.assignedToName else null
+                    } else {
+                        existingHabit?.assignedToName
+                    },
                 )
                 val savedHabitId = habitRepository.upsertHabit(habit)
 
@@ -329,6 +352,6 @@ class AddEditHabitViewModel @Inject constructor(
 
 sealed class AddEditHabitEvent {
     data class Saved(val isNew: Boolean) : AddEditHabitEvent()
-    data class ValidationError(val message: String) : AddEditHabitEvent()
+    data class ValidationError(@StringRes val messageResId: Int) : AddEditHabitEvent()
 }
 
