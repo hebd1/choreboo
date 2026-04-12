@@ -4,17 +4,20 @@ import android.content.Context
 import androidx.hilt.work.HiltWorker
 import androidx.work.CoroutineWorker
 import androidx.work.WorkerParameters
+import com.example.choreboo_habittrackerfriend.data.repository.ChorebooRepository
 import com.example.choreboo_habittrackerfriend.data.repository.HabitRepository
 import com.google.firebase.auth.FirebaseAuth
 import dagger.assisted.Assisted
 import dagger.assisted.AssistedInject
 import kotlinx.coroutines.flow.first
+import timber.log.Timber
 
 @HiltWorker
 class ReminderRescheduleWorker @AssistedInject constructor(
     @Assisted context: Context,
     @Assisted params: WorkerParameters,
     private val habitRepository: HabitRepository,
+    private val chorebooRepository: ChorebooRepository,
     private val firebaseAuth: FirebaseAuth,
 ) : CoroutineWorker(context, params) {
 
@@ -24,9 +27,13 @@ class ReminderRescheduleWorker @AssistedInject constructor(
             if (currentUid == null) {
                 // No user is authenticated — don't reschedule any alarms.
                 // This prevents stale alarms from a previous user from rescheduling after device reboot.
+                Timber.d("ReminderRescheduleWorker: no authenticated user, skipping alarm reschedule")
                 return Result.success()
             }
 
+            Timber.d("ReminderRescheduleWorker: rescheduling habit reminders and pet mood alarms")
+
+            // Reschedule habit reminders
             val habits = habitRepository.getAllHabits().first()
             habits.forEach { habit ->
                 // Reschedule reminders only for habits the current user owns or is assigned to (fixes B6).
@@ -46,9 +53,26 @@ class ReminderRescheduleWorker @AssistedInject constructor(
                     )
                 }
             }
+
+            // Reschedule pet mood alarm
+            val choreboo = chorebooRepository.getChorebooSync()
+            if (choreboo != null) {
+                Timber.d("ReminderRescheduleWorker: rescheduling pet mood alarm")
+                PetMoodScheduler.schedulePredictiveAlarm(
+                    applicationContext,
+                    choreboo.hunger,
+                    choreboo.happiness,
+                    choreboo.energy,
+                    choreboo.sleepUntil,
+                    choreboo.name,
+                )
+            }
+
             Result.success()
-        } catch (_: Exception) {
+        } catch (e: Exception) {
+            Timber.e(e, "ReminderRescheduleWorker: error during reschedule")
             Result.retry()
         }
     }
 }
+

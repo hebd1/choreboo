@@ -13,6 +13,7 @@ import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.flatMapLatest
 import kotlinx.coroutines.flow.flowOf
 import kotlinx.coroutines.flow.map
@@ -40,6 +41,10 @@ class CalendarViewModel @Inject constructor(
     /** True while a manual refresh is in progress */
     private val _isRefreshing = MutableStateFlow(false)
     val isRefreshing: StateFlow<Boolean> = _isRefreshing.asStateFlow()
+
+    /** True until the first completions load from Room — drives initial skeleton/placeholder */
+    private val _isLoading = MutableStateFlow(true)
+    val isLoading: StateFlow<Boolean> = _isLoading.asStateFlow()
 
     val totalPoints: StateFlow<Int> = userPreferences.totalPoints
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), 0)
@@ -83,6 +88,16 @@ class CalendarViewModel @Inject constructor(
             }
         }
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), emptyList())
+
+    init {
+        // Clear initial loading state after the first real Room emission.
+        // We collect directly from the upstream repo flow (not from the stateIn StateFlow)
+        // so we wait for an actual database result, not just the stateIn default value.
+        viewModelScope.launch {
+            habitRepository.getLogsForMonth(_selectedMonth.value.toString()).first()
+            _isLoading.value = false
+        }
+    }
 
     fun previousMonth() {
         _selectedMonth.value = _selectedMonth.value.minusMonths(1)

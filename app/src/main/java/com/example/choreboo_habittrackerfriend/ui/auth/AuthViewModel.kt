@@ -1,6 +1,5 @@
 package com.example.choreboo_habittrackerfriend.ui.auth
 
-import android.util.Log
 import androidx.annotation.StringRes
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
@@ -11,7 +10,6 @@ import com.example.choreboo_habittrackerfriend.data.repository.AuthResult
 import com.example.choreboo_habittrackerfriend.data.repository.ChorebooRepository
 import com.example.choreboo_habittrackerfriend.data.repository.SyncManager
 import com.example.choreboo_habittrackerfriend.data.repository.UserRepository
-import com.google.android.gms.auth.api.signin.GoogleSignInAccount
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.flow.MutableSharedFlow
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -23,8 +21,6 @@ import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
 import javax.inject.Inject
-
-private const val TAG = "AuthViewModel"
 
 /**
  * Typed validation error for auth form fields. Each variant maps to a string resource so the
@@ -96,15 +92,15 @@ class AuthViewModel @Inject constructor(
         }
     }
 
-    fun signInWithGoogle(account: GoogleSignInAccount) {
+    fun signInWithGoogle(idToken: String, photoUrl: String? = null) {
         viewModelScope.launch {
             _formState.update { it.copy(isLoading = true) }
-            val result = authRepository.signInWithGoogle(account)
+            val result = authRepository.signInWithGoogle(idToken)
             _formState.update { it.copy(isLoading = false) }
 
-            // Prefer the GoogleSignInAccount photo URL (highest quality); fall back to the
-            // FirebaseUser photo URL in case the account object doesn't carry it.
-            val googleAccountPhotoUrl = account.photoUrl?.toString()
+            // Prefer the photo URL passed in from Credential Manager; fall back to the
+            // FirebaseUser photo URL in case the credential didn't carry it.
+            val googleAccountPhotoUrl = photoUrl
                 ?: (result as? AuthResult.Success)?.user?.photoUrl?.toString()
 
             handleResult(result, googleAccountPhotoUrl)

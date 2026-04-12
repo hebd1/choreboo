@@ -198,6 +198,14 @@
     <!-- Parameterized: "[emoji] [label] background unlocked!" -->
     <string name="pet_snack_background_unlocked">%1$s %2$s background unlocked!</string>
     <string name="pet_snack_habit_created">Habit created! Keep it up! 🌟</string>
+    <!-- E4: Error state when Choreboo fails to load -->
+    <string name="pet_load_error">Couldn\'t load your Choreboo. Please try again.</string>
+    <string name="pet_retry_button">Retry</string>
+    <!-- E6: Error snackbars for pet actions -->
+    <string name="pet_snack_feed_error">Failed to feed your Choreboo. Please try again.</string>
+    <string name="pet_snack_sleep_error">Failed to put your Choreboo to sleep. Please try again.</string>
+    <string name="pet_snack_delete_error">Failed to delete habit. Please try again.</string>
+    <string name="pet_snack_purchase_error">Failed to unlock background. Please try again.</string>
 
     <!-- Level-up dialog (inline in PetScreen) -->
     <string name="levelup_evolved_title">🎉 Evolution! 🎉</string>
@@ -549,17 +557,43 @@
     <string name="notif_pet_name_fallback">Your Choreboo</string>
     <string name="notif_habit_name_fallback">Habit</string>
     <string name="notif_mark_complete">Mark Complete</string>
-    <!-- Reminder cute messages (parameterized with habitTitle and petName) -->
-    <string name="notif_msg_time_to">Time to %1$s!</string>
-    <string name="notif_msg_believes_in_you">%2$s believes in you! Complete %1$s!</string>
-    <string name="notif_msg_dont_forget">Don\'t forget about %2$s!</string>
-    <string name="notif_msg_feeling_neglected">%2$s is feeling neglected! Complete %1$s!</string>
-    <string name="notif_msg_cheering_you_on">%2$s is cheering you on!</string>
-    <string name="notif_msg_buddy_waiting">Your buddy %2$s is waiting!</string>
-    <string name="notif_msg_crush_it">%2$s wants to see you crush %1$s!</string>
-    <string name="notif_msg_keep_pet_happy">Keep %2$s happy—time to %1$s!</string>
-    <string name="notif_msg_misses_you">%2$s misses you! Let\'s do this!</string>
-    <string name="notif_msg_rooting_for_you">Let\'s go, champ! %2$s is rooting for you!</string>
+    <!-- Reminder quirky messages (parameterized with habitTitle and petName) -->
+    <!-- Movie/TV quotes -->
+    <string name="notif_msg_1">I am %2$s. And I am… reminding you to %1$s.</string>
+    <string name="notif_msg_2">You shall not pass… until you %1$s!</string>
+    <string name="notif_msg_3">Houston, we have a problem. %2$s says you haven\'t done %1$s yet.</string>
+    <string name="notif_msg_4">May the %1$s be with you. — %2$s</string>
+    <string name="notif_msg_5">This is the way. %1$s. Now.</string>
+    <string name="notif_msg_6">Life finds a way… to remind you about %1$s. — %2$s</string>
+    <string name="notif_msg_7">After all this time? Always. (Do %1$s.) — %2$s</string>
+    <!-- Meme/Internet -->
+    <string name="notif_msg_8">One does not simply skip %1$s. — %2$s</string>
+    <string name="notif_msg_9">We have %1$s at home. The %1$s at home: actually doing it.</string>
+    <string name="notif_msg_10">%2$s used Remind! It\'s super effective!</string>
+    <string name="notif_msg_11">Nobody: … %2$s: DO %1$s RIGHT NOW</string>
+    <string name="notif_msg_12">%2$s is staring at you. Menacingly. Do %1$s.</string>
+    <string name="notif_msg_13">It\'s giving \'forgot to %1$s\' energy. Fix it.</string>
+    <string name="notif_msg_14">POV: %2$s catches you not doing %1$s</string>
+    <!-- Dad jokes/puns -->
+    <string name="notif_msg_15">Why did %2$s cross the road? To remind you about %1$s.</string>
+    <string name="notif_msg_16">Knock knock. Who\'s there? %1$s. %1$s who? %1$s isn\'t gonna do itself!</string>
+    <!-- Motivational-sarcastic -->
+    <string name="notif_msg_17">Plot twist: you actually do %1$s today. %2$s gasps.</string>
+    <string name="notif_msg_18">Be the person %2$s already thinks you are. Do %1$s.</string>
+    <string name="notif_msg_19">Your future self called. They said do %1$s. %2$s agrees.</string>
+    <string name="notif_msg_20">%2$s wrote you a motivational speech but it just says \'%1$s\' 47 times.</string>
+    <string name="notif_msg_21">Friendly reminder from %2$s that %1$s won\'t complete itself</string>
+    <!-- Pet-personality -->
+    <string name="notif_msg_22">%2$s is dramatically sighing until you %1$s</string>
+    <string name="notif_msg_23">%2$s has been practicing their disappointed face. Don\'t let them use it.</string>
+    <string name="notif_msg_24">%2$s asked me to tell you: %1$s. Please. I\'m begging.</string>
+    <string name="notif_msg_25">Breaking news: local pet (%2$s) demands %1$s immediately</string>
+    <string name="notif_msg_26">%2$s started a countdown. You have… well, whenever. But do %1$s.</string>
+    <!-- Misc -->
+    <string name="notif_msg_27">Today\'s quest: %1$s. Reward: %2$s\'s eternal gratitude.</string>
+    <string name="notif_msg_28">If %1$s were easy, everyone would do it. But %2$s believes in you.</string>
+    <string name="notif_msg_29">Legend says those who %1$s daily are blessed by %2$s.</string>
+    <string name="notif_msg_30">*%2$s sends you a carrier pigeon* It says: %1$s</string>
     <!-- HabitCompleteReceiver confirmation messages -->
     <string name="notif_already_completed">Already completed today!</string>
     <string name="notif_complete_failed">Failed to complete. Try in the app.</string>
@@ -704,4 +738,43 @@
         <string name="tier_common">C</string>
         <string name="tier_rare">R</string>
         <string name="tier_premium">P</string>
- </resources>
+
+        <!-- ===== SPLASH SCREEN ===== -->
+        <string name="splash_brand_name">Choreboo</string>
+        <string name="splash_loading">Loading…</string>
+
+         <!-- ===== NOTIFICATION CHANNEL ===== -->
+         <string name="notif_channel_name">Habit Reminders</string>
+         <string name="notif_channel_description">Daily reminders to complete your habits and feed your Choreboo</string>
+         <string name="notif_pet_alert_channel_name">Pet Alerts</string>
+         <string name="notif_pet_alert_channel_description">Notifications when your Choreboo needs attention</string>
+
+         <!-- HabitCompleteReceiver confirmation suffixes -->
+         <string name="notif_streak_suffix"> | %1$d day streak!</string>
+         <string name="notif_level_up_suffix"> ↑ Level %1$d!</string>
+         <string name="notif_xp_earned">+%1$d XP</string>
+
+          <!-- Pet mood notification title variants -->
+          <string name="pet_mood_notif_title_1">%1$s needs you!</string>
+          <string name="pet_mood_notif_title_2">%1$s has entered crisis mode</string>
+          <string name="pet_mood_notif_title_3">SOS from %1$s</string>
+          <string name="pet_mood_notif_title_4">URGENT: %1$s situation</string>
+          <!-- Pet mood notification - Hungry messages -->
+          <string name="pet_mood_notif_hungry_1">%1$s is hangry and considering eating your slippers</string>
+          <string name="pet_mood_notif_hungry_2">%1$s just googled \'how to order pizza with paws\'</string>
+          <string name="pet_mood_notif_hungry_3">*stomach growl echoes across the land* — %1$s, probably</string>
+          <string name="pet_mood_notif_hungry_4">%1$s is giving you the \'we have food at home\' stare</string>
+          <string name="pet_mood_notif_hungry_5">%1$s hasn\'t eaten since forever (their words, not mine)</string>
+          <!-- Pet mood notification - Tired messages -->
+          <string name="pet_mood_notif_tired_1">%1$s is running on zero caffeine and one braincell</string>
+          <string name="pet_mood_notif_tired_2">%1$s just face-planted into their bed. Send energy.</string>
+          <string name="pet_mood_notif_tired_3">ERROR 404: %1$s\'s energy not found</string>
+          <string name="pet_mood_notif_tired_4">%1$s is buffering… please feed them rest</string>
+          <string name="pet_mood_notif_tired_5">%1$s\'s vibe check: exhausted. Critically.</string>
+          <!-- Pet mood notification - Sad messages -->
+          <string name="pet_mood_notif_sad_1">%1$s wrote \'I miss you\' on a tiny sign. It\'s very dramatic.</string>
+          <string name="pet_mood_notif_sad_2">%1$s is listening to sad music and staring out the window</string>
+          <string name="pet_mood_notif_sad_3">Petition signed by %1$s: \'Play with me challenge (IMPOSSIBLE)\'</string>
+          <string name="pet_mood_notif_sad_4">%1$s: \'Am I a joke to you?\' (They\'re not. Spend time with them.)</string>
+          <string name="pet_mood_notif_sad_5">%1$s activated dramatic mode. Only attention can cure it.</string>
+  </resources>

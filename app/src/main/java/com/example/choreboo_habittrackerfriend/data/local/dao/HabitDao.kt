@@ -62,6 +62,8 @@ interface HabitDao {
     suspend fun deleteHabit(habit: HabitEntity)
     @Query("UPDATE habits SET isArchived = 1 WHERE id = :id")
     suspend fun archiveHabit(id: Long)
+    @Query("UPDATE habits SET isArchived = 0 WHERE id = :id")
+    suspend fun unarchiveHabit(id: Long)
     @Query("DELETE FROM habits WHERE id = :id")
     suspend fun deleteHabitById(id: Long)
 
@@ -103,4 +105,12 @@ interface HabitDao {
     /** Returns true if the user has any household habits (owned or synced from others). */
     @Query("SELECT COUNT(*) > 0 FROM habits WHERE isHouseholdHabit = 1 AND householdId IS NOT NULL")
     suspend fun hasHouseholdHabits(): Boolean
+
+    /** D2: Set pendingSync=true to protect this row from cloud-wins overwrite during write-through. */
+    @Query("UPDATE habits SET pendingSync = 1 WHERE id = :id")
+    suspend fun markPendingSync(id: Long)
+
+    /** D2: Clear pendingSync=false once write-through succeeds or exhausts retries. */
+    @Query("UPDATE habits SET pendingSync = 0 WHERE id = :id")
+    suspend fun clearPendingSync(id: Long)
 }

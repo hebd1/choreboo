@@ -7,6 +7,7 @@ import com.example.choreboo_habittrackerfriend.data.repository.AuthRepository
 import com.example.choreboo_habittrackerfriend.data.repository.BadgeRepository
 import com.example.choreboo_habittrackerfriend.data.repository.ChorebooRepository
 import com.example.choreboo_habittrackerfriend.data.repository.HabitRepository
+import com.example.choreboo_habittrackerfriend.data.repository.SyncManager
 import com.example.choreboo_habittrackerfriend.domain.model.Badge
 import com.example.choreboo_habittrackerfriend.domain.model.ChorebooStats
 import com.example.choreboo_habittrackerfriend.domain.model.PetType
@@ -14,9 +15,12 @@ import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
+import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.flatMapLatest
 import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.stateIn
+import kotlinx.coroutines.launch
 import java.time.DayOfWeek
 import java.time.LocalDate
 import java.time.YearMonth
@@ -30,7 +34,16 @@ class StatsViewModel @Inject constructor(
     private val userPreferences: UserPreferences,
     private val authRepository: AuthRepository,
     private val badgeRepository: BadgeRepository,
+    private val syncManager: SyncManager,
 ) : ViewModel() {
+
+    /** True while a manual pull-to-refresh is in progress */
+    private val _isRefreshing = MutableStateFlow(false)
+    val isRefreshing: StateFlow<Boolean> = _isRefreshing.asStateFlow()
+
+    /** True until the first badge/data load from Room — drives the initial loading spinner */
+    private val _isLoading = MutableStateFlow(true)
+    val isLoading: StateFlow<Boolean> = _isLoading.asStateFlow()
 
     val totalPoints: StateFlow<Int> = userPreferences.totalPoints
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), 0)
@@ -92,6 +105,19 @@ class StatsViewModel @Inject constructor(
         LocalDate.now().format(DateTimeFormatter.ISO_LOCAL_DATE),
     )
 
+    /** Manual pull-to-refresh: force-syncs from cloud; Room flows update automatically. */
+    fun refreshData() {
+        viewModelScope.launch {
+            _isRefreshing.value = true
+            try {
+                refreshTodayDate()
+                syncManager.syncAll(force = true)
+            } finally {
+                _isRefreshing.value = false
+            }
+        }
+    }
+
     /** Refreshes the today date — call when the screen becomes visible to handle midnight crossings. */
     fun refreshTodayDate() {
         _todayDate.value = LocalDate.now().format(DateTimeFormatter.ISO_LOCAL_DATE)
@@ -128,4 +154,12 @@ class StatsViewModel @Inject constructor(
                 }
         }
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), 0)
+
+    init {
+        // Clear initial loading state once the first badges value arrives from Room
+        viewModelScope.launch {
+            allBadges.first()
+            _isLoading.value = false
+        }
+    }
 }

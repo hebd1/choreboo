@@ -67,6 +67,12 @@ class HabitRepository @Inject constructor(
      * Cancel all pending write-through coroutines and create a fresh scope.
      * Called on sign-out and account reset to prevent stale writes executing after
      * the user's data has been cleared.
+     *
+     * Thread-safety: must be called from the main thread (SettingsViewModel/ResetRepository
+     * always invoke this from viewModelScope which is confined to Main). The cancel() and
+     * scope reassignment are therefore sequentially ordered — no new coroutines can be
+     * launched on the old scope after this returns because all callers hold a reference to
+     * the *current* writeScope at launch time.
      */
     fun cancelPendingWrites() {
         writeScope.coroutineContext[Job]?.cancel()

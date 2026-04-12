@@ -31,6 +31,12 @@ import javax.inject.Singleton
 /** Subscription product ID registered in the Google Play Console. */
 const val PREMIUM_PRODUCT_ID = "choreboo_premium_monthly"
 
+/** Maximum number of reconnection attempts after billing service disconnects. */
+private const val MAX_BILLING_RETRY_ATTEMPTS = 3
+
+/** Maximum backoff delay between reconnection attempts. */
+private const val MAX_BILLING_RETRY_DELAY_MS = 30_000L
+
 @Singleton
 class BillingRepository @Inject constructor(
     @ApplicationContext private val context: Context,
@@ -73,7 +79,7 @@ class BillingRepository @Inject constructor(
     // Connection
     // -----------------------------------------------------------------------------------------
 
-    private fun connectWithRetry(retryDelayMs: Long = 1_000L) {
+    private fun connectWithRetry(retryDelayMs: Long = 1_000L, attempt: Int = 0) {
         billingClient.startConnection(object : BillingClientStateListener {
             override fun onBillingSetupFinished(billingResult: BillingResult) {
                 if (billingResult.responseCode == BillingClient.BillingResponseCode.OK) {
@@ -88,10 +94,17 @@ class BillingRepository @Inject constructor(
             }
 
             override fun onBillingServiceDisconnected() {
-                Timber.d("Billing service disconnected — retrying in ${retryDelayMs}ms")
+                if (attempt >= MAX_BILLING_RETRY_ATTEMPTS) {
+                    Timber.w("Billing service disconnected — max retries ($MAX_BILLING_RETRY_ATTEMPTS) reached, giving up.")
+                    return
+                }
+                Timber.d("Billing service disconnected — retrying in ${retryDelayMs}ms (attempt ${attempt + 1}/$MAX_BILLING_RETRY_ATTEMPTS)")
                 scope.launch {
                     delay(retryDelayMs)
-                    connectWithRetry(minOf(retryDelayMs * 2, 30_000L))
+                    connectWithRetry(
+                        retryDelayMs = minOf(retryDelayMs * 2, MAX_BILLING_RETRY_DELAY_MS),
+                        attempt = attempt + 1,
+                    )
                 }
             }
         })

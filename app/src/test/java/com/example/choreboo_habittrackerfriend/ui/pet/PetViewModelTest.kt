@@ -101,7 +101,7 @@ class PetViewModelTest {
         every { userPreferences.profilePhotoUri } returns flowOf(null)
         every { authRepository.currentFirebaseUser } returns null
         every { householdRepository.householdMembers } returns flowOf(emptyList())
-        every { backgroundRepository.getPurchasedBackgrounds() } returns flowOf(emptyList())
+        every { backgroundRepository.getPurchasedBackgrounds(any()) } returns flowOf(emptyList())
         every { billingRepository.isPremium } returns MutableStateFlow(false)
 
         // Mock current user for habits filtering

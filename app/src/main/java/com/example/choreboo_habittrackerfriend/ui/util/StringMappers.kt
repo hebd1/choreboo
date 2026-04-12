@@ -1,5 +1,8 @@
 package com.example.choreboo_habittrackerfriend.ui.util
 
+import android.app.Activity
+import android.content.Context
+import android.content.ContextWrapper
 import androidx.annotation.StringRes
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.res.stringResource
@@ -11,6 +14,25 @@ import com.example.choreboo_habittrackerfriend.domain.model.ChorebooStage
 import com.example.choreboo_habittrackerfriend.domain.model.PetType
 import com.example.choreboo_habittrackerfriend.ui.onboarding.BiggestStruggle
 import com.example.choreboo_habittrackerfriend.ui.onboarding.UsageIntent
+
+// ------------------------------------------------------------------------------------------------
+// Context utilities
+// ------------------------------------------------------------------------------------------------
+
+/**
+ * Walks the [Context] wrapper chain to find the underlying [Activity].
+ * Returns null if no Activity is found (e.g. in a service or application context).
+ * Prefer this over a direct `context as? Activity` cast, which fails when the context
+ * is wrapped (e.g. [ContextThemeWrapper]).
+ */
+fun Context.findActivity(): Activity? {
+    var ctx: Context = this
+    while (ctx is ContextWrapper) {
+        if (ctx is Activity) return ctx
+        ctx = ctx.baseContext
+    }
+    return null
+}
 
 // ------------------------------------------------------------------------------------------------
 // ChorebooMood

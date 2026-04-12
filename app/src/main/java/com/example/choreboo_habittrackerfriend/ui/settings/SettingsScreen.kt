@@ -1,12 +1,10 @@
 package com.example.choreboo_habittrackerfriend.ui.settings
 
-import android.app.Activity
 import android.content.Intent
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.PickVisualMediaRequest
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.background
-
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -55,10 +53,11 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.OutlinedTextFieldDefaults
 import androidx.compose.material3.Scaffold
-import androidx.compose.material3.SnackbarDuration
 import androidx.compose.material3.SnackbarHost
 import androidx.compose.material3.SnackbarHostState
+import com.example.choreboo_habittrackerfriend.ui.components.SnackbarType
 import com.example.choreboo_habittrackerfriend.ui.components.StitchSnackbar
+import com.example.choreboo_habittrackerfriend.ui.components.showStitchSnackbar
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Switch
 import androidx.compose.material3.Text
@@ -67,18 +66,20 @@ import androidx.compose.material3.TopAppBar
 import androidx.compose.material3.TopAppBarDefaults
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
-import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
+import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
+import androidx.compose.foundation.text.KeyboardActions
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.platform.LocalFocusManager
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.text.input.KeyboardType
@@ -90,12 +91,15 @@ import androidx.compose.ui.unit.sp
 import androidx.compose.ui.res.stringResource
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import androidx.credentials.CredentialManager
+import androidx.credentials.GetCredentialRequest
+import androidx.credentials.exceptions.GetCredentialException
 import com.example.choreboo_habittrackerfriend.R
 import com.example.choreboo_habittrackerfriend.ui.components.PremiumBadge
 import com.example.choreboo_habittrackerfriend.ui.components.ProfileAvatar
-import com.google.android.gms.auth.api.signin.GoogleSignIn
-import com.google.android.gms.auth.api.signin.GoogleSignInOptions
-import com.google.android.gms.common.api.ApiException
+import com.example.choreboo_habittrackerfriend.ui.util.findActivity
+import com.google.android.libraries.identity.googleid.GetGoogleIdOption
+import com.google.android.libraries.identity.googleid.GoogleIdTokenCredential
 import kotlinx.coroutines.launch
 
 @OptIn(ExperimentalMaterial3Api::class)
@@ -106,57 +110,65 @@ fun SettingsScreen(
     viewModel: SettingsViewModel = hiltViewModel(),
 ) {
     val context = LocalContext.current
-    val themeMode by viewModel.themeMode.collectAsState()
-    val soundEnabled by viewModel.soundEnabled.collectAsState()
-    val totalPoints by viewModel.totalPoints.collectAsState()
-    val profilePhotoUri by viewModel.profilePhotoUri.collectAsState()
-    val googlePhotoUrl by viewModel.googlePhotoUrl.collectAsState()
-    val isResetting by viewModel.isResetting.collectAsState()
-    val currentDisplayName by viewModel.currentDisplayName.collectAsState()
-    val isUpdatingName by viewModel.isUpdatingName.collectAsState()
+    val focusManager = LocalFocusManager.current
+    val themeMode by viewModel.themeMode.collectAsStateWithLifecycle()
+    val soundEnabled by viewModel.soundEnabled.collectAsStateWithLifecycle()
+    val totalPoints by viewModel.totalPoints.collectAsStateWithLifecycle()
+    val profilePhotoUri by viewModel.profilePhotoUri.collectAsStateWithLifecycle()
+    val googlePhotoUrl by viewModel.googlePhotoUrl.collectAsStateWithLifecycle()
+    val isResetting by viewModel.isResetting.collectAsStateWithLifecycle()
+    val currentDisplayName by viewModel.currentDisplayName.collectAsStateWithLifecycle()
+    val isUpdatingName by viewModel.isUpdatingName.collectAsStateWithLifecycle()
     val isGoogleUser = viewModel.isGoogleUser
     val snackbarHostState = remember { SnackbarHostState() }
     val scope = rememberCoroutineScope()
-    var showSignOutDialog by remember { mutableStateOf(false) }
-    var showResetDialog by remember { mutableStateOf(false) }
-    var resetPassword by remember { mutableStateOf("") }
-    var resetPasswordVisible by remember { mutableStateOf(false) }
-    var showPhotoOptionsDialog by remember { mutableStateOf(false) }
-    var showInviteDialog by remember { mutableStateOf(false) }
-    var showJoinDialog by remember { mutableStateOf(false) }
-    var showManageMembersDialog by remember { mutableStateOf(false) }
-    var showLeaveHouseholdDialog by remember { mutableStateOf(false) }
-    var showCreateHouseholdDialog by remember { mutableStateOf(false) }
-    var showEditNameDialog by remember { mutableStateOf(false) }
-    var editNameText by remember { mutableStateOf("") }
+    var showSignOutDialog by rememberSaveable { mutableStateOf(false) }
+    var showResetDialog by rememberSaveable { mutableStateOf(false) }
+    var resetPassword by rememberSaveable { mutableStateOf("") }
+    var resetPasswordVisible by rememberSaveable { mutableStateOf(false) }
+    var showPhotoOptionsDialog by rememberSaveable { mutableStateOf(false) }
+    var showInviteDialog by rememberSaveable { mutableStateOf(false) }
+    var showJoinDialog by rememberSaveable { mutableStateOf(false) }
+    var showManageMembersDialog by rememberSaveable { mutableStateOf(false) }
+    var showLeaveHouseholdDialog by rememberSaveable { mutableStateOf(false) }
+    var showCreateHouseholdDialog by rememberSaveable { mutableStateOf(false) }
+    var showEditNameDialog by rememberSaveable { mutableStateOf(false) }
+    var editNameText by rememberSaveable { mutableStateOf("") }
 
-    // Google sign-in launcher used for re-authentication before account reset
-    val googleReauthLauncher = rememberLauncherForActivityResult(
-        contract = ActivityResultContracts.StartActivityForResult(),
-    ) { result ->
-        if (result.resultCode == Activity.RESULT_OK) {
+    // Credential Manager — used for Google re-authentication before account reset.
+    // Not wrapped in remember{} so it is never tied to a stale Activity context after
+    // a configuration change; CredentialManager.create() is cheap to call per-composition.
+    val credentialManager = CredentialManager.create(context)
+    val webClientId = stringResource(R.string.default_web_client_id)
+
+    fun launchGoogleReauth() {
+        scope.launch {
             try {
-                val account = GoogleSignIn.getSignedInAccountFromIntent(result.data)
-                    .getResult(ApiException::class.java)
-                viewModel.resetAccount(googleAccount = account)
-            } catch (e: ApiException) {
-                scope.launch {
-                    snackbarHostState.showSnackbar(
-                        message = context.getString(R.string.settings_msg_google_signin_failed),
-                        actionLabel = "error",
-                        duration = SnackbarDuration.Short,
-                    )
-                }
+                val googleIdOption = GetGoogleIdOption.Builder()
+                    .setFilterByAuthorizedAccounts(true)
+                    .setServerClientId(webClientId)
+                    .build()
+                val request = GetCredentialRequest.Builder()
+                    .addCredentialOption(googleIdOption)
+                    .build()
+                val result = credentialManager.getCredential(context, request)
+                val googleIdTokenCredential = GoogleIdTokenCredential.createFrom(result.credential.data)
+                viewModel.resetAccount(googleIdToken = googleIdTokenCredential.idToken)
+            } catch (e: GetCredentialException) {
+                snackbarHostState.showStitchSnackbar(
+                    message = context.getString(R.string.settings_msg_google_signin_failed),
+                    type = SnackbarType.Error,
+                )
             }
         }
     }
 
     // Household state
-    val currentHousehold by viewModel.currentHousehold.collectAsState()
-    val householdMembers by viewModel.householdMembers.collectAsState()
-    val isCreatingHousehold by viewModel.isCreatingHousehold.collectAsState()
-    val isJoiningHousehold by viewModel.isJoiningHousehold.collectAsState()
-    val isLeavingHousehold by viewModel.isLeavingHousehold.collectAsState()
+    val currentHousehold by viewModel.currentHousehold.collectAsStateWithLifecycle()
+    val householdMembers by viewModel.householdMembers.collectAsStateWithLifecycle()
+    val isCreatingHousehold by viewModel.isCreatingHousehold.collectAsStateWithLifecycle()
+    val isJoiningHousehold by viewModel.isJoiningHousehold.collectAsStateWithLifecycle()
+    val isLeavingHousehold by viewModel.isLeavingHousehold.collectAsStateWithLifecycle()
     val isPremium by viewModel.isPremium.collectAsStateWithLifecycle()
     val isRestoringPurchases by viewModel.isRestoringPurchases.collectAsStateWithLifecycle()
     LaunchedEffect(Unit) {
@@ -170,7 +182,7 @@ fun SettingsScreen(
                             context.getString(event.messageRes, event.formatArg)
                         else
                             context.getString(event.messageRes)
-                        snackbarHostState.showSnackbar(message = msg, actionLabel = "error", duration = SnackbarDuration.Short)
+                        snackbarHostState.showStitchSnackbar(message = msg, type = SnackbarType.Error)
                     }
                 }
                 is SettingsEvent.ShowSuccess -> {
@@ -180,12 +192,12 @@ fun SettingsScreen(
                             context.getString(event.messageRes, event.formatArg)
                         else
                             context.getString(event.messageRes)
-                        snackbarHostState.showSnackbar(message = msg, actionLabel = "success", duration = SnackbarDuration.Short)
+                        snackbarHostState.showStitchSnackbar(message = msg, type = SnackbarType.Success)
                     }
                 }
                 is SettingsEvent.ShowRawError -> {
                     scope.launch {
-                        snackbarHostState.showSnackbar(message = event.message, actionLabel = "error", duration = SnackbarDuration.Short)
+                        snackbarHostState.showStitchSnackbar(message = event.message, type = SnackbarType.Error)
                     }
                 }
             }
@@ -215,6 +227,10 @@ fun SettingsScreen(
                         modifier = Modifier.fillMaxWidth(),
                         colors = OutlinedTextFieldDefaults.colors(
                             focusedBorderColor = MaterialTheme.colorScheme.primary,
+                        ),
+                        keyboardOptions = KeyboardOptions(imeAction = ImeAction.Done),
+                        keyboardActions = KeyboardActions(
+                            onDone = { focusManager.clearFocus() },
                         ),
                     )
                     if (editNameText.length >= 20) {
@@ -370,12 +386,7 @@ fun SettingsScreen(
                     onClick = {
                         showResetDialog = false
                         if (isGoogleUser) {
-                            val gso = GoogleSignInOptions.Builder(GoogleSignInOptions.DEFAULT_SIGN_IN)
-                                .requestIdToken(context.getString(com.example.choreboo_habittrackerfriend.R.string.default_web_client_id))
-                                .requestEmail()
-                                .build()
-                            val client = GoogleSignIn.getClient(context, gso)
-                            googleReauthLauncher.launch(client.signInIntent)
+                            launchGoogleReauth()
                         } else {
                             val pwd = resetPassword
                             resetPassword = ""
@@ -455,7 +466,7 @@ fun SettingsScreen(
 
     // Create Household dialog
     if (showCreateHouseholdDialog) {
-        var householdName by remember { mutableStateOf("") }
+        var householdName by rememberSaveable { mutableStateOf("") }
         AlertDialog(
             onDismissRequest = { showCreateHouseholdDialog = false },
             title = { Text(stringResource(R.string.settings_create_household_dialog_title)) },
@@ -491,6 +502,10 @@ fun SettingsScreen(
                             unfocusedBorderColor = MaterialTheme.colorScheme.outlineVariant,
                             focusedBorderColor = MaterialTheme.colorScheme.primary,
                         ),
+                        keyboardOptions = KeyboardOptions(imeAction = ImeAction.Done),
+                        keyboardActions = KeyboardActions(
+                            onDone = { focusManager.clearFocus() },
+                        ),
                     )
                 }
             },
@@ -525,7 +540,7 @@ fun SettingsScreen(
 
     // Join Household dialog
     if (showJoinDialog) {
-        var inviteCode by remember { mutableStateOf("") }
+        var inviteCode by rememberSaveable { mutableStateOf("") }
         AlertDialog(
             onDismissRequest = { showJoinDialog = false },
             title = { Text(stringResource(R.string.settings_join_household_dialog_title)) },
@@ -547,6 +562,10 @@ fun SettingsScreen(
                             focusedContainerColor = MaterialTheme.colorScheme.surfaceContainerLowest,
                             unfocusedBorderColor = MaterialTheme.colorScheme.outlineVariant,
                             focusedBorderColor = MaterialTheme.colorScheme.primary,
+                        ),
+                        keyboardOptions = KeyboardOptions(imeAction = ImeAction.Done),
+                        keyboardActions = KeyboardActions(
+                            onDone = { focusManager.clearFocus() },
                         ),
                     )
                 }
@@ -787,7 +806,7 @@ fun SettingsScreen(
                 colors = TopAppBarDefaults.topAppBarColors(containerColor = Color.Transparent),
             )
         },
-        snackbarHost = { },
+        snackbarHost = { SnackbarHost(snackbarHostState) { StitchSnackbar(it) } },
     ) { padding ->
         Column(
             modifier = Modifier
@@ -935,7 +954,7 @@ fun SettingsScreen(
                         Spacer(modifier = Modifier.height(16.dp))
                         Button(
                             onClick = {
-                                val activity = context as? Activity
+                                val activity = context.findActivity()
                                 if (activity != null) {
                                     viewModel.launchPremiumPurchase(activity)
                                 }
@@ -1305,7 +1324,6 @@ fun SettingsScreen(
                 }
             }
 
-            Spacer(modifier = Modifier.height(80.dp))
         }
 
         // Snackbar pinned above the bottom nav bar

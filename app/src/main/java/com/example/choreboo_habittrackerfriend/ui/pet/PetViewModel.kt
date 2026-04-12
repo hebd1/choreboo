@@ -158,13 +158,22 @@ class PetViewModel @Inject constructor(
 
     /**
      * Set of background IDs that the current user has unlocked (default always included).
+     * Uses [AuthRepository.currentUser] via flatMapLatest so it re-subscribes if the
+     * authenticated UID changes, preventing stale-UID reads (P6-13 fix).
      */
-    val unlockedBackgroundIds: StateFlow<Set<String>> = backgroundRepository
-        .getPurchasedBackgrounds()
-        .map { entities ->
-            val ids = entities.map { it.backgroundId }.toMutableSet()
-            ids.add(BACKGROUND_DEFAULT_ID) // default is always unlocked
-            ids
+    val unlockedBackgroundIds: StateFlow<Set<String>> = authRepository.currentUser
+        .flatMapLatest { user ->
+            val uid = user?.uid
+            if (uid == null) {
+                flowOf(setOf(BACKGROUND_DEFAULT_ID))
+            } else {
+                backgroundRepository.getPurchasedBackgrounds(uid)
+                    .map { entities ->
+                        val ids = entities.map { it.backgroundId }.toMutableSet()
+                        ids.add(BACKGROUND_DEFAULT_ID) // default is always unlocked
+                        ids
+                    }
+            }
         }
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), setOf(BACKGROUND_DEFAULT_ID))
 

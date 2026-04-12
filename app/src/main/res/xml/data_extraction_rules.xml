@@ -1,19 +1,33 @@
-<?xml version="1.0" encoding="utf-8"?><!--
-   Sample data extraction rules file; uncomment and customize as necessary.
-   See https://developer.android.com/about/versions/12/backup-restore#xml-changes
-   for details.
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+    Data extraction rules for Android 12+ (API 31+) cloud backup and device-to-device transfers.
+    Excludes sensitive data: Room database, DataStore preferences, and auth tokens.
+    See https://developer.android.com/about/versions/12/backup-restore#xml-changes
 -->
 <data-extraction-rules>
     <cloud-backup>
-        <!-- TODO: Use <include> and <exclude> to control what is backed up.
-        <include .../>
-        <exclude .../>
-        -->
+        <!-- Exclude the Room database files -->
+        <exclude domain="database" path="choreboo_database" />
+        <exclude domain="database" path="choreboo_database-shm" />
+        <exclude domain="database" path="choreboo_database-wal" />
+
+        <!-- Exclude DataStore preferences (contains points, theme, onboarding state) -->
+        <exclude domain="file" path="datastore/choreboo_preferences.preferences_pb" />
+
+        <!-- Exclude any cached auth/session tokens -->
+        <exclude domain="sharedpref" path="com.google.android.gms.auth.api.signin.StoredSignInOptions" />
     </cloud-backup>
-    <!--
+
     <device-transfer>
-        <include .../>
-        <exclude .../>
+        <!-- Exclude the Room database files -->
+        <exclude domain="database" path="choreboo_database" />
+        <exclude domain="database" path="choreboo_database-shm" />
+        <exclude domain="database" path="choreboo_database-wal" />
+
+        <!-- Exclude DataStore preferences -->
+        <exclude domain="file" path="datastore/choreboo_preferences.preferences_pb" />
+
+        <!-- Exclude any cached auth/session tokens -->
+        <exclude domain="sharedpref" path="com.google.android.gms.auth.api.signin.StoredSignInOptions" />
     </device-transfer>
-    -->
 </data-extraction-rules>

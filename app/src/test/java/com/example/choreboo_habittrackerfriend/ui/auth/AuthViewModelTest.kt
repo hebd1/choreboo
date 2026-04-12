@@ -13,7 +13,6 @@ import com.example.choreboo_habittrackerfriend.domain.model.ChorebooStage
 import com.example.choreboo_habittrackerfriend.domain.model.ChorebooStats
 import com.example.choreboo_habittrackerfriend.domain.model.PetType
 import com.example.choreboo_habittrackerfriend.ui.auth.AuthValidationError
-import com.google.android.gms.auth.api.signin.GoogleSignInAccount
 import com.google.firebase.auth.FirebaseUser
 import io.mockk.coEvery
 import io.mockk.coVerify
@@ -53,7 +52,6 @@ class AuthViewModelTest {
     private lateinit var userPreferences: UserPreferences
 
     private val mockUser = mockk<FirebaseUser>(relaxed = true)
-    private val mockAccount = mockk<GoogleSignInAccount>(relaxed = true)
 
     private val defaultChoreboo = ChorebooStats(
         id = 1,
@@ -81,10 +79,8 @@ class AuthViewModelTest {
         // Default: Google sign-in succeeds, no profile photo set, no choreboo
         every { mockUser.uid } returns "uid-123"
         every { mockUser.photoUrl } returns null
-        every { mockAccount.photoUrl } returns null
-        every { mockAccount.idToken } returns "google-token"
         every { userPreferences.profilePhotoUri } returns flowOf(null)
-        coEvery { authRepository.signInWithGoogle(mockAccount) } returns AuthResult.Success(mockUser)
+        coEvery { authRepository.signInWithGoogle("google-token") } returns AuthResult.Success(mockUser)
         coEvery { syncManager.syncAll(any()) } returns true
         coEvery { chorebooRepository.getChorebooSync() } returns null
     }
@@ -261,7 +257,7 @@ class AuthViewModelTest {
         val vm = createViewModel()
 
         vm.events.test {
-            vm.signInWithGoogle(mockAccount)
+            vm.signInWithGoogle("google-token")
             val event = awaitItem()
             assertTrue(event is AuthEvent.AuthSuccess)
             assertFalse((event as AuthEvent.AuthSuccess).onboardingComplete)
@@ -273,7 +269,7 @@ class AuthViewModelTest {
         coEvery { chorebooRepository.getChorebooSync() } returns null
         val vm = createViewModel()
 
-        vm.signInWithGoogle(mockAccount)
+        vm.signInWithGoogle("google-token")
         advanceUntilIdle()
 
         coVerify(exactly = 0) { userPreferences.setOnboardingComplete(true) }
@@ -287,7 +283,7 @@ class AuthViewModelTest {
         val vm = createViewModel()
 
         vm.events.test {
-            vm.signInWithGoogle(mockAccount)
+            vm.signInWithGoogle("google-token")
             val event = awaitItem()
             assertTrue(event is AuthEvent.AuthSuccess)
             assertTrue((event as AuthEvent.AuthSuccess).onboardingComplete)
@@ -299,7 +295,7 @@ class AuthViewModelTest {
         coEvery { chorebooRepository.getChorebooSync() } returns defaultChoreboo
         val vm = createViewModel()
 
-        vm.signInWithGoogle(mockAccount)
+        vm.signInWithGoogle("google-token")
         advanceUntilIdle()
 
         coVerify(exactly = 1) { userPreferences.setOnboardingComplete(true) }
@@ -311,7 +307,7 @@ class AuthViewModelTest {
         val vm = createViewModel()
 
         vm.events.test {
-            vm.signInWithGoogle(mockAccount)
+            vm.signInWithGoogle("google-token")
             val event = awaitItem() as AuthEvent.AuthSuccess
             assertEquals("expected-uid", event.uid)
         }
@@ -325,7 +321,7 @@ class AuthViewModelTest {
         val vm = createViewModel()
 
         vm.events.test {
-            vm.signInWithGoogle(mockAccount)
+            vm.signInWithGoogle("google-token")
             // When sync fails, handleResult emits ShowMessage first, then AuthSuccess
             val first = awaitItem()
             assertTrue(first is AuthEvent.ShowMessage)
@@ -338,11 +334,11 @@ class AuthViewModelTest {
 
     @Test
     fun `auth error emits ShowError with the error message`() = runTest {
-        coEvery { authRepository.signInWithGoogle(mockAccount) } returns AuthResult.Error(AuthErrorType.InvalidCredentials)
+        coEvery { authRepository.signInWithGoogle("google-token") } returns AuthResult.Error(AuthErrorType.InvalidCredentials)
         val vm = createViewModel()
 
         vm.events.test {
-            vm.signInWithGoogle(mockAccount)
+            vm.signInWithGoogle("google-token")
             val event = awaitItem()
             assertTrue(event is AuthEvent.ShowError)
             assertTrue((event as AuthEvent.ShowError).messageRes > 0)
@@ -353,13 +349,10 @@ class AuthViewModelTest {
 
     @Test
     fun `signInWithGoogle saves photo URI from account when none is stored`() = runTest {
-        val photoUri = mockk<android.net.Uri>()
-        every { photoUri.toString() } returns "https://example.com/photo.jpg"
-        every { mockAccount.photoUrl } returns photoUri
         every { userPreferences.profilePhotoUri } returns flowOf(null)
         val vm = createViewModel()
 
-        vm.signInWithGoogle(mockAccount)
+        vm.signInWithGoogle("google-token", photoUrl = "https://example.com/photo.jpg")
         advanceUntilIdle()
 
         coVerify { userPreferences.setProfilePhotoUri("https://example.com/photo.jpg") }
@@ -369,12 +362,12 @@ class AuthViewModelTest {
     fun `signInWithGoogle falls back to FirebaseUser photoUrl when account has no photo`() = runTest {
         val photoUri = mockk<android.net.Uri>()
         every { photoUri.toString() } returns "https://firebase.google.com/photo.jpg"
-        every { mockAccount.photoUrl } returns null          // account has no photo
-        every { mockUser.photoUrl } returns photoUri         // but FirebaseUser does
+        every { mockUser.photoUrl } returns photoUri         // FirebaseUser has a photo
         every { userPreferences.profilePhotoUri } returns flowOf(null)
         val vm = createViewModel()
 
-        vm.signInWithGoogle(mockAccount)
+        // No photoUrl param — should fall back to FirebaseUser.photoUrl
+        vm.signInWithGoogle("google-token")
         advanceUntilIdle()
 
         coVerify { userPreferences.setProfilePhotoUri("https://firebase.google.com/photo.jpg") }
@@ -382,13 +375,10 @@ class AuthViewModelTest {
 
     @Test
     fun `signInWithGoogle does not overwrite photo URI when one is already stored`() = runTest {
-        val photoUri = mockk<android.net.Uri>()
-        every { photoUri.toString() } returns "https://example.com/photo.jpg"
-        every { mockAccount.photoUrl } returns photoUri
         every { userPreferences.profilePhotoUri } returns flowOf("https://custom.example.com/avatar.jpg")
         val vm = createViewModel()
 
-        vm.signInWithGoogle(mockAccount)
+        vm.signInWithGoogle("google-token", photoUrl = "https://example.com/photo.jpg")
         advanceUntilIdle()
 
         coVerify(exactly = 0) { userPreferences.setProfilePhotoUri(any()) }
@@ -396,12 +386,12 @@ class AuthViewModelTest {
 
     @Test
     fun `handleResult does not save photo URI when neither account nor FirebaseUser has one`() = runTest {
-        every { mockAccount.photoUrl } returns null
         every { mockUser.photoUrl } returns null
         every { userPreferences.profilePhotoUri } returns flowOf(null)
         val vm = createViewModel()
 
-        vm.signInWithGoogle(mockAccount)
+        // No photoUrl param and FirebaseUser has no photo either
+        vm.signInWithGoogle("google-token")
         advanceUntilIdle()
 
         coVerify(exactly = 0) { userPreferences.setProfilePhotoUri(any()) }
@@ -413,7 +403,7 @@ class AuthViewModelTest {
     fun `isSyncing is false after handleResult completes`() = runTest {
         val vm = createViewModel()
 
-        vm.signInWithGoogle(mockAccount)
+        vm.signInWithGoogle("google-token")
         advanceUntilIdle()
 
         assertFalse(vm.formState.value.isSyncing)

@@ -35,26 +35,33 @@ private data class SnackbarStyle(
 
 @Composable
 fun StitchSnackbar(data: SnackbarData) {
-    val style = when (data.visuals.actionLabel) {
-        "achievement" -> SnackbarStyle(
+    val type = (data.visuals as? StitchSnackbarVisuals)?.type
+        ?: when (data.visuals.actionLabel) {
+            "achievement" -> SnackbarType.Achievement
+            "success"     -> SnackbarType.Success
+            "error"       -> SnackbarType.Error
+            else          -> SnackbarType.Info
+        }
+    val style = when (type) {
+        is SnackbarType.Achievement -> SnackbarStyle(
             header = stringResource(R.string.snackbar_achievement),
             emoji = "\uD83C\uDF89",
             background = MaterialTheme.colorScheme.secondary,
             contentColor = MaterialTheme.colorScheme.onSecondary,
         )
-        "success" -> SnackbarStyle(
+        is SnackbarType.Success -> SnackbarStyle(
             header = stringResource(R.string.snackbar_success),
             emoji = "\u2705",
             background = MaterialTheme.colorScheme.primary,
             contentColor = MaterialTheme.colorScheme.onPrimary,
         )
-        "error" -> SnackbarStyle(
+        is SnackbarType.Error -> SnackbarStyle(
             header = stringResource(R.string.snackbar_error),
             emoji = "\u26A0\uFE0F",
             background = MaterialTheme.colorScheme.error,
             contentColor = MaterialTheme.colorScheme.onError,
         )
-        else -> SnackbarStyle(
+        is SnackbarType.Info -> SnackbarStyle(
             header = stringResource(R.string.snackbar_info),
             emoji = "\u2139\uFE0F",
             background = MaterialTheme.colorScheme.surfaceVariant,

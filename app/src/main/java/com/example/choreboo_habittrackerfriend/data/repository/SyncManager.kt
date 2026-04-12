@@ -1,6 +1,5 @@
 package com.example.choreboo_habittrackerfriend.data.repository
 
-import android.util.Log
 import com.google.firebase.auth.FirebaseAuth
 import kotlinx.coroutines.async
 import kotlinx.coroutines.coroutineScope
@@ -8,10 +7,9 @@ import kotlinx.coroutines.delay
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
 import kotlinx.coroutines.tasks.await
+import timber.log.Timber
 import javax.inject.Inject
 import javax.inject.Singleton
-
-private const val TAG = "SyncManager"
 
 /** Minimum time between background (app-resume) syncs. Auth-triggered syncs bypass this. */
 private const val SYNC_COOLDOWN_MS = 5 * 60 * 1000L // 5 minutes
@@ -58,12 +56,12 @@ class SyncManager @Inject constructor(
         for ((attempt, delayMs) in RETRY_DELAYS_MS.withIndex()) {
             try {
                 if (attempt > 0) {
-                    Log.d(TAG, "Retry attempt $attempt after ${delayMs}ms delay")
+                    Timber.d("Retry attempt %d after %dms delay", attempt, delayMs)
                     delay(delayMs)
                 }
                 return block()
             } catch (e: Exception) {
-                Log.w(TAG, "Attempt $attempt failed: ${e.message}")
+                Timber.w("Attempt %d failed: %s", attempt, e.message)
                 lastException = e
             }
         }
@@ -94,8 +92,8 @@ class SyncManager @Inject constructor(
         // a wasteful network round-trip.
         try {
             firebaseAuth.currentUser?.getIdToken(false)?.await()
-        } catch (_: Exception) {
-            Log.w(TAG, "Failed to pre-fetch auth token — sync may fail with UNAUTHENTICATED")
+        } catch (e: Exception) {
+            Timber.w(e, "Failed to pre-fetch auth token — sync may fail with UNAUTHENTICATED")
         }
 
         // After sign-in (force=true), getIdToken(false) may resolve synchronously from
@@ -109,14 +107,14 @@ class SyncManager @Inject constructor(
         }
 
         if (!force && !shouldSync()) {
-            Log.d(TAG, "Skipping sync — within cooldown window")
+            Timber.d("Skipping sync — within cooldown window")
             return true // Not a failure, just throttled
         }
 
         return syncMutex.withLock {
             // Re-check after acquiring lock in case another coroutine already ran
             if (!force && !shouldSync()) {
-                Log.d(TAG, "Skipping sync — within cooldown window (post-lock)")
+                Timber.d("Skipping sync — within cooldown window (post-lock)")
                 return@withLock true
             }
 
@@ -131,7 +129,7 @@ class SyncManager @Inject constructor(
                         retryWithBackoff { habitRepository.syncHabitsFromCloud() }
                         true
                     } catch (e: Exception) {
-                        Log.e(TAG, "Habit sync failed after retries", e)
+                        Timber.e(e, "Habit sync failed after retries")
                         false
                     }
                 }
@@ -142,7 +140,7 @@ class SyncManager @Inject constructor(
                         retryWithBackoff { chorebooRepository.syncFromCloud() }
                         true
                     } catch (e: Exception) {
-                        Log.e(TAG, "Choreboo sync failed after retries", e)
+                        Timber.e(e, "Choreboo sync failed after retries")
                         false
                     }
                 }
@@ -153,7 +151,7 @@ class SyncManager @Inject constructor(
                         retryWithBackoff { userRepository.syncPointsFromCloud() }
                         true
                     } catch (e: Exception) {
-                        Log.e(TAG, "Points sync failed after retries", e)
+                        Timber.e(e, "Points sync failed after retries")
                         false
                     }
                 }
@@ -164,7 +162,7 @@ class SyncManager @Inject constructor(
                         retryWithBackoff { backgroundRepository.syncFromCloud() }
                         true
                     } catch (e: Exception) {
-                        Log.e(TAG, "Background sync failed after retries", e)
+                        Timber.e(e, "Background sync failed after retries")
                         false
                     }
                 }
@@ -181,7 +179,7 @@ class SyncManager @Inject constructor(
                         retryWithBackoff { habitRepository.syncHabitLogsFromCloud() }
                         anySuccess = true
                     } catch (e: Exception) {
-                        Log.e(TAG, "Habit log sync failed after retries", e)
+                        Timber.e(e, "Habit log sync failed after retries")
                     }
                 }
 
@@ -189,7 +187,7 @@ class SyncManager @Inject constructor(
                 try {
                     habitRepository.syncHouseholdHabitLogsForToday()
                 } catch (e: Exception) {
-                    Log.e(TAG, "Household habit log sync failed (non-fatal)", e)
+                    Timber.e(e, "Household habit log sync failed (non-fatal)")
                 }
             }
 
@@ -198,7 +196,7 @@ class SyncManager @Inject constructor(
             if (anySuccess) {
                 lastSyncTimestampMs = System.currentTimeMillis()
             }
-            Log.d(TAG, "Sync complete (anySuccess=$anySuccess)")
+            Timber.d("Sync complete (anySuccess=$anySuccess)")
             anySuccess
         }
     }

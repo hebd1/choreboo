@@ -13,3 +13,11 @@
 .externalNativeBuild
 .cxx
 local.properties
+
+# Firebase / secrets — never commit these
+google-services.json
+app/google-services.json
+*.keystore
+*.jks
+/keystore.properties
+serviceAccountKey.json

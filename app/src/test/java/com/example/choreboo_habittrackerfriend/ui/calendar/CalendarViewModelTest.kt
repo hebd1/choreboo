@@ -154,7 +154,7 @@ class CalendarViewModelTest {
     @Test
     fun `selectDate sets new date`() {
         val vm = createViewModel()
-        val target = LocalDate.of(2026, 4, 10)
+        val target = LocalDate.of(2026, 4, 15)
 
         vm.selectDate(target)
 
@@ -164,7 +164,7 @@ class CalendarViewModelTest {
     @Test
     fun `selectDate toggles off when same date selected again`() {
         val vm = createViewModel()
-        val target = LocalDate.of(2026, 4, 10)
+        val target = LocalDate.of(2026, 4, 15)
 
         vm.selectDate(target)
         vm.selectDate(target)
@@ -175,7 +175,7 @@ class CalendarViewModelTest {
     @Test
     fun `selectDate changes to new date without toggle`() {
         val vm = createViewModel()
-        val first = LocalDate.of(2026, 4, 10)
+        val first = LocalDate.of(2026, 4, 15)
         val second = LocalDate.of(2026, 4, 20)
 
         vm.selectDate(first)

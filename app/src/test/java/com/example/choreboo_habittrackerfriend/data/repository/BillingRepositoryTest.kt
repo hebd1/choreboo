@@ -1,66 +1,22 @@
 package com.example.choreboo_habittrackerfriend.data.repository
 
-import android.app.Activity
-import com.android.billingclient.api.BillingClient
 import com.android.billingclient.api.ProductDetails
-import com.example.choreboo_habittrackerfriend.data.datastore.UserPreferences
-import io.mockk.coEvery
-import io.mockk.every
-import io.mockk.mockk
-import io.mockk.mockkStatic
-import io.mockk.verify
-import kotlinx.coroutines.flow.MutableStateFlow
-import kotlinx.coroutines.flow.first
-import kotlinx.coroutines.test.runTest
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertTrue
-import org.junit.Before
 import org.junit.Test
 
 /**
  * Unit tests for [BillingRepository].
  *
  * Because [BillingClient] is an Android SDK class, we mock it directly with MockK.
- * Tests focus on the three pure/observable behaviours:
- *   1. [isPremium] starts seeded from the DataStore cached value.
+ * Tests focus on the two guard behaviours that can be tested without a real BillingClient:
+ *   1. [launchPurchaseFlow] returns false when product details are null or the client is not ready.
  *   2. [verifyPremiumStatus] is a no-op when the billing client is not ready.
- *   3. [launchPurchaseFlow] returns false when product details are null or the client is not ready.
+ *
+ * Note: The DataStore-seeded [isPremium] cache was removed (S8 fix). [isPremium] now always
+ * defaults to false until [verifyPremiumStatus] confirms a purchase via BillingClient.
  */
 class BillingRepositoryTest {
-
-    private lateinit var userPreferences: UserPreferences
-
-    // We cannot construct a real BillingClient in JVM tests, so these tests verify the
-    // logic branches that do NOT depend on BillingClient (early-return guards, DataStore seed).
-    // The BillingClient-dependent paths are covered by integration / manual testing.
-
-    @Before
-    fun setUp() {
-        userPreferences = mockk(relaxed = true)
-        every { userPreferences.isPremium } returns MutableStateFlow(false)
-    }
-
-    // -----------------------------------------------------------------------
-    // isPremium initial seed from DataStore
-    // -----------------------------------------------------------------------
-
-    @Test
-    fun `isPremium defaults to false when DataStore cache is false`() = runTest {
-        every { userPreferences.isPremium } returns MutableStateFlow(false)
-
-        // BillingRepository starts by collecting userPreferences.isPremium, so the initial
-        // value should match the cached DataStore value.
-        val flow = userPreferences.isPremium
-        assertFalse(flow.first())
-    }
-
-    @Test
-    fun `isPremium reflects true when DataStore cache is true`() = runTest {
-        every { userPreferences.isPremium } returns MutableStateFlow(true)
-
-        val flow = userPreferences.isPremium
-        assertTrue(flow.first())
-    }
 
     // -----------------------------------------------------------------------
     // launchPurchaseFlow guard — no product details
@@ -80,7 +36,7 @@ class BillingRepositoryTest {
 
     @Test
     fun `launchPurchaseFlow returns false when billingClient is not ready`() {
-        val productDetails = mockk<ProductDetails>(relaxed = true)
+        val productDetails = io.mockk.mockk<ProductDetails>(relaxed = true)
         val result = simulateLaunchPurchaseFlow(productDetails = productDetails, clientReady = false)
         assertFalse(result)
     }
@@ -90,7 +46,7 @@ class BillingRepositoryTest {
     // -----------------------------------------------------------------------
 
     @Test
-    fun `verifyPremiumStatus returns early when billingClient is not ready`() = runTest {
+    fun `verifyPremiumStatus returns early when billingClient is not ready`() {
         // The real verifyPremiumStatus checks billingClient.isReady before querying purchases.
         // We verify the guard logic directly via the simulated helper.
         val invoked = simulateVerifyPremiumStatus(clientReady = false)
@@ -98,7 +54,7 @@ class BillingRepositoryTest {
     }
 
     @Test
-    fun `verifyPremiumStatus proceeds when billingClient is ready`() = runTest {
+    fun `verifyPremiumStatus proceeds when billingClient is ready`() {
         val invoked = simulateVerifyPremiumStatus(clientReady = true)
         assertTrue("queryPurchasesAsync should be called when client is ready", invoked)
     }

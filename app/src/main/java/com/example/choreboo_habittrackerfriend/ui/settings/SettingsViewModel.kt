@@ -18,7 +18,6 @@ import com.example.choreboo_habittrackerfriend.data.repository.ResetResult
 import com.example.choreboo_habittrackerfriend.data.repository.UserRepository
 import com.example.choreboo_habittrackerfriend.domain.model.Household
 import com.example.choreboo_habittrackerfriend.domain.model.HouseholdMember
-import com.google.android.gms.auth.api.signin.GoogleSignInAccount
 import com.google.firebase.auth.EmailAuthProvider
 import com.google.firebase.auth.GoogleAuthProvider
 import dagger.hilt.android.lifecycle.HiltViewModel
@@ -32,6 +31,7 @@ import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.launch
+import timber.log.Timber
 import javax.inject.Inject
 import java.io.File
 @HiltViewModel
@@ -209,7 +209,7 @@ class SettingsViewModel @Inject constructor(
             try {
                 habitRepository.cancelAllReminders()
             } catch (e: Exception) {
-                android.util.Log.w("SettingsViewModel", "Error cancelling reminders on sign-out", e)
+                Timber.w(e, "Error cancelling reminders on sign-out")
             }
 
             // Cancel in-flight write-through coroutines to prevent stale cloud writes after sign-out
@@ -224,7 +224,7 @@ class SettingsViewModel @Inject constructor(
                 userPreferences.clearAllData()
             } catch (e: Exception) {
                 // Best-effort cleanup — proceed with sign-out even if cleanup fails
-                android.util.Log.e("SettingsViewModel", "Error during sign-out cleanup", e)
+                Timber.e(e, "Error during sign-out cleanup")
             }
             authRepository.signOut()
             _events.emit(SettingsEvent.SignedOut)
@@ -237,13 +237,13 @@ class SettingsViewModel @Inject constructor(
      * so the user can re-register from a blank slate.
      *
      * Firebase requires recent authentication for account deletion. The caller must supply
-     * either [password] (email/password accounts) or [googleAccount] (Google accounts) so
+     * either [password] (email/password accounts) or [googleIdToken] (Google accounts) so
      * this method can build the correct [com.google.firebase.auth.AuthCredential] and
      * re-authenticate before deleting.
      *
      * Intended for development/testing only.
      */
-    fun resetAccount(password: String? = null, googleAccount: GoogleSignInAccount? = null) {
+    fun resetAccount(password: String? = null, googleIdToken: String? = null) {
         viewModelScope.launch {
             val currentUser = authRepository.currentFirebaseUser
             if (currentUser == null) {
@@ -252,8 +252,8 @@ class SettingsViewModel @Inject constructor(
             }
 
             val credential = when {
-                googleAccount != null ->
-                    GoogleAuthProvider.getCredential(googleAccount.idToken, null)
+                googleIdToken != null ->
+                    GoogleAuthProvider.getCredential(googleIdToken, null)
                 password != null -> {
                     val email = currentUser.email
                     if (email == null) {
@@ -269,15 +269,13 @@ class SettingsViewModel @Inject constructor(
             }
 
             _isResetting.value = true
-            when (val result = resetRepository.resetAll(credential)) {
-                is ResetResult.Success -> {
-                    _isResetting.value = false
-                    _events.emit(SettingsEvent.AccountReset)
+            try {
+                when (val result = resetRepository.resetAll(credential)) {
+                    is ResetResult.Success -> _events.emit(SettingsEvent.AccountReset)
+                    is ResetResult.Error -> _events.emit(SettingsEvent.ShowRawError(result.message))
                 }
-                is ResetResult.Error -> {
-                    _isResetting.value = false
-                    _events.emit(SettingsEvent.ShowRawError(result.message))
-                }
+            } finally {
+                _isResetting.value = false
             }
         }
     }

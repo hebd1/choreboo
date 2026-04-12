@@ -3,6 +3,7 @@ package com.example.choreboo_habittrackerfriend.ui.components
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.material3.MaterialTheme
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
@@ -18,10 +19,17 @@ import com.example.choreboo_habittrackerfriend.domain.model.BACKGROUND_DEFAULT_I
 import com.example.choreboo_habittrackerfriend.domain.model.ChorebooMood
 import com.example.choreboo_habittrackerfriend.domain.model.backgroundById
 import com.example.choreboo_habittrackerfriend.ui.theme.PetMoodContentStart
+import com.example.choreboo_habittrackerfriend.ui.theme.PetMoodDarkContentStart
+import com.example.choreboo_habittrackerfriend.ui.theme.PetMoodDarkHappyStart
+import com.example.choreboo_habittrackerfriend.ui.theme.PetMoodDarkHungryStart
+import com.example.choreboo_habittrackerfriend.ui.theme.PetMoodDarkIdleStart
+import com.example.choreboo_habittrackerfriend.ui.theme.PetMoodDarkSadStart
+import com.example.choreboo_habittrackerfriend.ui.theme.PetMoodDarkTiredStart
 import com.example.choreboo_habittrackerfriend.ui.theme.PetMoodHappyStart
 import com.example.choreboo_habittrackerfriend.ui.theme.PetMoodHungryStart
 import com.example.choreboo_habittrackerfriend.ui.theme.PetMoodSadStart
 import com.example.choreboo_habittrackerfriend.ui.theme.PetMoodTiredStart
+import androidx.compose.foundation.isSystemInDarkTheme
 
 /**
  * Fills its parent with either:
@@ -67,12 +75,31 @@ fun PetBackgroundImage(
     }
 }
 
-/** Convenience helper — resolves the animated mood color to a [Color]. */
-fun moodColor(mood: ChorebooMood): Color = when (mood) {
-    ChorebooMood.HAPPY -> PetMoodHappyStart
-    ChorebooMood.CONTENT -> PetMoodContentStart
-    ChorebooMood.HUNGRY -> PetMoodHungryStart
-    ChorebooMood.TIRED -> PetMoodTiredStart
-    ChorebooMood.SAD -> PetMoodSadStart
-    ChorebooMood.IDLE -> Color(0xFFF0F4F8) // StitchSurfaceContainerLow equivalent
+/**
+ * Theme-aware helper — resolves the mood background color respecting light/dark theme.
+ * Must be called from a composable context.
+ */
+@Composable
+fun moodColor(mood: ChorebooMood): Color {
+    val isDark = isSystemInDarkTheme()
+    val idle = MaterialTheme.colorScheme.surfaceContainerLow
+    return if (isDark) {
+        when (mood) {
+            ChorebooMood.HAPPY -> PetMoodDarkHappyStart
+            ChorebooMood.CONTENT -> PetMoodDarkContentStart
+            ChorebooMood.HUNGRY -> PetMoodDarkHungryStart
+            ChorebooMood.TIRED -> PetMoodDarkTiredStart
+            ChorebooMood.SAD -> PetMoodDarkSadStart
+            ChorebooMood.IDLE -> PetMoodDarkIdleStart
+        }
+    } else {
+        when (mood) {
+            ChorebooMood.HAPPY -> PetMoodHappyStart
+            ChorebooMood.CONTENT -> PetMoodContentStart
+            ChorebooMood.HUNGRY -> PetMoodHungryStart
+            ChorebooMood.TIRED -> PetMoodTiredStart
+            ChorebooMood.SAD -> PetMoodSadStart
+            ChorebooMood.IDLE -> idle
+        }
+    }
 }

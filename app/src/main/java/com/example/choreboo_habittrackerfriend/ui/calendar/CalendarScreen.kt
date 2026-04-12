@@ -25,6 +25,7 @@ import androidx.compose.material.icons.automirrored.filled.KeyboardArrowRight
 import androidx.compose.material.icons.filled.Stars
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
+import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
@@ -38,6 +39,8 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.saveable.rememberSaveable
+import androidx.compose.runtime.saveable.Saver
 import androidx.compose.runtime.setValue
 import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.compose.LifecycleEventEffect
@@ -74,11 +77,17 @@ fun CalendarScreen(
     val selectedDateLogs by viewModel.selectedDateLogs.collectAsStateWithLifecycle()
     val totalPoints by viewModel.totalPoints.collectAsStateWithLifecycle()
     val isRefreshing by viewModel.isRefreshing.collectAsStateWithLifecycle()
+    val isLoading by viewModel.isLoading.collectAsStateWithLifecycle()
     val profilePhotoUri by viewModel.profilePhotoUri.collectAsStateWithLifecycle()
     val googlePhotoUrl by viewModel.googlePhotoUrl.collectAsStateWithLifecycle()
 
     val today = remember { LocalDate.now() }
-    var todayDate by remember { mutableStateOf(today) }
+    var todayDate by rememberSaveable(
+        stateSaver = Saver<LocalDate, Long>(
+            save = { date -> date.toEpochDay() },
+            restore = { epoch -> LocalDate.ofEpochDay(epoch) },
+        ),
+    ) { mutableStateOf(today) }
 
     // Refresh today's date and ViewModel date state on every screen resume
     // so that the "today" highlight is correct after midnight crossings.
@@ -145,6 +154,16 @@ fun CalendarScreen(
             onRefresh = { viewModel.refreshData() },
             modifier = Modifier.fillMaxSize(),
         ) {
+            if (isLoading) {
+                Box(
+                    modifier = Modifier
+                        .fillMaxSize()
+                        .padding(padding),
+                    contentAlignment = Alignment.Center,
+                ) {
+                    CircularProgressIndicator()
+                }
+            } else {
             LazyColumn(
                 modifier = Modifier
                     .fillMaxSize()
@@ -429,8 +448,8 @@ fun CalendarScreen(
                 }
             }
 
-            item { Spacer(modifier = Modifier.height(80.dp)) }
             } // end LazyColumn
+            } // end else (isLoading)
         } // end PullToRefreshBox
     }
 }

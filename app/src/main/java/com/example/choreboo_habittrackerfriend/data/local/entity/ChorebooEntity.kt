@@ -23,4 +23,10 @@ data class ChorebooEntity(
     val remoteId: String? = null,
     /** Selected background id (matches BackgroundItem.id). Null = Default mood gradient. */
     val backgroundId: String? = null,
+    /**
+     * D2: True while a write-through is pending (in-flight or awaiting retry).
+     * Cloud-to-local sync skips overwriting this row while pendingSync=true.
+     * Cleared to false once the write-through succeeds or exhausts retries.
+     */
+    val pendingSync: Boolean = false,
 )

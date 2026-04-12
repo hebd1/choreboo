@@ -5,7 +5,6 @@ import android.graphics.drawable.AnimatedImageDrawable
 import android.graphics.drawable.Animatable2
 import android.graphics.drawable.Drawable
 import android.os.Build
-import android.util.Log
 import android.widget.ImageView
 import androidx.annotation.RequiresApi
 import androidx.compose.foundation.background
@@ -23,8 +22,7 @@ import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.compose.LifecycleEventEffect
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
-
-private const val TAG = "WebmAnimationView"
+import timber.log.Timber
 
 /**
  * Composable for playing animated WebP files (VP8+alpha converted via libvpx).
@@ -72,7 +70,8 @@ private fun AnimatedWebpViewImpl(
     modifier: Modifier,
 ) {
     val context = LocalContext.current
-    val imageView = remember { ImageView(context) }
+    // Use applicationContext so the ImageView does not hold a reference to the Activity.
+    val imageView = remember { ImageView(context.applicationContext) }
 
     LaunchedEffect(assetPath) {
         try {
@@ -80,14 +79,14 @@ private fun AnimatedWebpViewImpl(
             (imageView.drawable as? AnimatedImageDrawable)?.stop()
             imageView.setImageDrawable(null)
 
-            Log.d(TAG, "Loading animated WebP: $assetPath")
+            Timber.d("Loading animated WebP: $assetPath")
             val drawable = withContext(Dispatchers.IO) {
                 val source = ImageDecoder.createSource(context.assets, assetPath)
                 ImageDecoder.decodeDrawable(source)
             } as? AnimatedImageDrawable
 
             if (drawable == null) {
-                Log.e(TAG, "Decoded drawable is not AnimatedImageDrawable: $assetPath")
+                Timber.e("Decoded drawable is not AnimatedImageDrawable: $assetPath")
                 return@LaunchedEffect
             }
 
@@ -99,16 +98,16 @@ private fun AnimatedWebpViewImpl(
 
             drawable.registerAnimationCallback(object : Animatable2.AnimationCallback() {
                 override fun onAnimationEnd(d: Drawable?) {
-                    Log.d(TAG, "Animation complete: $assetPath")
+                    Timber.d("Animation complete: $assetPath")
                     onComplete()
                 }
             })
 
             imageView.setImageDrawable(drawable)
             drawable.start()
-            Log.d(TAG, "Animation started: $assetPath")
+            Timber.d("Animation started: $assetPath")
         } catch (e: Exception) {
-            Log.e(TAG, "Failed to load animated WebP: $assetPath", e)
+            Timber.e(e, "Failed to load animated WebP: $assetPath")
         }
     }
 
@@ -130,7 +129,7 @@ private fun AnimatedWebpViewImpl(
         onDispose {
             (imageView.drawable as? AnimatedImageDrawable)?.stop()
             imageView.setImageDrawable(null)
-            Log.d(TAG, "ImageView cleaned up")
+            Timber.d("ImageView cleaned up")
         }
     }
 

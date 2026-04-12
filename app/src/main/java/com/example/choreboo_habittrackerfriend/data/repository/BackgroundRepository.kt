@@ -21,9 +21,13 @@ class BackgroundRepository @Inject constructor(
 ) {
     private val connector by lazy { ChorebooConnector.instance }
 
-    /** Observe all purchased backgrounds for the current user. */
-    fun getPurchasedBackgrounds(): Flow<List<PurchasedBackgroundEntity>> {
-        val uid = firebaseAuth.currentUser?.uid ?: return kotlinx.coroutines.flow.flowOf(emptyList())
+    /**
+     * Observe all purchased backgrounds for the given [uid].
+     * Callers should pass the authenticated UID explicitly so this flow is not
+     * coupled to [FirebaseAuth.currentUser] at collection time (which may be stale
+     * if auth state changes while the flow is active).
+     */
+    fun getPurchasedBackgrounds(uid: String): Flow<List<PurchasedBackgroundEntity>> {
         return purchasedBackgroundDao.getPurchasedBackgrounds(uid)
     }
 

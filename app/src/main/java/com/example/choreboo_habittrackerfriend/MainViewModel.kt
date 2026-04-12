@@ -1,14 +1,18 @@
 package com.example.choreboo_habittrackerfriend
 
-import android.util.Log
+import android.content.Context
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
+import androidx.work.PeriodicWorkRequestBuilder
+import androidx.work.WorkManager
 import com.example.choreboo_habittrackerfriend.data.datastore.UserPreferences
 import com.example.choreboo_habittrackerfriend.data.repository.AuthRepository
 import com.example.choreboo_habittrackerfriend.data.repository.ChorebooRepository
 import com.example.choreboo_habittrackerfriend.data.repository.SyncManager
 import com.example.choreboo_habittrackerfriend.domain.model.ChorebooMood
+import com.example.choreboo_habittrackerfriend.worker.PetMoodCheckWorker
 import dagger.hilt.android.lifecycle.HiltViewModel
+import dagger.hilt.android.qualifiers.ApplicationContext
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
@@ -17,12 +21,13 @@ import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.launch
+import timber.log.Timber
+import java.util.concurrent.TimeUnit
 import javax.inject.Inject
-
-private const val TAG = "MainViewModel"
 
 @HiltViewModel
 class MainViewModel @Inject constructor(
+    @ApplicationContext private val context: Context,
     val userPreferences: UserPreferences,
     private val chorebooRepository: ChorebooRepository,
     val authRepository: AuthRepository,
@@ -72,6 +77,7 @@ class MainViewModel @Inject constructor(
      *    Cloud sync and WebM animation loading both run in the background and
      *    do NOT block the splash screen. PetScreen shows an emoji placeholder
      *    while WebM videos load.
+     * 4. Enqueue the periodic pet mood check worker (6-hour interval).
      */
     private suspend fun runStartupSequence() {
         // 1. Wait for DataStore to emit the first real value
@@ -79,7 +85,7 @@ class MainViewModel @Inject constructor(
 
         // 2. Fast path for users who need auth or onboarding — no data to wait for
         if (!authRepository.isAuthenticated || isOnboarded != true) {
-            Log.d(TAG, "Startup fast-path (unauth or not onboarded)")
+            Timber.d("Startup fast-path (unauth or not onboarded)")
             _startupComplete.value = true
             return
         }
@@ -88,14 +94,14 @@ class MainViewModel @Inject constructor(
         //    Cloud sync is fire-and-forget — does NOT block the splash screen.
         //    WebM animations are also NOT awaited — PetScreen has an emoji
         //    fallback and will show the video once it's ready.
-        Log.d(TAG, "Running full startup sequence")
+        Timber.d("Running full startup sequence")
 
         viewModelScope.launch {
             try {
                 val ok = syncManager.syncAll(force = false)
-                Log.d(TAG, "Background cloud sync complete (success=$ok)")
+                Timber.d("Background cloud sync complete (success=$ok)")
             } catch (e: Exception) {
-                Log.e(TAG, "Background cloud sync failed", e)
+                Timber.e(e, "Background cloud sync failed")
             }
         }
 
@@ -104,12 +110,34 @@ class MainViewModel @Inject constructor(
         try {
             chorebooRepository.getOrCreateChoreboo()
             chorebooRepository.applyStatDecay()
-            Log.d(TAG, "Room warmup complete")
+            Timber.d("Room warmup complete")
         } catch (e: Exception) {
-            Log.e(TAG, "Room warmup failed", e)
+            Timber.e(e, "Room warmup failed")
         }
 
+        // Enqueue the periodic pet mood check worker (6-hour interval, won't duplicate if already enqueued).
+        enqueuePetMoodCheckWorker()
+
         _startupComplete.value = true
-        Log.d(TAG, "Startup sequence finished — app ready")
+        Timber.d("Startup sequence finished — app ready")
+    }
+
+    private fun enqueuePetMoodCheckWorker() {
+        try {
+            val petMoodCheckWork = PeriodicWorkRequestBuilder<PetMoodCheckWorker>(
+                6,
+                TimeUnit.HOURS,
+            ).build()
+
+            // Enqueue with KEEP policy so it won't duplicate if already enqueued
+            WorkManager.getInstance(context).enqueueUniquePeriodicWork(
+                "pet_mood_check",
+                androidx.work.ExistingPeriodicWorkPolicy.KEEP,
+                petMoodCheckWork,
+            )
+            Timber.d("Enqueued periodic pet mood check worker (6-hour interval)")
+        } catch (e: Exception) {
+            Timber.e(e, "Failed to enqueue pet mood check worker")
+        }
     }
 }

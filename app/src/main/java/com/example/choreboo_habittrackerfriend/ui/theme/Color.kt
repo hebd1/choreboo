@@ -102,7 +102,7 @@ val StitchDarkOnError          = Color(0xFF690005)
 val StitchDarkErrorContainer   = Color(0xFF93000A)
 val StitchDarkOnErrorContainer = Color(0xFFFFDAD6)
 
-// ── Pet mood gradient colors ──────────────────────────────────────────────────
+// ── Pet mood gradient colors — Light ─────────────────────────────────────────
 val PetMoodHappyStart   = Color(0xFFFFF9C4)  // yellow radial center
 val PetMoodHappyEnd     = Color(0xFF4CAF50)  // primaryContainer green edge
 val PetMoodHungryStart  = Color(0xFFFFF3E0)
@@ -113,6 +113,20 @@ val PetMoodSadStart     = Color(0xFFECEFF1)
 val PetMoodSadEnd       = Color(0xFFB0BEC5)
 val PetMoodContentStart = Color(0xFFE8F5E9)
 val PetMoodContentEnd   = Color(0xFF66BB6A)
+val PetMoodIdleStart    = StitchSurfaceContainerLow  // neutral fallback (= 0xFFF0F4F8 light)
+
+// ── Pet mood gradient colors — Dark ──────────────────────────────────────────
+val PetMoodDarkHappyStart   = Color(0xFF3A3A00)  // muted yellow-olive
+val PetMoodDarkHappyEnd     = Color(0xFF1B5E20)  // dark green
+val PetMoodDarkHungryStart  = Color(0xFF3E2800)
+val PetMoodDarkHungryEnd    = Color(0xFFE65100)
+val PetMoodDarkTiredStart   = Color(0xFF0D253A)
+val PetMoodDarkTiredEnd     = Color(0xFF1565C0)
+val PetMoodDarkSadStart     = Color(0xFF1C2126)
+val PetMoodDarkSadEnd       = Color(0xFF455A64)
+val PetMoodDarkContentStart = Color(0xFF1B2E1C)
+val PetMoodDarkContentEnd   = Color(0xFF2E7D32)
+val PetMoodDarkIdleStart    = StitchDarkSurfaceContainerLow  // = 0xFF171C1F dark
 
 // ── Semantic accent colors ────────────────────────────────────────────────────
 val StreakFlame = Color(0xFFFF6D00)  // streak fire icon / text

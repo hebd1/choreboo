@@ -1,6 +1,5 @@
 package com.example.choreboo_habittrackerfriend.ui.onboarding
 
-import android.app.Activity
 import androidx.compose.animation.AnimatedContent
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.fadeIn
@@ -46,27 +45,33 @@ import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
-import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
+import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
+import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.platform.LocalFocusManager
 import androidx.compose.ui.platform.LocalUriHandler
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import androidx.compose.foundation.text.KeyboardActions
+import androidx.compose.foundation.text.KeyboardOptions
+import androidx.compose.ui.text.input.ImeAction
 import androidx.hilt.navigation.compose.hiltViewModel
 import com.example.choreboo_habittrackerfriend.R
 import com.example.choreboo_habittrackerfriend.domain.model.PetType
 import com.example.choreboo_habittrackerfriend.ui.util.displayName
+import com.example.choreboo_habittrackerfriend.ui.util.findActivity
 import com.example.choreboo_habittrackerfriend.ui.util.localizedLabel
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
@@ -98,16 +103,16 @@ fun OnboardingScreen(
     onComplete: () -> Unit,
     viewModel: OnboardingViewModel = hiltViewModel(),
 ) {
-    val currentStep by viewModel.currentStep.collectAsState()
-    val selectedPetType by viewModel.selectedPetType.collectAsState()
-    val usageIntent by viewModel.usageIntent.collectAsState()
-    val biggestStruggle by viewModel.biggestStruggle.collectAsState()
-    val isHatching by viewModel.isHatching.collectAsState()
-    val isPurchasing by viewModel.isPurchasing.collectAsState()
-    val productDetails by viewModel.productDetails.collectAsState()
+    val currentStep by viewModel.currentStep.collectAsStateWithLifecycle()
+    val selectedPetType by viewModel.selectedPetType.collectAsStateWithLifecycle()
+    val usageIntent by viewModel.usageIntent.collectAsStateWithLifecycle()
+    val biggestStruggle by viewModel.biggestStruggle.collectAsStateWithLifecycle()
+    val isHatching by viewModel.isHatching.collectAsStateWithLifecycle()
+    val isPurchasing by viewModel.isPurchasing.collectAsStateWithLifecycle()
+    val productDetails by viewModel.productDetails.collectAsStateWithLifecycle()
 
-    var chorebooName by remember { mutableStateOf("") }
-    var showContent by remember { mutableStateOf(false) }
+    var chorebooName by rememberSaveable { mutableStateOf("") }
+    var showContent by rememberSaveable { mutableStateOf(false) }
     val snackbarHostState = remember { SnackbarHostState() }
     val scope = rememberCoroutineScope()
     val context = LocalContext.current
@@ -118,7 +123,7 @@ fun OnboardingScreen(
     }
 
     // When the billing library confirms a premium purchase, complete onboarding.
-    val isPremium by viewModel.isPremium.collectAsState()
+    val isPremium by viewModel.isPremium.collectAsStateWithLifecycle()
     LaunchedEffect(isPremium, currentStep) {
         if (isPremium && currentStep == STEP_PAYWALL) {
             viewModel.completePremiumOnboarding()
@@ -226,7 +231,7 @@ fun OnboardingScreen(
                             productDetails = productDetails,
                             isPurchasing = isPurchasing,
                             onSubscribe = {
-                                val activity = context as? Activity ?: return@PaywallStep
+                                val activity = context.findActivity() ?: return@PaywallStep
                                 viewModel.startPurchase(activity)
                             },
                             onSkip = { viewModel.skipPremium() },
@@ -609,6 +614,7 @@ private fun NameStep(
     onHatch: () -> Unit,
 ) {
     val uriHandler = LocalUriHandler.current
+    val focusManager = LocalFocusManager.current
 
     Column(
         modifier = Modifier.fillMaxWidth(),
@@ -672,6 +678,10 @@ private fun NameStep(
                         focusedContainerColor = MaterialTheme.colorScheme.surfaceContainerHighest,
                         unfocusedBorderColor = Color.Transparent,
                         focusedBorderColor = MaterialTheme.colorScheme.primary.copy(alpha = 0.4f),
+                    ),
+                    keyboardOptions = KeyboardOptions(imeAction = ImeAction.Done),
+                    keyboardActions = KeyboardActions(
+                        onDone = { focusManager.clearFocus() },
                     ),
                 )
                 Spacer(modifier = Modifier.height(20.dp))

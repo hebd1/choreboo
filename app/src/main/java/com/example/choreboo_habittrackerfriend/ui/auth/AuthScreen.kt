@@ -1,8 +1,5 @@
 package com.example.choreboo_habittrackerfriend.ui.auth
 
-import android.app.Activity
-import androidx.activity.compose.rememberLauncherForActivityResult
-import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.animation.AnimatedContent
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.fadeIn
@@ -44,19 +41,22 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Scaffold
-import androidx.compose.material3.SnackbarDuration
 import androidx.compose.material3.SnackbarHost
 import androidx.compose.material3.SnackbarHostState
+import com.example.choreboo_habittrackerfriend.ui.components.SnackbarType
 import com.example.choreboo_habittrackerfriend.ui.components.StitchSnackbar
+import com.example.choreboo_habittrackerfriend.ui.components.showStitchSnackbar
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
-import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
+import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
+import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -74,33 +74,49 @@ import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.hilt.navigation.compose.hiltViewModel
+import androidx.credentials.CredentialManager
+import androidx.credentials.GetCredentialRequest
+import androidx.credentials.exceptions.GetCredentialException
 import com.example.choreboo_habittrackerfriend.R
-import com.google.android.gms.auth.api.signin.GoogleSignIn
-import com.google.android.gms.auth.api.signin.GoogleSignInOptions
-import com.google.android.gms.common.api.ApiException
+import com.google.android.libraries.identity.googleid.GetGoogleIdOption
+import com.google.android.libraries.identity.googleid.GoogleIdTokenCredential
+import kotlinx.coroutines.launch
 
 @Composable
 fun AuthScreen(
     onAuthSuccess: (onboardingComplete: Boolean) -> Unit,
     viewModel: AuthViewModel = hiltViewModel(),
 ) {
-    val formState by viewModel.formState.collectAsState()
+    val formState by viewModel.formState.collectAsStateWithLifecycle()
     val snackbarHostState = remember { SnackbarHostState() }
     val context = LocalContext.current
     val focusManager = LocalFocusManager.current
+    val scope = rememberCoroutineScope()
 
-    // Google Sign-In launcher
-    val googleSignInLauncher = rememberLauncherForActivityResult(
-        contract = ActivityResultContracts.StartActivityForResult(),
-    ) { result ->
-        if (result.resultCode == Activity.RESULT_OK) {
+    // Credential Manager — replaces legacy Google Sign-In launcher
+    val credentialManager = remember { CredentialManager.create(context) }
+    val webClientId = stringResource(R.string.default_web_client_id)
+
+    fun launchGoogleSignIn() {
+        scope.launch {
             try {
-                val account = GoogleSignIn.getSignedInAccountFromIntent(result.data)
-                    .getResult(ApiException::class.java)
-                viewModel.signInWithGoogle(account)
-            } catch (e: ApiException) {
-                // Will surface via AuthEvent.ShowError if the VM catches it,
-                // but ApiException here means the launcher itself failed
+                val googleIdOption = GetGoogleIdOption.Builder()
+                    .setFilterByAuthorizedAccounts(false)
+                    .setServerClientId(webClientId)
+                    .build()
+                val request = GetCredentialRequest.Builder()
+                    .addCredentialOption(googleIdOption)
+                    .build()
+                val result = credentialManager.getCredential(context, request)
+                val googleIdTokenCredential = GoogleIdTokenCredential.createFrom(result.credential.data)
+                val idToken = googleIdTokenCredential.idToken
+                val photoUrl = googleIdTokenCredential.profilePictureUri?.toString()
+                viewModel.signInWithGoogle(idToken, photoUrl)
+            } catch (e: GetCredentialException) {
+                snackbarHostState.showStitchSnackbar(
+                    message = context.getString(R.string.auth_error_google_failed),
+                    type = SnackbarType.Error,
+                )
             }
         }
     }
@@ -109,11 +125,11 @@ fun AuthScreen(
         viewModel.events.collect { event ->
             when (event) {
                 is AuthEvent.AuthSuccess -> onAuthSuccess(event.onboardingComplete)
-                is AuthEvent.ShowError -> snackbarHostState.showSnackbar(message = context.getString(event.messageRes), actionLabel = "error", duration = SnackbarDuration.Short)
+                is AuthEvent.ShowError -> snackbarHostState.showStitchSnackbar(message = context.getString(event.messageRes), type = SnackbarType.Error)
                 is AuthEvent.ShowMessage -> {
                     val msg = if (event.formatArg != null) context.getString(event.messageRes, event.formatArg)
                               else context.getString(event.messageRes)
-                    snackbarHostState.showSnackbar(message = msg, actionLabel = "info", duration = SnackbarDuration.Short)
+                    snackbarHostState.showStitchSnackbar(message = msg, type = SnackbarType.Info)
                 }
             }
         }
@@ -238,7 +254,7 @@ fun AuthScreen(
                         Spacer(modifier = Modifier.height(12.dp))
 
                         // Password field
-                        var passwordVisible by remember { mutableStateOf(false) }
+                        var passwordVisible by rememberSaveable { mutableStateOf(false) }
                         OutlinedTextField(
                             value = formState.password,
                             onValueChange = viewModel::onPasswordChange,
@@ -343,17 +359,7 @@ fun AuthScreen(
 
                 // Google Sign-In button
                 OutlinedButton(
-                    onClick = {
-                        val gso = GoogleSignInOptions.Builder(GoogleSignInOptions.DEFAULT_SIGN_IN)
-                            .requestIdToken(context.getString(
-                                com.example.choreboo_habittrackerfriend.R.string.default_web_client_id
-                            ))
-                            .requestEmail()
-                            .requestProfile()
-                            .build()
-                        val client = GoogleSignIn.getClient(context, gso)
-                        googleSignInLauncher.launch(client.signInIntent)
-                    },
+                    onClick = { launchGoogleSignIn() },
                     enabled = !formState.isLoading,
                     modifier = Modifier
                         .fillMaxWidth()

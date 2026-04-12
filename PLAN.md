@@ -234,125 +234,27 @@ Server-side validation gaps and schema improvements.
 
 ---
 
-## Phase 6: Medium-Priority Reliability & UX
+## Phase 6: Medium-Priority Reliability & UX ✅
 
 Bugs, degraded UX, and reliability improvements.
 
-### P6-01 — `SettingsViewModel.resetAccount()` missing try/finally for `_isResetting` (MEDIUM)
-- **File:** `ui/settings/SettingsViewModel.kt:271-282`
-- **Problem:** If `resetAccount()` throws, `_isResetting` is never reset to `false`.
-  The UI stays in a permanent loading state.
-- **Fix:** Wrap in `try/finally { _isResetting.value = false }`.
-
-### P6-02 — `OnboardingScreen` uses `remember` instead of `rememberSaveable` (MEDIUM)
-- **File:** `ui/onboarding/OnboardingScreen.kt:115`
-- **Problem:** `showContent` state uses `remember` — lost on configuration change.
-  User rotates device during onboarding and the animation state resets.
-- **Fix:** Change to `rememberSaveable`.
-
-### P6-03 — Onboarding Hatch button no double-tap debounce (MEDIUM)
-- **File:** `ui/onboarding/OnboardingScreen.kt:699`
-- **Problem:** Rapid taps on the Hatch button can trigger multiple coroutine launches,
-  potentially creating duplicate Choreboos.
-- **Fix:** Disable the button while `isHatching` is true (may already be partially done —
-  verify and ensure the guard is complete).
-
-### P6-04 — `SettingsScreen` CredentialManager created with Activity context in `remember` (MEDIUM)
-- **File:** `ui/settings/SettingsScreen.kt:138`
-- **Problem:** `CredentialManager.create(context)` inside `remember {}` captures the
-  Activity context. On config change, the composable recomposes but `remember` retains
-  the stale Activity reference.
-- **Fix:** Use `LocalContext.current` outside `remember` and pass `applicationContext`,
-  or recreate on each use.
-
-### P6-05 — `BannerAdView` holds Activity context, no cleanup (MEDIUM)
-- **Files:** `ui/components/BannerAdView.kt:32-37`
-- **Problem:** `AdView` is created in `remember {}` holding the Activity context. No
-  `DisposableEffect` calls `adView.destroy()` when the composable leaves composition.
-  This leaks the Activity.
-- **Fix:** Wrap `AdView` lifecycle in `DisposableEffect { onDispose { adView.destroy() } }`.
-
-### P6-06 — `WebmAnimationView` ImageView holds Activity context (MEDIUM)
-- **File:** `ui/components/WebmAnimationView.kt:73`
-- **Problem:** `ImageView(context)` inside `remember {}` captures Activity context.
-- **Fix:** Use `context.applicationContext` for ImageView creation.
-
-### P6-07 — `CalendarViewModel.isLoading` cleared prematurely (MEDIUM)
-- **File:** `ui/calendar/CalendarViewModel.kt:94-97`
-- **Problem:** `isLoading` starts `true` and is cleared after the first `stateIn` emission.
-  With `UnconfinedTestDispatcher` or fast emission, this can clear before the UI renders
-  the loading state. In production with `WhileSubscribed`, the `stateIn` might emit the
-  default immediately.
-- **Fix:** Clear `isLoading` only after the first *non-default* data emission.
-
-### P6-08 — `applyStatDecay()` integer division (sub-hour decay always 0) (MEDIUM)
-- **File:** `data/repository/ChorebooRepository.kt:165`
-- **Problem:** Stat decay calculation uses integer division. If less than 1 hour has elapsed,
-  decay computes to 0. Stats never decrease for users who open the app frequently.
-- **Fix:** Use floating-point division or accumulate fractional decay.
-
-### P6-09 — `refreshHouseholdHabits()` uses `LocalDate.now()` not reactive date (MEDIUM)
-- **File:** `data/repository/HouseholdRepository.kt:347`
-- **Problem:** Uses `LocalDate.now()` directly instead of the reactive `_todayDate`. If the
-  date rolls over while the app is open, stale data persists until next sync.
-- **Fix:** Accept the date as a parameter or use the reactive `_todayDate` flow.
-
-### P6-10 — `SettingsScreen` snackbar host passed as empty lambda (MEDIUM)
-- **File:** `ui/settings/SettingsScreen.kt:807`
-- **Problem:** Scaffold's `snackbarHost` is `{}` — snackbars have nowhere to display.
-  SettingsViewModel emits snackbar events that are silently lost.
-- **Fix:** Provide a proper `SnackbarHost(snackbarHostState)`.
-
-### P6-11 — Fragile Activity casts for Google sign-in (MEDIUM)
-- **Files:**
-  - `ui/settings/SettingsScreen.kt:955` — `context as? Activity`
-  - `ui/onboarding/OnboardingScreen.kt:234` — `context as? Activity`
-  - `ui/settings/SettingsScreen.kt:151` — direct Activity context for re-auth
-- **Problem:** `context as? Activity` fails silently if the context is wrapped (e.g.,
-  `ContextThemeWrapper`). The null branch is often unhandled.
-- **Fix:** Use `context.findActivity()` extension that walks the context chain.
-
-### P6-12 — `AppLifecycleObserver` uses unscoped CoroutineScope (MEDIUM)
-- **File:** `di/AppLifecycleObserver.kt:43`
-- **Problem:** `CoroutineScope(SupervisorJob() + Dispatchers.Main)` is never cancelled.
-  Since this is a `@Singleton`, it lives for the process lifetime, which is acceptable but
-  should be documented. However, if the scope launches failing coroutines, errors are
-  silently swallowed.
-- **Fix:** Add a `CoroutineExceptionHandler` to log uncaught exceptions via Timber.
-
-### P6-13 — `BackgroundRepository` not reactive to auth state changes (MEDIUM)
-- **File:** `data/repository/BackgroundRepository.kt:26`
-- **Problem:** Uses `firebaseAuth.currentUser?.uid` at call time. If auth state changes
-  (sign-out/sign-in), the repository may use a stale or null UID.
-- **Fix:** Accept UID as a parameter from the calling ViewModel, or observe auth state.
-
-### P6-14 — `BillingRepository` unbounded retry on connection failure (MEDIUM)
-- **File:** `data/repository/BillingRepository.kt:90-95`
-- **Problem:** Connection retry loop has no backoff and no maximum retry count. Can spin
-  indefinitely consuming CPU and battery.
-- **Fix:** Add exponential backoff and a max retry count (e.g., 3 attempts).
-
-### P6-15 — `writeScope` in repositories never properly cancelled (MEDIUM)
-- **Files:**
-  - `data/repository/HabitRepository.kt`
-  - `data/repository/ChorebooRepository.kt`
-- **Problem:** `writeScope` is a `CoroutineScope` used for fire-and-forget cloud writes.
-  `cancelPendingWrites()` exists but creates a new scope — pending coroutines in the old
-  scope may still be running.
-- **Fix:** Ensure `cancelPendingWrites()` actually cancels the old scope's job before
-  creating a new one. Verify this with a test.
-
-### P6-16 — Standalone mood colors not theme-aware (MEDIUM)
-- **File:** `ui/theme/Color.kt:119-132`
-- **Problem:** `moodHappy`, `moodSad`, etc. are top-level `Color` vals. They don't adapt
-  to light/dark theme. Hard to read mood indicators in dark mode.
-- **Fix:** Move to `ColorScheme` extension properties or provide light/dark variants.
-
-### P6-17 — `StitchSnackbar` uses `actionLabel` as type discriminator (MEDIUM)
-- **File:** `ui/components/StitchSnackbar.kt:38-63`
-- **Problem:** The snackbar type (success/error/info) is encoded in `actionLabel` string
-  rather than a proper sealed class or enum. Fragile string matching.
-- **Fix:** Use `SnackbarVisuals` subclass with an explicit `type` field.
+### P6-01 ✅ — `SettingsViewModel.resetAccount()` missing try/finally for `_isResetting` (MEDIUM)
+### P6-02 ✅ — `OnboardingScreen` uses `remember` instead of `rememberSaveable` (MEDIUM)
+### P6-03 ✅ — Onboarding Hatch button no double-tap debounce (already guarded, no change needed) (MEDIUM)
+### P6-04 ✅ — `SettingsScreen` CredentialManager created with Activity context in `remember` (MEDIUM)
+### P6-05 ✅ — `BannerAdView` holds Activity context, no cleanup (MEDIUM)
+### P6-06 ✅ — `WebmAnimationView` ImageView holds Activity context (MEDIUM)
+### P6-07 ✅ — `CalendarViewModel.isLoading` cleared prematurely (MEDIUM)
+### P6-08 ✅ — `applyStatDecay()` integer division (sub-hour decay always 0) (MEDIUM)
+### P6-09 ✅ — `refreshHouseholdHabits()` uses `LocalDate.now()` not reactive date (MEDIUM)
+### P6-10 ✅ — `SettingsScreen` snackbar host passed as empty lambda (MEDIUM)
+### P6-11 ✅ — Fragile Activity casts for Google sign-in (MEDIUM)
+### P6-12 ✅ — `AppLifecycleObserver` uses unscoped CoroutineScope (MEDIUM)
+### P6-13 ✅ — `BackgroundRepository` not reactive to auth state changes (MEDIUM)
+### P6-14 ✅ — `BillingRepository` unbounded retry on connection failure (MEDIUM)
+### P6-15 ✅ — `writeScope` in repositories never properly cancelled (MEDIUM)
+### P6-16 ✅ — Standalone mood colors not theme-aware (MEDIUM)
+### P6-17 ✅ — `StitchSnackbar` uses `actionLabel` as type discriminator (MEDIUM)
 
 ---
 

@@ -14,18 +14,21 @@ import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.foundation.layout.consumeWindowInsets
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.navigationBars
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.statusBars
+import androidx.compose.foundation.layout.union
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
-import androidx.compose.runtime.collectAsState
+import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
@@ -48,10 +51,10 @@ class MainActivity : ComponentActivity() {
         enableEdgeToEdge()
 
         setContent {
-            val isAppReady by viewModel.isAppReady.collectAsState()
-            val onboardingComplete by viewModel.onboardingComplete.collectAsState()
-            val themeMode by viewModel.themeMode.collectAsState()
-            val petMood by viewModel.petMood.collectAsState()
+            val isAppReady by viewModel.isAppReady.collectAsStateWithLifecycle()
+            val onboardingComplete by viewModel.onboardingComplete.collectAsStateWithLifecycle()
+            val themeMode by viewModel.themeMode.collectAsStateWithLifecycle()
+            val petMood by viewModel.petMood.collectAsStateWithLifecycle()
 
             ChorebooHabitTrackerFriendTheme(
                 themeMode = themeMode,
@@ -99,7 +102,7 @@ private fun BrandedSplashScreen() {
             )
             Spacer(modifier = Modifier.height(16.dp))
             Text(
-                text = "Choreboo",
+                text = stringResource(R.string.splash_brand_name),
                 style = MaterialTheme.typography.headlineLarge,
                 fontWeight = FontWeight.Bold,
                 color = MaterialTheme.colorScheme.primary,
@@ -110,7 +113,7 @@ private fun BrandedSplashScreen() {
             )
             Spacer(modifier = Modifier.height(12.dp))
             Text(
-                text = "Loading...",
+                text = stringResource(R.string.splash_loading),
                 style = MaterialTheme.typography.bodyMedium,
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
             )
@@ -137,26 +140,24 @@ fun ChorebooApp(
     )
     val showBottomBar = currentRoute in bottomNavRoutes
 
-    Box(modifier = Modifier.fillMaxSize()) {
-        Scaffold(
-            modifier = Modifier.fillMaxSize(),
-            contentWindowInsets = WindowInsets.statusBars,
-        ) { innerPadding ->
-            ChorebooNavGraph(
-                navController = navController,
-                startDestination = startDestination,
-                modifier = Modifier
-                    .padding(innerPadding)
-                    .consumeWindowInsets(innerPadding),
-            )
-        }
-
-        if (showBottomBar) {
-            BottomNavBar(
-                navController = navController,
-                petMood = petMood,
-                modifier = Modifier.align(Alignment.BottomCenter),
-            )
-        }
+    Scaffold(
+        modifier = Modifier.fillMaxSize(),
+        contentWindowInsets = WindowInsets.statusBars.union(WindowInsets.navigationBars),
+        bottomBar = {
+            if (showBottomBar) {
+                BottomNavBar(
+                    navController = navController,
+                    petMood = petMood,
+                )
+            }
+        },
+    ) { innerPadding ->
+        ChorebooNavGraph(
+            navController = navController,
+            startDestination = startDestination,
+            modifier = Modifier
+                .padding(innerPadding)
+                .consumeWindowInsets(innerPadding),
+        )
     }
 }

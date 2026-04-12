@@ -1,6 +1,8 @@
 package com.example.choreboo_habittrackerfriend.di
 
+import android.content.Context
 import com.example.choreboo_habittrackerfriend.data.repository.BillingRepository
+import com.example.choreboo_habittrackerfriend.data.repository.ChorebooRepository
 import com.example.choreboo_habittrackerfriend.data.repository.SyncManager
 import io.mockk.coEvery
 import io.mockk.coVerify
@@ -19,16 +21,25 @@ import org.junit.Test
  */
 class AppLifecycleObserverTest {
 
+    private lateinit var context: Context
     private lateinit var syncManager: SyncManager
     private lateinit var billingRepository: BillingRepository
+    private lateinit var chorebooRepository: ChorebooRepository
     private lateinit var observer: AppLifecycleObserver
     private val owner = mockk<androidx.lifecycle.LifecycleOwner>(relaxed = true)
 
     @Before
     fun setUp() {
+        context = mockk(relaxed = true)
         syncManager = mockk(relaxed = true)
         billingRepository = mockk(relaxed = true)
-        observer = AppLifecycleObserver(syncManager, billingRepository)
+        chorebooRepository = mockk(relaxed = true)
+        observer = AppLifecycleObserver(
+            context = context,
+            syncManager = syncManager,
+            billingRepository = billingRepository,
+            chorebooRepository = chorebooRepository,
+        )
     }
 
     // ── Cold start ───────────────────────────────────────────────────────

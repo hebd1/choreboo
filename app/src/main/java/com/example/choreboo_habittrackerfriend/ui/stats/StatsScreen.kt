@@ -23,6 +23,7 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Check
 import androidx.compose.material.icons.filled.Lock
 import androidx.compose.material.icons.filled.Stars
+import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
@@ -31,15 +32,17 @@ import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
 import androidx.compose.material3.TopAppBar
 import androidx.compose.material3.TopAppBarDefaults
+import androidx.compose.material3.pulltorefresh.PullToRefreshBox
 import androidx.compose.material3.rememberModalBottomSheetState
 import androidx.compose.runtime.Composable
-import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.compose.LifecycleEventEffect
+import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.alpha
@@ -66,19 +69,21 @@ import java.time.DayOfWeek
 fun StatsScreen(
     viewModel: StatsViewModel = hiltViewModel(),
 ) {
-    val totalPoints by viewModel.totalPoints.collectAsState()
-    val profilePhotoUri by viewModel.profilePhotoUri.collectAsState()
-    val googlePhotoUrl by viewModel.googlePhotoUrl.collectAsState()
-    val maxStreak by viewModel.maxStreak.collectAsState()
-    val todayXp by viewModel.todayXp.collectAsState()
-    val chorebooStats by viewModel.chorebooStats.collectAsState()
-    val weeklyCompletionDays by viewModel.weeklyCompletionDays.collectAsState()
-    val allBadges by viewModel.allBadges.collectAsState()
-    val habits by viewModel.habits.collectAsState()
-    val todayCompletions by viewModel.todayCompletions.collectAsState()
-    val monthlyCompletionRate by viewModel.monthlyCompletionRate.collectAsState()
+    val totalPoints by viewModel.totalPoints.collectAsStateWithLifecycle()
+    val profilePhotoUri by viewModel.profilePhotoUri.collectAsStateWithLifecycle()
+    val googlePhotoUrl by viewModel.googlePhotoUrl.collectAsStateWithLifecycle()
+    val maxStreak by viewModel.maxStreak.collectAsStateWithLifecycle()
+    val todayXp by viewModel.todayXp.collectAsStateWithLifecycle()
+    val chorebooStats by viewModel.chorebooStats.collectAsStateWithLifecycle()
+    val weeklyCompletionDays by viewModel.weeklyCompletionDays.collectAsStateWithLifecycle()
+    val allBadges by viewModel.allBadges.collectAsStateWithLifecycle()
+    val habits by viewModel.habits.collectAsStateWithLifecycle()
+    val todayCompletions by viewModel.todayCompletions.collectAsStateWithLifecycle()
+    val monthlyCompletionRate by viewModel.monthlyCompletionRate.collectAsStateWithLifecycle()
+    val isRefreshing by viewModel.isRefreshing.collectAsStateWithLifecycle()
+    val isLoading by viewModel.isLoading.collectAsStateWithLifecycle()
 
-    var showBadgeSheet by remember { mutableStateOf(false) }
+    var showBadgeSheet by rememberSaveable { mutableStateOf(false) }
 
     // Refresh today's date on every screen resume to handle midnight crossings
     LifecycleEventEffect(Lifecycle.Event.ON_RESUME) {
@@ -140,6 +145,21 @@ fun StatsScreen(
             )
         },
     ) { padding ->
+        PullToRefreshBox(
+            isRefreshing = isRefreshing,
+            onRefresh = { viewModel.refreshData() },
+            modifier = Modifier.fillMaxSize(),
+        ) {
+        if (isLoading) {
+            Box(
+                modifier = Modifier
+                    .fillMaxSize()
+                    .padding(padding),
+                contentAlignment = Alignment.Center,
+            ) {
+                CircularProgressIndicator()
+            }
+        } else {
         LazyColumn(
             modifier = Modifier
                 .fillMaxSize()
@@ -186,8 +206,8 @@ fun StatsScreen(
                 MonthlyMasteryCard(completionRate = monthlyCompletionRate)
             }
 
-            item { Spacer(modifier = Modifier.height(80.dp)) }
         }
+        } // end else (isLoading)
 
         // Badge collection bottom sheet
         if (showBadgeSheet) {
@@ -196,6 +216,7 @@ fun StatsScreen(
                 onDismiss = { showBadgeSheet = false },
             )
         }
+        } // end PullToRefreshBox
     }
 }
 

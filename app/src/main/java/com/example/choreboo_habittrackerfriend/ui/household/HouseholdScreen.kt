@@ -29,9 +29,10 @@ import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.SnackbarDuration
 import androidx.compose.material3.SnackbarHost
 import androidx.compose.material3.SnackbarHostState
+import com.example.choreboo_habittrackerfriend.ui.components.SnackbarType
+import com.example.choreboo_habittrackerfriend.ui.components.showStitchSnackbar
 import androidx.compose.material3.pulltorefresh.PullToRefreshBox
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
@@ -82,7 +83,7 @@ fun HouseholdScreen(
         viewModel.events.collect { event ->
             when (event) {
                 is HouseholdEvent.ShowSnackbar -> {
-                    scope.launch { snackbarHostState.showSnackbar(event.message, duration = SnackbarDuration.Short) }
+                    scope.launch { snackbarHostState.showStitchSnackbar(event.message, type = SnackbarType.Info) }
                 }
             }
         }
@@ -187,7 +188,7 @@ fun HouseholdScreen(
             hostState = snackbarHostState,
             modifier = Modifier
                 .align(Alignment.BottomCenter)
-                .padding(bottom = 80.dp),
+                .padding(bottom = 8.dp),
         ) { data -> StitchSnackbar(data) }
     } // end Box
 }

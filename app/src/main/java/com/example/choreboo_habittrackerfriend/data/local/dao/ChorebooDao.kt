@@ -24,4 +24,12 @@ interface ChorebooDao {
     /** Delete all choreboos — used for sign-out data cleanup. */
     @Query("DELETE FROM choreboos")
     suspend fun deleteAllChoreboos()
+
+    /** D2: Set pendingSync=true to protect this choreboo from cloud-wins overwrite during write-through. */
+    @Query("UPDATE choreboos SET pendingSync = 1 WHERE id = :id")
+    suspend fun markPendingSync(id: Long)
+
+    /** D2: Clear pendingSync=false once write-through succeeds or exhausts retries. */
+    @Query("UPDATE choreboos SET pendingSync = 0 WHERE id = :id")
+    suspend fun clearPendingSync(id: Long)
 }

@@ -2,7 +2,6 @@ package com.example.choreboo_habittrackerfriend.data.repository
 
 import androidx.annotation.StringRes
 import com.example.choreboo_habittrackerfriend.R
-import com.google.android.gms.auth.api.signin.GoogleSignInAccount
 import com.google.firebase.auth.FirebaseAuth
 import com.google.firebase.auth.FirebaseUser
 import com.google.firebase.auth.GoogleAuthProvider
@@ -82,9 +81,9 @@ class AuthRepository @Inject constructor(
         }
     }
 
-    suspend fun signInWithGoogle(account: GoogleSignInAccount): AuthResult {
+    suspend fun signInWithGoogle(idToken: String): AuthResult {
         return try {
-            val credential = GoogleAuthProvider.getCredential(account.idToken, null)
+            val credential = GoogleAuthProvider.getCredential(idToken, null)
             val result = firebaseAuth.signInWithCredential(credential).await()
             val user = result.user ?: return AuthResult.Error(AuthErrorType.GoogleNoUser)
             AuthResult.Success(user)

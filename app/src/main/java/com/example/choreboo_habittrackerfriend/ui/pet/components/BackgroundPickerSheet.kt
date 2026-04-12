@@ -356,7 +356,7 @@ private fun TierBadge(tier: BackgroundTier?, isUnlocked: Boolean) {
             text = label,
             style = MaterialTheme.typography.labelSmall,
             fontWeight = FontWeight.Black,
-            color = Color.White,
+            color = MaterialTheme.colorScheme.onPrimary,
             fontSize = 9.sp,
         )
     }

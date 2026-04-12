@@ -341,10 +341,14 @@ class HouseholdRepository @Inject constructor(
      * Fetch household habits + today's completion status from Data Connect and persist to Room.
      * Calls GetMyHouseholdHabits for the habit list, then GetHouseholdHabitLogsForDate
      * to overlay who (if anyone) has completed each habit today.
+     *
+     * [date] must be an ISO-8601 date string ("YYYY-MM-DD"). Callers should pass the
+     * reactive today date rather than calling LocalDate.now() here, so that the correct
+     * date is used even if midnight rolls over while the app is open.
      */
-    suspend fun refreshHouseholdHabits() {
+    suspend fun refreshHouseholdHabits(date: String = LocalDate.now().toString()) {
         try {
-            val today = LocalDate.now().toString() // "YYYY-MM-DD"
+            val today = date
 
             // Run both network calls in parallel
             val (habitNodes, logsByHabitId) = coroutineScope {

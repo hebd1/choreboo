@@ -52,10 +52,11 @@ import androidx.compose.material3.OutlinedTextFieldDefaults
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Slider
 import androidx.compose.material3.SliderDefaults
-import androidx.compose.material3.SnackbarDuration
 import androidx.compose.material3.SnackbarHost
 import androidx.compose.material3.SnackbarHostState
+import com.example.choreboo_habittrackerfriend.ui.components.SnackbarType
 import com.example.choreboo_habittrackerfriend.ui.components.StitchSnackbar
+import com.example.choreboo_habittrackerfriend.ui.components.showStitchSnackbar
 import androidx.compose.material3.Switch
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
@@ -63,21 +64,26 @@ import androidx.compose.material3.TimePicker
 import androidx.compose.material3.rememberTimePickerState
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
-import androidx.compose.runtime.collectAsState
+import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.platform.LocalFocusManager
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.compose.ui.viewinterop.AndroidView
+import androidx.compose.foundation.text.KeyboardActions
+import androidx.compose.foundation.text.KeyboardOptions
+import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.res.stringResource
 import androidx.emoji2.emojipicker.EmojiPickerView
 import androidx.hilt.navigation.compose.hiltViewModel
@@ -128,15 +134,16 @@ fun AddEditHabitScreen(
     onSavedBack: (isNew: Boolean) -> Unit = { onNavigateBack() },
     viewModel: AddEditHabitViewModel = hiltViewModel(),
 ) {
-    val formState by viewModel.formState.collectAsState()
-    val isOwner by viewModel.isOwner.collectAsState()
-    val profilePhotoUri by viewModel.profilePhotoUri.collectAsState()
-    val googlePhotoUrl by viewModel.googlePhotoUrl.collectAsState()
-    val householdMembers by viewModel.householdMembers.collectAsState()
+    val formState by viewModel.formState.collectAsStateWithLifecycle()
+    val isOwner by viewModel.isOwner.collectAsStateWithLifecycle()
+    val profilePhotoUri by viewModel.profilePhotoUri.collectAsStateWithLifecycle()
+    val googlePhotoUrl by viewModel.googlePhotoUrl.collectAsStateWithLifecycle()
+    val householdMembers by viewModel.householdMembers.collectAsStateWithLifecycle()
     val snackbarHostState = remember { SnackbarHostState() }
-    var showTimePicker by remember { mutableStateOf(false) }
-    var showEmojiPicker by remember { mutableStateOf(false) }
+    var showTimePicker by rememberSaveable { mutableStateOf(false) }
+    var showEmojiPicker by rememberSaveable { mutableStateOf(false) }
     val context = LocalContext.current
+    val focusManager = LocalFocusManager.current
     
     val emojiIcons = emojiIconIds.map { (idAndEmoji, labelRes) ->
         val (id, emoji) = idAndEmoji
@@ -148,10 +155,9 @@ fun AddEditHabitScreen(
             when (event) {
                 is AddEditHabitEvent.Saved -> onSavedBack(event.isNew)
                 is AddEditHabitEvent.ValidationError -> {
-                    snackbarHostState.showSnackbar(
+                    snackbarHostState.showStitchSnackbar(
                         message = context.getString(event.messageResId),
-                        actionLabel = "error",
-                        duration = SnackbarDuration.Short,
+                        type = SnackbarType.Error,
                     )
                 }
             }
@@ -263,6 +269,10 @@ fun AddEditHabitScreen(
                                 focusedContainerColor = MaterialTheme.colorScheme.surfaceContainerLowest,
                                 unfocusedBorderColor = Color.Transparent,
                                 focusedBorderColor = MaterialTheme.colorScheme.primary.copy(alpha = 0.4f),
+                            ),
+                            keyboardOptions = KeyboardOptions(imeAction = ImeAction.Done),
+                            keyboardActions = KeyboardActions(
+                                onDone = { focusManager.clearFocus() },
                             ),
                         )
                     }
@@ -648,15 +658,6 @@ private fun ChorebooTopBar(
                 letterSpacing = (-0.5).sp,
             )
         }
-
-        // Notification icon
-        IconButton(onClick = {}) {
-            Icon(
-                Icons.Default.NotificationsNone,
-                contentDescription = stringResource(R.string.add_habit_notifications_cd),
-                tint = MaterialTheme.colorScheme.onSurfaceVariant,
-            )
-        }
     }
 }
 
@@ -879,7 +880,7 @@ private fun ReminderCard(
     onTimeClick: () -> Unit,
 ) {
     // Permission launcher for POST_NOTIFICATIONS (Android 13+)
-    var showPermissionDialog by remember { mutableStateOf(false) }
+    var showPermissionDialog by rememberSaveable { mutableStateOf(false) }
     val notificationPermissionLauncher = rememberLauncherForActivityResult(
         ActivityResultContracts.RequestPermission(),
     ) { isGranted ->

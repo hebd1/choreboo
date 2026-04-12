@@ -1,5 +1,6 @@
 package com.example.choreboo_habittrackerfriend
 
+import android.content.Context
 import app.cash.turbine.test
 import com.example.choreboo_habittrackerfriend.data.datastore.UserPreferences
 import com.example.choreboo_habittrackerfriend.data.repository.AuthRepository
@@ -38,6 +39,7 @@ class MainViewModelTest {
     @get:Rule
     val dispatcherRule = TestDispatcherRule()
 
+    private lateinit var context: Context
     private lateinit var userPreferences: UserPreferences
     private lateinit var chorebooRepository: ChorebooRepository
     private lateinit var authRepository: AuthRepository
@@ -60,6 +62,7 @@ class MainViewModelTest {
 
     @Before
     fun setUp() {
+        context = mockk(relaxed = true)
         userPreferences = mockk(relaxed = true)
         chorebooRepository = mockk(relaxed = true)
         authRepository = mockk(relaxed = true)
@@ -75,6 +78,7 @@ class MainViewModelTest {
     }
 
     private fun createViewModel() = MainViewModel(
+        context = context,
         userPreferences = userPreferences,
         chorebooRepository = chorebooRepository,
         authRepository = authRepository,

@@ -4,6 +4,7 @@ import android.content.Context
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.wrapContentHeight
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.remember
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
@@ -35,6 +36,11 @@ fun BannerAdView(
             this.adUnitId = adUnitId
             loadAd(AdRequest.Builder().build())
         }
+    }
+
+    // Destroy the AdView when this composable leaves composition to prevent Activity leak.
+    DisposableEffect(adView) {
+        onDispose { adView.destroy() }
     }
 
     AndroidView(

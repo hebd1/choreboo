@@ -1,13 +1,18 @@
-<?xml version="1.0" encoding="utf-8"?><!--
-   Sample backup rules file; uncomment and customize as necessary.
-   See https://developer.android.com/guide/topics/data/autobackup
-   for details.
-   Note: This file is ignored for devices older than API 31
-   See https://developer.android.com/about/versions/12/backup-restore
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+    Backup rules for Android Auto Backup (API 23+).
+    Excludes sensitive data: Room database, DataStore preferences, and auth tokens.
+    See https://developer.android.com/guide/topics/data/autobackup
 -->
 <full-backup-content>
-    <!--
-   <include domain="sharedpref" path="."/>
-   <exclude domain="sharedpref" path="device.xml"/>
--->
+    <!-- Exclude the Room database files -->
+    <exclude domain="database" path="choreboo_database" />
+    <exclude domain="database" path="choreboo_database-shm" />
+    <exclude domain="database" path="choreboo_database-wal" />
+
+    <!-- Exclude DataStore preferences (contains points, theme, onboarding state) -->
+    <exclude domain="file" path="datastore/choreboo_preferences.preferences_pb" />
+
+    <!-- Exclude any cached auth/session tokens -->
+    <exclude domain="sharedpref" path="com.google.android.gms.auth.api.signin.StoredSignInOptions" />
 </full-backup-content>

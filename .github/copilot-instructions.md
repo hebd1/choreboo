@@ -22,7 +22,7 @@ A Tamagotchi-style habit tracker Android app where users complete daily habits t
 - **UI:** Jetpack Compose + Material3
 - **DI:** Hilt (`@HiltAndroidApp`, `@AndroidEntryPoint`, `@HiltViewModel`)
 - **Database:** Room (local cache) + Firebase Data Connect (PostgreSQL cloud backend)
-- **Auth:** Firebase Auth (email/password + Google sign-in)
+- **Auth:** Firebase Auth (email/password + Google sign-in via **Android Credential Manager API** — `androidx.credentials` 1.5.0 + `googleid` 1.1.1; legacy GMS `GoogleSignIn` API not used)
 - **Preferences:** DataStore
 - **Animations:** Lottie Compose (placeholder emoji for now, swappable to Lottie later)
 - **Images:** Coil
@@ -31,7 +31,7 @@ A Tamagotchi-style habit tracker Android app where users complete daily habits t
 - **Navigation:** Navigation Compose with bottom tabs
 - **Serialization:** Gson (for Room TypeConverters)
 - **Desugaring:** Enabled (`isCoreLibraryDesugaringEnabled = true`) for `java.time` on minSdk 24
-- **Min SDK:** 24 | **Target SDK:** 36 | **Compile SDK:** 36
+- **Min SDK:** 24 | **Target SDK:** 36 | **Compile SDK:** 36 | **Compose BOM:** 2025.05.00
 
 ## Architecture
 - **Pattern:** MVVM (Screen → ViewModel → Repository → DAO → Room), with write-through to Firebase Data Connect
@@ -98,7 +98,7 @@ A Tamagotchi-style habit tracker Android app where users complete daily habits t
 
 - **Write-through**: All Room mutations also fire the corresponding Data Connect mutation. Failures are silent.
 - **Cloud-to-local sync**: Triggered **after auth** (`force = true`, bypasses cooldown) and **on every app foreground** (`force = false`, 5-minute cooldown). `SyncManager` orchestrates all sync. Order: habits + choreboo + user points + purchased backgrounds (parallel) → habit logs (sequential, needs habit remoteIds) → household habit logs (best-effort). Cloud wins on conflict.
-- **Security**: All 17 queries and 23 mutations have `@auth(level: USER)` directives with auth-scoped filters. 4 household queries (`GetMyHousehold`, `GetMyHouseholdMembers`, `GetMyHouseholdChoreboos`, `GetMyHouseholdHabits`) are **inherently auth-scoped** — they traverse from `auth.uid` to the user's household, so no `householdId` parameter is needed. 3 habit/log queries (`GetHabitById`, `GetLogsForHabit`, `GetLogsForHabitAndDate`) that allow access to household habits now require household membership verification — the `isHouseholdHabit` branch checks that the caller's `auth.uid` is a member of the habit's household.
+- **Security**: All 16 queries and 27 mutations have `@auth(level: USER)` directives with auth-scoped filters. 4 household queries (`GetMyHousehold`, `GetMyHouseholdMembers`, `GetMyHouseholdChoreboos`, `GetMyHouseholdHabits`) are **inherently auth-scoped** — they traverse from `auth.uid` to the user's household, so no `householdId` parameter is needed. 3 habit/log queries (`GetHabitById`, `GetLogsForHabit`, `GetLogsForHabitAndDate`) that allow access to household habits now require household membership verification — the `isHouseholdHabit` branch checks that the caller's `auth.uid` is a member of the habit's household.
 - **SDK regen**: `npx firebase-tools@latest dataconnect:sdk:generate`
 - **Firebase Storage**: Configured for profile photo uploads (`storage.rules` in project root)
 
@@ -134,9 +134,12 @@ Deploy the backend (Data Connect schema/connectors + Storage rules) to the `chor
 - Stat decay calculated on app open based on `lastInteractionAt` timestamp
 - Core library desugaring enabled for `java.time` API support on minSdk 24
 - Write-through: any Room mutation should also call the corresponding Data Connect mutation
+- **StateFlow collection**: Always use `collectAsStateWithLifecycle()` (from `androidx.lifecycle.compose`) in Screen composables — never `collectAsState()`
+- **Saveable state**: Use `rememberSaveable` (import `androidx.compose.runtime.saveable.rememberSaveable`) for dialog flags, form text, and tab state that must survive config changes
+- **String resources**: All user-facing strings use `stringResource(R.string.*)` — no hardcoded string literals in composables. Add strings to `res/values/strings.xml` only
 
 ## Implemented Features
-- **Firebase Auth** — Email/password + Google sign-in, syncing overlay on auth screen
+- **Firebase Auth** — Email/password + Google sign-in via Android Credential Manager, syncing overlay on auth screen
 - **Households** — Create/join via invite code, view household members' pets and habits
 - **Cloud sync** — Write-through on all mutations, cloud-to-local sync on auth + app foreground (via `SyncManager`)
 - **Habit completion** — XP earned (base + streak bonus), prevents over-completion via targetCount
@@ -157,12 +160,13 @@ Deploy the backend (Data Connect schema/connectors + Storage rules) to the `chor
 
 ## Style Guidelines
 - Modern, rounded UI: `RoundedCornerShape(16.dp)` for cards, `RoundedCornerShape(12.dp)` for inputs
-- Use `MaterialTheme.typography.*` consistently (no hardcoded text styles)
+- Use `MaterialTheme.typography.*` and `MaterialTheme.colorScheme.*` consistently — no hardcoded text styles or colors
 - Touch targets >= 48dp
 - All icons have `contentDescription` for accessibility
 - Empty states show emoji + friendly message + call to action
 - Use `AnimatedVisibility`, `animateColorAsState` for smooth transitions
 - Destructive actions (delete) require confirmation dialog
+- **Bottom nav bar** lives in `Scaffold`'s `bottomBar` slot in `MainActivity`; no hardcoded 80dp spacers in screens — `innerPadding` + `consumeWindowInsets` propagates to the nav graph
 
 ## Available Habit Icons
 Emoji-based system using `EmojiIcon` data class. 15 preset emoji (e.g., "🥗", "💧", "🏃", "📚", "🧘", "🎵", "🔥", "🏋️", "😴", "💻", "🍽️", "🧹", "📖", "🎨", "❤️") plus custom emoji input. Not Material Icons.
@@ -198,3 +202,4 @@ Emoji-based system using `EmojiIcon` data class. 15 preset emoji (e.g., "🥗", 
 - Sound effects (play on completion, feeding, level-up)
 - Lottie animations (replace emoji placeholders)
 - Multiple Choreboos
+- IME keyboard padding (`imePadding()` not yet applied to Auth, Onboarding, AddEditHabit, Settings screens)

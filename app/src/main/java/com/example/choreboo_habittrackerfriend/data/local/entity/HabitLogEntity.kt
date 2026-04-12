@@ -29,4 +29,10 @@ data class HabitLogEntity(
     val streakAtCompletion: Int = 0,
     val completedByUid: String? = null,
     val remoteId: String? = null,
+    /**
+     * D2: True while a write-through is pending (in-flight or awaiting retry).
+     * Cloud-to-local sync skips overwriting rows with pendingSync=true.
+     * Cleared to false once the write-through succeeds or exhausts retries.
+     */
+    val pendingSync: Boolean = false,
 )

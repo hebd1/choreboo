@@ -46,12 +46,18 @@ import com.example.choreboo_habittrackerfriend.domain.model.HouseholdPet
 import com.example.choreboo_habittrackerfriend.domain.model.PetType
 import com.example.choreboo_habittrackerfriend.ui.components.PetBackgroundImage
 import com.example.choreboo_habittrackerfriend.ui.components.WebmAnimationView
+import androidx.compose.foundation.isSystemInDarkTheme
+import androidx.compose.ui.res.stringResource
 import com.example.choreboo_habittrackerfriend.ui.theme.PetMoodContentStart
+import com.example.choreboo_habittrackerfriend.ui.theme.PetMoodDarkContentStart
+import com.example.choreboo_habittrackerfriend.ui.theme.PetMoodDarkHappyStart
+import com.example.choreboo_habittrackerfriend.ui.theme.PetMoodDarkHungryStart
+import com.example.choreboo_habittrackerfriend.ui.theme.PetMoodDarkSadStart
+import com.example.choreboo_habittrackerfriend.ui.theme.PetMoodDarkTiredStart
 import com.example.choreboo_habittrackerfriend.ui.theme.PetMoodHappyStart
 import com.example.choreboo_habittrackerfriend.ui.theme.PetMoodHungryStart
 import com.example.choreboo_habittrackerfriend.ui.theme.PetMoodSadStart
 import com.example.choreboo_habittrackerfriend.ui.theme.PetMoodTiredStart
-import androidx.compose.ui.res.stringResource
 
 private enum class HouseholdAnimPhase { MOOD, IDLE }
 
@@ -94,12 +100,18 @@ fun HouseholdPetCard(
                             .clip(RoundedCornerShape(12.dp)),
                         contentAlignment = Alignment.Center,
                     ) {
+                        val isDark = isSystemInDarkTheme()
                         val moodBg = when (pet.mood) {
-                            ChorebooMood.HAPPY, ChorebooMood.CONTENT -> PetMoodHappyStart
-                            ChorebooMood.HUNGRY -> PetMoodHungryStart
-                            ChorebooMood.TIRED -> PetMoodTiredStart
-                            ChorebooMood.SAD -> PetMoodSadStart
-                            else -> PetMoodContentStart
+                            ChorebooMood.HAPPY, ChorebooMood.CONTENT ->
+                                if (isDark) PetMoodDarkHappyStart else PetMoodHappyStart
+                            ChorebooMood.HUNGRY ->
+                                if (isDark) PetMoodDarkHungryStart else PetMoodHungryStart
+                            ChorebooMood.TIRED ->
+                                if (isDark) PetMoodDarkTiredStart else PetMoodTiredStart
+                            ChorebooMood.SAD ->
+                                if (isDark) PetMoodDarkSadStart else PetMoodSadStart
+                            else ->
+                                if (isDark) PetMoodDarkContentStart else PetMoodContentStart
                         }
                         PetBackgroundImage(
                             backgroundId = pet.backgroundId,

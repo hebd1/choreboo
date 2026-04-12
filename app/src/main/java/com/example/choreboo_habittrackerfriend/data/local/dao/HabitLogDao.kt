@@ -92,6 +92,14 @@ interface HabitLogDao {
      */
     @Query("SELECT completedByUid FROM habit_logs WHERE habitId = :habitId AND date = :date LIMIT 1")
     suspend fun getCompletedByUidForDate(habitId: Long, date: String): String?
+
+    /** D2: Set pendingSync=true to protect this log from cloud-wins overwrite during write-through. */
+    @Query("UPDATE habit_logs SET pendingSync = 1 WHERE id = :id")
+    suspend fun markPendingSync(id: Long)
+
+    /** D2: Clear pendingSync=false once write-through succeeds or exhausts retries. */
+    @Query("UPDATE habit_logs SET pendingSync = 0 WHERE id = :id")
+    suspend fun clearPendingSync(id: Long)
 }
 
 data class HabitStreak(

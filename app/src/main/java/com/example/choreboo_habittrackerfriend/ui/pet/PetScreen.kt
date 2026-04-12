@@ -28,6 +28,7 @@ import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.foundation.isSystemInDarkTheme
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.Close
@@ -46,7 +47,6 @@ import androidx.compose.material3.LinearProgressIndicator
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.pulltorefresh.PullToRefreshBox
 import androidx.compose.material3.Scaffold
-import androidx.compose.material3.SnackbarDuration
 import androidx.compose.material3.SnackbarHost
 import androidx.compose.material3.SnackbarHostState
 import androidx.compose.material3.Text
@@ -59,6 +59,7 @@ import androidx.compose.runtime.getValue
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -88,11 +89,18 @@ import com.example.choreboo_habittrackerfriend.ui.components.PetBackgroundImage
 import com.example.choreboo_habittrackerfriend.ui.components.PremiumBadge
 import com.example.choreboo_habittrackerfriend.ui.components.ProfileAvatar
 import com.example.choreboo_habittrackerfriend.ui.components.ShimmerPlaceholder
+import com.example.choreboo_habittrackerfriend.ui.components.SnackbarType
 import com.example.choreboo_habittrackerfriend.ui.components.StitchSnackbar
+import com.example.choreboo_habittrackerfriend.ui.components.showStitchSnackbar
 import com.example.choreboo_habittrackerfriend.ui.components.WebmAnimationView
 import com.example.choreboo_habittrackerfriend.ui.habits.components.HabitCard
 import com.example.choreboo_habittrackerfriend.ui.pet.components.BackgroundPickerSheet
 import com.example.choreboo_habittrackerfriend.ui.theme.PetMoodContentStart
+import com.example.choreboo_habittrackerfriend.ui.theme.PetMoodDarkContentStart
+import com.example.choreboo_habittrackerfriend.ui.theme.PetMoodDarkHappyStart
+import com.example.choreboo_habittrackerfriend.ui.theme.PetMoodDarkHungryStart
+import com.example.choreboo_habittrackerfriend.ui.theme.PetMoodDarkSadStart
+import com.example.choreboo_habittrackerfriend.ui.theme.PetMoodDarkTiredStart
 import com.example.choreboo_habittrackerfriend.ui.theme.PetMoodHappyStart
 import com.example.choreboo_habittrackerfriend.ui.theme.PetMoodHungryStart
 import com.example.choreboo_habittrackerfriend.ui.theme.PetMoodSadStart
@@ -124,6 +132,7 @@ fun PetScreen(
     val profilePhotoUri by viewModel.profilePhotoUri.collectAsStateWithLifecycle()
     val googlePhotoUrl by viewModel.googlePhotoUrl.collectAsStateWithLifecycle()
     val petType by viewModel.petType.collectAsStateWithLifecycle()
+    val initError by viewModel.initError.collectAsStateWithLifecycle()
 
     // Habit state
     val habits by viewModel.habits.collectAsStateWithLifecycle()
@@ -142,15 +151,16 @@ fun PetScreen(
 
     // Local UI state
     val snackbarHostState = remember { SnackbarHostState() }
-    var showSleepDialog by remember { mutableStateOf(false) }
-    var showDetailedStats by remember { mutableStateOf(false) }
+    var showSleepDialog by rememberSaveable { mutableStateOf(false) }
+    var showDetailedStats by rememberSaveable { mutableStateOf(false) }
     var showLevelUpDialog by remember { mutableStateOf<PetEvent.HabitCompleted?>(null) }
-    var habitToDelete by remember { mutableStateOf<Habit?>(null) }
+    var habitToDeleteId by rememberSaveable { mutableStateOf<Long?>(null) }
+    val habitToDelete = habits.find { it.id == habitToDeleteId }
     var isInteracting by remember { mutableStateOf(false) }
     var showStartSleepAnimation by remember { mutableStateOf(false) }
     var showThumbsUp by remember { mutableStateOf(false) }
-    var showBackgroundPicker by remember { mutableStateOf(false) }
-    var resubscribeNudgeDismissed by remember { mutableStateOf(false) }
+    var showBackgroundPicker by rememberSaveable { mutableStateOf(false) }
+    var resubscribeNudgeDismissed by rememberSaveable { mutableStateOf(false) }
 
     // True when user has a premium pet but no active subscription
     val showResubscribeNudge = !isPremium && petType.isPremium && !resubscribeNudgeDismissed
@@ -165,35 +175,35 @@ fun PetScreen(
     val completionErrorMsg = stringResource(R.string.pet_snack_completion_error_generic)
     val bgUnlockedFmt = stringResource(R.string.pet_snack_background_unlocked)
     val habitCreatedMsg = stringResource(R.string.pet_snack_habit_created)
+    val feedErrorMsg = stringResource(R.string.pet_snack_feed_error)
+    val sleepErrorMsg = stringResource(R.string.pet_snack_sleep_error)
+    val deleteErrorMsg = stringResource(R.string.pet_snack_delete_error)
+    val purchaseErrorMsg = stringResource(R.string.pet_snack_purchase_error)
     LaunchedEffect(Unit) {
         viewModel.events.collect { event ->
             when (event) {
                 is PetEvent.Fed -> {
-                    snackbarHostState.showSnackbar(
+                    snackbarHostState.showStitchSnackbar(
                         message = fedMsg,
-                        actionLabel = "success",
-                        duration = SnackbarDuration.Short,
+                        type = SnackbarType.Success,
                     )
                 }
                 is PetEvent.InsufficientPoints -> {
-                    snackbarHostState.showSnackbar(
+                    snackbarHostState.showStitchSnackbar(
                         message = notEnoughPointsMsg,
-                        actionLabel = "error",
-                        duration = SnackbarDuration.Short,
+                        type = SnackbarType.Error,
                     )
                 }
                 is PetEvent.Sleeping -> {
-                    snackbarHostState.showSnackbar(
+                    snackbarHostState.showStitchSnackbar(
                         message = sleepingNowMsg,
-                        actionLabel = "info",
-                        duration = SnackbarDuration.Short,
+                        type = SnackbarType.Info,
                     )
                 }
                 is PetEvent.AlreadySleeping -> {
-                    snackbarHostState.showSnackbar(
+                    snackbarHostState.showStitchSnackbar(
                         message = alreadySleepingMsg,
-                        actionLabel = "info",
-                        duration = SnackbarDuration.Short,
+                        type = SnackbarType.Info,
                     )
                 }
                 is PetEvent.HabitCompleted -> {
@@ -201,32 +211,52 @@ fun PetScreen(
                     if (event.leveledUp || event.evolved) {
                         showLevelUpDialog = event
                     }
-                    snackbarHostState.showSnackbar(
+                    snackbarHostState.showStitchSnackbar(
                         message = habitCompletedFmt.format(event.xpEarned, event.streak),
-                        actionLabel = "achievement",
-                        duration = SnackbarDuration.Short,
+                        type = SnackbarType.Achievement,
                     )
                 }
                 is PetEvent.AlreadyComplete -> {
-                    snackbarHostState.showSnackbar(
+                    snackbarHostState.showStitchSnackbar(
                         message = alreadyCompletedMsg,
-                        actionLabel = "info",
-                        duration = SnackbarDuration.Short,
+                        type = SnackbarType.Info,
                     )
                 }
                 is PetEvent.CompletionError -> {
-                    snackbarHostState.showSnackbar(
+                    snackbarHostState.showStitchSnackbar(
                         message = completionErrorMsg,
-                        actionLabel = "error",
-                        duration = SnackbarDuration.Short,
+                        type = SnackbarType.Error,
+                    )
+                }
+                is PetEvent.FeedError -> {
+                    snackbarHostState.showStitchSnackbar(
+                        message = feedErrorMsg,
+                        type = SnackbarType.Error,
+                    )
+                }
+                is PetEvent.SleepError -> {
+                    snackbarHostState.showStitchSnackbar(
+                        message = sleepErrorMsg,
+                        type = SnackbarType.Error,
+                    )
+                }
+                is PetEvent.DeleteError -> {
+                    snackbarHostState.showStitchSnackbar(
+                        message = deleteErrorMsg,
+                        type = SnackbarType.Error,
+                    )
+                }
+                is PetEvent.PurchaseError -> {
+                    snackbarHostState.showStitchSnackbar(
+                        message = purchaseErrorMsg,
+                        type = SnackbarType.Error,
                     )
                 }
                 is PetEvent.BackgroundPurchased -> {
                     val label = context.getString(event.item.labelRes())
-                    snackbarHostState.showSnackbar(
+                    snackbarHostState.showStitchSnackbar(
                         message = bgUnlockedFmt.format(event.item.emoji, label),
-                        actionLabel = "success",
-                        duration = SnackbarDuration.Short,
+                        type = SnackbarType.Success,
                     )
                 }
             }
@@ -236,22 +266,34 @@ fun PetScreen(
     // Habit creation success snackbar
     LaunchedEffect(habitJustCreated) {
         if (habitJustCreated) {
-            snackbarHostState.showSnackbar(
+            snackbarHostState.showStitchSnackbar(
                 message = habitCreatedMsg,
-                duration = SnackbarDuration.Short,
+                type = SnackbarType.Success,
             )
             onHabitCreatedConsumed()
         }
     }
 
+    val isDark = isSystemInDarkTheme()
     val moodBgStart by animateColorAsState(
-        targetValue = when (mood) {
-            ChorebooMood.HAPPY -> PetMoodHappyStart
-            ChorebooMood.CONTENT -> PetMoodContentStart
-            ChorebooMood.HUNGRY -> PetMoodHungryStart
-            ChorebooMood.TIRED -> PetMoodTiredStart
-            ChorebooMood.SAD -> PetMoodSadStart
-            ChorebooMood.IDLE -> MaterialTheme.colorScheme.surfaceContainerLow
+        targetValue = if (isDark) {
+            when (mood) {
+                ChorebooMood.HAPPY -> PetMoodDarkHappyStart
+                ChorebooMood.CONTENT -> PetMoodDarkContentStart
+                ChorebooMood.HUNGRY -> PetMoodDarkHungryStart
+                ChorebooMood.TIRED -> PetMoodDarkTiredStart
+                ChorebooMood.SAD -> PetMoodDarkSadStart
+                ChorebooMood.IDLE -> MaterialTheme.colorScheme.surfaceContainerLow
+            }
+        } else {
+            when (mood) {
+                ChorebooMood.HAPPY -> PetMoodHappyStart
+                ChorebooMood.CONTENT -> PetMoodContentStart
+                ChorebooMood.HUNGRY -> PetMoodHungryStart
+                ChorebooMood.TIRED -> PetMoodTiredStart
+                ChorebooMood.SAD -> PetMoodSadStart
+                ChorebooMood.IDLE -> MaterialTheme.colorScheme.surfaceContainerLow
+            }
         },
         label = "petBgStart",
     )
@@ -331,7 +373,23 @@ fun PetScreen(
     ) { padding ->
         if (choreboo == null) {
             Box(Modifier.fillMaxSize().padding(padding), contentAlignment = Alignment.Center) {
-                Text(stringResource(R.string.pet_loading))
+                if (initError) {
+                    Column(
+                        horizontalAlignment = Alignment.CenterHorizontally,
+                        verticalArrangement = Arrangement.spacedBy(12.dp),
+                    ) {
+                        Text(
+                            stringResource(R.string.pet_load_error),
+                            style = MaterialTheme.typography.bodyMedium,
+                            color = MaterialTheme.colorScheme.onSurface,
+                        )
+                        Button(onClick = { viewModel.retryInit() }) {
+                            Text(stringResource(R.string.pet_retry_button))
+                        }
+                    }
+                } else {
+                    Text(stringResource(R.string.pet_loading))
+                }
             }
             return@Scaffold
         }
@@ -631,22 +689,21 @@ fun PetScreen(
                             isScheduledToday = habit.isScheduledForToday(),
                             onComplete = { viewModel.completeHabit(habit.id) },
                             onEdit = { onEditHabit(habit.id) },
-                            onDelete = { habitToDelete = habit },
+                            onDelete = { habitToDeleteId = habit.id },
                             canModify = habit.ownerUid == viewModel.currentUserUid || habit.assignedToUid == viewModel.currentUserUid,
                             householdCompleterName = householdCompleterNames[habit.id],
                         )
                     }
                 }
 
-                item { Spacer(modifier = Modifier.height(80.dp)) }
                 } // end LazyColumn
             } // end PullToRefreshBox
 
-            // Snackbar pinned above the nav bar
+            // Snackbar above content
             Box(
                 modifier = Modifier
                     .fillMaxSize()
-                    .padding(bottom = 90.dp),
+                    .padding(bottom = 8.dp),
                 contentAlignment = Alignment.BottomCenter,
             ) {
                 SnackbarHost(snackbarHostState) { data ->
@@ -663,7 +720,7 @@ fun PetScreen(
                 Box(
                     modifier = Modifier
                         .fillMaxSize()
-                        .background(Color.Black.copy(alpha = 0.45f))
+                        .background(MaterialTheme.colorScheme.scrim.copy(alpha = 0.45f))
                         .clickable(
                             indication = null,
                             interactionSource = remember { MutableInteractionSource() },
@@ -837,7 +894,7 @@ fun PetScreen(
         // Delete confirmation dialog
         habitToDelete?.let { habit ->
             AlertDialog(
-                onDismissRequest = { habitToDelete = null },
+                onDismissRequest = { habitToDeleteId = null },
                 title = { Text(stringResource(R.string.pet_delete_habit_title), fontWeight = FontWeight.Bold) },
                 text = {
                     Text(stringResource(R.string.pet_delete_habit_text, habit.title))
@@ -846,14 +903,14 @@ fun PetScreen(
                     TextButton(
                         onClick = {
                             viewModel.deleteHabit(habit.id)
-                            habitToDelete = null
+                            habitToDeleteId = null
                         },
                     ) {
                         Text(stringResource(R.string.pet_delete_button), color = MaterialTheme.colorScheme.error)
                     }
                 },
                 dismissButton = {
-                    TextButton(onClick = { habitToDelete = null }) {
+                    TextButton(onClick = { habitToDeleteId = null }) {
                         Text(stringResource(R.string.pet_cancel_button))
                     }
                 },
