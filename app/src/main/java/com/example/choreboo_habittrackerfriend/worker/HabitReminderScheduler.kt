@@ -30,7 +30,7 @@ object HabitReminderScheduler {
 
         val pendingIntent = PendingIntent.getBroadcast(
             context,
-            habitId.toInt(),
+            (habitId and 0x7FFFFFFF).toInt(),
             intent,
             PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE,
         )
@@ -38,11 +38,25 @@ object HabitReminderScheduler {
         val nextTriggerTime = calculateNextTriggerTime(reminderTime, scheduledDays)
         if (nextTriggerTime != null) {
             try {
-                alarmManager.setExactAndAllowWhileIdle(
-                    AlarmManager.RTC_WAKEUP,
-                    nextTriggerTime.toInstant().toEpochMilli(),
-                    pendingIntent,
-                )
+                val canScheduleExact = if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.S) {
+                    alarmManager.canScheduleExactAlarms()
+                } else {
+                    true
+                }
+
+                if (canScheduleExact) {
+                    alarmManager.setExactAndAllowWhileIdle(
+                        AlarmManager.RTC_WAKEUP,
+                        nextTriggerTime.toInstant().toEpochMilli(),
+                        pendingIntent,
+                    )
+                } else {
+                    alarmManager.setAndAllowWhileIdle(
+                        AlarmManager.RTC_WAKEUP,
+                        nextTriggerTime.toInstant().toEpochMilli(),
+                        pendingIntent,
+                    )
+                }
             } catch (_: SecurityException) {
                 // If SCHEDULE_EXACT_ALARM permission isn't granted, fall back to inexact
                 alarmManager.setAndAllowWhileIdle(
@@ -58,10 +72,12 @@ object HabitReminderScheduler {
         val alarmManager = context.getSystemService(Context.ALARM_SERVICE) as? AlarmManager
             ?: return
 
-        val intent = Intent(context, HabitReminderReceiver::class.java)
+        val intent = Intent(context, HabitReminderReceiver::class.java).apply {
+            action = "com.example.choreboo_habittrackerfriend.HABIT_REMINDER"
+        }
         val pendingIntent = PendingIntent.getBroadcast(
             context,
-            habitId.toInt(),
+            (habitId and 0x7FFFFFFF).toInt(),
             intent,
             PendingIntent.FLAG_NO_CREATE or PendingIntent.FLAG_IMMUTABLE,
         ) ?: return

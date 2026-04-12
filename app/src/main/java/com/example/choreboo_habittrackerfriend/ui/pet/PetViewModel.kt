@@ -34,6 +34,7 @@ import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.onEach
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.launch
+import timber.log.Timber
 import java.time.LocalDate
 import java.time.format.DateTimeFormatter
 import javax.inject.Inject
@@ -68,8 +69,8 @@ class PetViewModel @Inject constructor(
     val totalPoints: StateFlow<Int> = userPreferences.totalPoints
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), 0)
 
-    val isSleeping: StateFlow<Boolean> = chorebooFlow
-        .map { it?.isSleeping ?: false }
+     val isSleeping: StateFlow<Boolean> = chorebooFlow
+        .map { it?.isSleeping() ?: false }
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), false)
 
     /** True while the eating Lottie animation should be playing */
@@ -199,15 +200,37 @@ class PetViewModel @Inject constructor(
     val events = _events.asSharedFlow()
 
     // -----------------------------------------------------------------------
+    // Init error state (E4/E5)
+    // -----------------------------------------------------------------------
+
+    private val _initError = MutableStateFlow(false)
+    val initError: StateFlow<Boolean> = _initError.asStateFlow()
+
+    // -----------------------------------------------------------------------
     // Init
     // -----------------------------------------------------------------------
 
     init {
+        runInit()
+    }
+
+    private fun runInit() {
         viewModelScope.launch {
-            // Ensure a choreboo exists (handles empty DB after destructive migration)
-            chorebooRepository.getOrCreateChoreboo()
-            chorebooRepository.applyStatDecay()
+            try {
+                _initError.value = false
+                // Ensure a choreboo exists (handles empty DB after destructive migration)
+                chorebooRepository.getOrCreateChoreboo()
+                chorebooRepository.applyStatDecay()
+            } catch (e: Exception) {
+                Timber.e(e, "PetViewModel init failed")
+                _initError.value = true
+            }
         }
+    }
+
+    /** Retry init after an error — clears the error flag and re-runs startup logic. */
+    fun retryInit() {
+        runInit()
     }
 
     // -----------------------------------------------------------------------
@@ -217,30 +240,40 @@ class PetViewModel @Inject constructor(
     /** Manual feed: costs 10 points, adds +20 hunger, triggers eating animation. */
     fun feedChoreboo() {
         viewModelScope.launch {
-            val deducted = userPreferences.deductPoints(10)
-            if (deducted) {
-                chorebooRepository.feedChoreboo()
-                _isEating.value = true
-                _events.emit(PetEvent.Fed)
-                // Write-through: sync deducted points so cloud stays current
-                val newPoints = userPreferences.totalPoints.first()
-                val newLifetimeXp = userPreferences.totalLifetimeXp.first()
-                userRepository.syncPointsToCloud(newPoints, newLifetimeXp)
-            } else {
-                _events.emit(PetEvent.InsufficientPoints)
+            try {
+                val deducted = userPreferences.deductPoints(10)
+                if (deducted) {
+                    chorebooRepository.feedChoreboo()
+                    _isEating.value = true
+                    _events.emit(PetEvent.Fed)
+                    // Write-through: sync deducted points so cloud stays current
+                    val newPoints = userPreferences.totalPoints.first()
+                    val newLifetimeXp = userPreferences.totalLifetimeXp.first()
+                    userRepository.syncPointsToCloud(newPoints, newLifetimeXp)
+                } else {
+                    _events.emit(PetEvent.InsufficientPoints)
+                }
+            } catch (e: Exception) {
+                Timber.e(e, "feedChoreboo failed")
+                _events.emit(PetEvent.FeedError)
             }
         }
     }
 
     /** Put pet to sleep for 24 hours — freezes stat decay. */
     fun sleepChoreboo() {
-        viewModelScope.launch {
-            val choreboo = chorebooRepository.getChorebooSync()
-            if (choreboo?.isSleeping == true) {
-                _events.emit(PetEvent.AlreadySleeping)
-            } else {
-                chorebooRepository.putToSleep()
-                _events.emit(PetEvent.Sleeping)
+         viewModelScope.launch {
+            try {
+                val choreboo = chorebooRepository.getChorebooSync()
+                if (choreboo?.isSleeping() == true) {
+                    _events.emit(PetEvent.AlreadySleeping)
+                } else {
+                    chorebooRepository.putToSleep()
+                    _events.emit(PetEvent.Sleeping)
+                }
+            } catch (e: Exception) {
+                Timber.e(e, "sleepChoreboo failed")
+                _events.emit(PetEvent.SleepError)
             }
         }
     }
@@ -300,7 +333,12 @@ class PetViewModel @Inject constructor(
 
     fun deleteHabit(id: Long) {
         viewModelScope.launch {
-            habitRepository.deleteHabit(id)
+            try {
+                habitRepository.deleteHabit(id)
+            } catch (e: Exception) {
+                Timber.e(e, "deleteHabit failed for id=$id")
+                _events.emit(PetEvent.DeleteError)
+            }
         }
     }
 
@@ -315,20 +353,25 @@ class PetViewModel @Inject constructor(
      */
     fun purchaseBackground(item: BackgroundItem) {
         viewModelScope.launch {
-            val cost = item.cost
-            if (cost > 0) {
-                val deducted = userPreferences.deductPoints(cost)
-                if (!deducted) {
-                    _events.emit(PetEvent.InsufficientPoints)
-                    return@launch
+            try {
+                val cost = item.cost
+                if (cost > 0) {
+                    val deducted = userPreferences.deductPoints(cost)
+                    if (!deducted) {
+                        _events.emit(PetEvent.InsufficientPoints)
+                        return@launch
+                    }
+                    // Write-through deducted points
+                    val newPoints = userPreferences.totalPoints.first()
+                    val newLifetimeXp = userPreferences.totalLifetimeXp.first()
+                    userRepository.syncPointsToCloud(newPoints, newLifetimeXp)
                 }
-                // Write-through deducted points
-                val newPoints = userPreferences.totalPoints.first()
-                val newLifetimeXp = userPreferences.totalLifetimeXp.first()
-                userRepository.syncPointsToCloud(newPoints, newLifetimeXp)
+                backgroundRepository.purchaseBackground(item.id)
+                _events.emit(PetEvent.BackgroundPurchased(item))
+            } catch (e: Exception) {
+                Timber.e(e, "purchaseBackground failed for item=${item.id}")
+                _events.emit(PetEvent.PurchaseError)
             }
-            backgroundRepository.purchaseBackground(item.id)
-            _events.emit(PetEvent.BackgroundPurchased(item))
         }
     }
 
@@ -367,5 +410,9 @@ sealed class PetEvent {
     ) : PetEvent()
     data object AlreadyComplete : PetEvent()
     data object CompletionError : PetEvent()
+    data object FeedError : PetEvent()
+    data object SleepError : PetEvent()
+    data object DeleteError : PetEvent()
+    data object PurchaseError : PetEvent()
     data class BackgroundPurchased(val item: BackgroundItem) : PetEvent()
 }

@@ -212,19 +212,19 @@ class ChorebooStatsTest {
 
     // ── isSleeping ──────────────────────────────────────────────────────
 
-    @Test
+     @Test
     fun `isSleeping is false when sleepUntil is 0`() {
-        assertFalse(stats(sleepUntil = 0).isSleeping)
+        assertFalse(stats(sleepUntil = 0).isSleeping())
     }
 
     @Test
     fun `isSleeping is false when sleepUntil is in the past`() {
-        assertFalse(stats(sleepUntil = System.currentTimeMillis() - 60_000).isSleeping)
+        assertFalse(stats(sleepUntil = System.currentTimeMillis() - 60_000).isSleeping())
     }
 
     @Test
     fun `isSleeping is true when sleepUntil is in the future`() {
-        assertTrue(stats(sleepUntil = System.currentTimeMillis() + 60_000).isSleeping)
+        assertTrue(stats(sleepUntil = System.currentTimeMillis() + 60_000).isSleeping())
     }
 
     // ── isHungry ────────────────────────────────────────────────────────

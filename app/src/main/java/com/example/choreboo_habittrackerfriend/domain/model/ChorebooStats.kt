@@ -1,8 +1,5 @@
 package com.example.choreboo_habittrackerfriend.domain.model
 
-import androidx.compose.runtime.Stable
-
-@Stable
 data class ChorebooStats(
     val id: Long = 0,
     val name: String = "Choreboo",
@@ -13,8 +10,8 @@ data class ChorebooStats(
     val happiness: Int = 80,
     val energy: Int = 80,
     val petType: PetType = PetType.FOX,
-    val lastInteractionAt: Long = System.currentTimeMillis(),
-    val createdAt: Long = System.currentTimeMillis(),
+    val lastInteractionAt: Long = 0L,
+    val createdAt: Long = 0L,
     val sleepUntil: Long = 0,
     /** Selected background id (matches BackgroundItem.id). Null = Default mood gradient. */
     val backgroundId: String? = null,
@@ -35,6 +32,8 @@ data class ChorebooStats(
     val xpToNextLevel: Int get() = level * 50
     val xpProgressFraction: Float
         get() = if (xpToNextLevel > 0) xp.toFloat() / xpToNextLevel else 0f
-    val isSleeping: Boolean
-        get() = sleepUntil > System.currentTimeMillis()
+
+    fun isSleeping(currentTimeMillis: Long = System.currentTimeMillis()): Boolean {
+        return sleepUntil > currentTimeMillis
+    }
 }

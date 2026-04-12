@@ -4,7 +4,6 @@ import android.app.PendingIntent
 import android.content.BroadcastReceiver
 import android.content.Context
 import android.content.Intent
-import android.util.Log
 import androidx.core.app.NotificationCompat
 import androidx.core.app.NotificationManagerCompat
 import com.example.choreboo_habittrackerfriend.ChorebooApplication
@@ -17,9 +16,9 @@ import dagger.hilt.android.AndroidEntryPoint
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.withTimeoutOrNull
+import timber.log.Timber
 import javax.inject.Inject
-
-private const val TAG = "HabitCompleteReceiver"
 
 @AndroidEntryPoint
 class HabitCompleteReceiver : BroadcastReceiver() {
@@ -33,56 +32,61 @@ class HabitCompleteReceiver : BroadcastReceiver() {
         if (intent.action != ACTION_HABIT_COMPLETE) return
 
         val habitId = intent.getLongExtra(EXTRA_HABIT_ID, -1L)
-        val habitTitle = intent.getStringExtra(EXTRA_HABIT_TITLE) ?: "Habit"
+        val habitTitle = intent.getStringExtra(EXTRA_HABIT_TITLE) ?: context.getString(R.string.notif_habit_name_fallback)
 
         if (habitId <= 0) return
 
         val pendingResult = goAsync()
-        val notificationId = (2000 + habitId).toInt()
+        val notificationId = ((2000L + habitId) and 0x7FFFFFFF).toInt()
 
         CoroutineScope(Dispatchers.Default).launch {
             try {
-                // Delegate to repositories — same flow as HabitListViewModel.completeHabit()
-                val result = habitRepository.completeHabit(habitId)
+                val timedOut = withTimeoutOrNull(25_000L) {
+                    // Delegate to repositories — same flow as HabitListViewModel.completeHabit()
+                    val result = habitRepository.completeHabit(habitId)
 
-                if (result.alreadyComplete) {
+                    if (result.alreadyComplete) {
+                        replaceWithConfirmation(
+                            context = context,
+                            notificationId = notificationId,
+                            habitTitle = habitTitle,
+                            message = context.getString(R.string.notif_already_completed),
+                        )
+                        return@withTimeoutOrNull
+                    }
+
+                    // Add XP to pet (handles level-up, stage evolution, cloud sync)
+                    val xpResult = chorebooRepository.addXp(result.xpEarned)
+
+                    // Auto-feed if hungry (handles point deduction, cloud sync)
+                    chorebooRepository.autoFeedIfNeeded(userPreferences)
+
+                    // Build confirmation message
+                    val streakText = if (result.newStreak > 1) context.getString(R.string.notif_streak_suffix, result.newStreak) else ""
+                    val evolvedHint = if (xpResult.evolved && xpResult.newStage != null) {
+                        " ✦ ${context.getString(xpResult.newStage.displayNameRes())}!"
+                    } else {
+                        ""
+                    }
+                    val levelUpHint = if (xpResult.levelsGained > 0 && !xpResult.evolved) {
+                        context.getString(R.string.notif_level_up_suffix, xpResult.newLevel)
+                    } else {
+                        ""
+                    }
+                    val message = context.getString(R.string.notif_xp_earned, result.xpEarned) + streakText + levelUpHint + evolvedHint
+
                     replaceWithConfirmation(
                         context = context,
                         notificationId = notificationId,
                         habitTitle = habitTitle,
-                        message = context.getString(R.string.notif_already_completed),
+                        message = message,
                     )
-                    return@launch
                 }
-
-                // Add XP to pet (handles level-up, stage evolution, cloud sync)
-                val xpResult = chorebooRepository.addXp(result.xpEarned)
-
-                // Auto-feed if hungry (handles point deduction, cloud sync)
-                chorebooRepository.autoFeedIfNeeded(userPreferences)
-
-                // Build confirmation message
-                val streakText = if (result.newStreak > 1) " | ${result.newStreak} day streak!" else ""
-                val evolvedHint = if (xpResult.evolved && xpResult.newStage != null) {
-                    " ✦ ${context.getString(xpResult.newStage.displayNameRes())}!"
-                } else {
-                    ""
+                if (timedOut == null) {
+                    Timber.w("HabitCompleteReceiver timed out for habitId=$habitId")
                 }
-                val levelUpHint = if (xpResult.levelsGained > 0 && !xpResult.evolved) {
-                    " ↑ Level ${xpResult.newLevel}!"
-                } else {
-                    ""
-                }
-                val message = "+${result.xpEarned} XP$streakText$levelUpHint$evolvedHint"
-
-                replaceWithConfirmation(
-                    context = context,
-                    notificationId = notificationId,
-                    habitTitle = habitTitle,
-                    message = message,
-                )
             } catch (e: Exception) {
-                Log.e(TAG, "Failed to complete habit from notification", e)
+                Timber.e(e, "Failed to complete habit from notification")
                 replaceWithConfirmation(
                     context = context,
                     notificationId = notificationId,
@@ -101,15 +105,14 @@ class HabitCompleteReceiver : BroadcastReceiver() {
         habitTitle: String,
         message: String,
     ) {
-        val notification = NotificationCompat.Builder(context, ChorebooApplication.REMINDER_CHANNEL_ID)
+        val notificationBuilder = NotificationCompat.Builder(context, ChorebooApplication.REMINDER_CHANNEL_ID)
             .setContentTitle(habitTitle)
             .setContentText(message)
-            .setSmallIcon(android.R.drawable.ic_dialog_info)
+            .setSmallIcon(R.drawable.ic_notification)
             .setAutoCancel(true)
             .setTimeoutAfter(8_000L)
-            .build()
 
-        NotificationManagerCompat.from(context).notify(notificationId, notification)
+        NotificationUtils.notifyIfPermitted(context, notificationId, notificationBuilder)
     }
 
     companion object {
@@ -126,8 +129,8 @@ class HabitCompleteReceiver : BroadcastReceiver() {
             return PendingIntent.getBroadcast(
                 context,
                 // Use a unique request code offset to avoid colliding with HabitReminderReceiver's
-                // pending intents which use habitId.toInt() directly.
-                (3000 + habitId).toInt(),
+                // pending intents which use habitId directly.
+                ((3000L + habitId) and 0x7FFFFFFF).toInt(),
                 intent,
                 PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE,
             )

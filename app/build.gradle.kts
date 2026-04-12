@@ -25,7 +25,8 @@ android {
 
     buildTypes {
         release {
-            isMinifyEnabled = false
+            isMinifyEnabled = true
+            isShrinkResources = true
             proguardFiles(
                 getDefaultProguardFile("proguard-android-optimize.txt"),
                 "proguard-rules.pro"
@@ -42,6 +43,7 @@ android {
     }
     buildFeatures {
         compose = true
+        buildConfig = true
     }
 
     // Add Data Connect generated SDK sources
@@ -61,6 +63,7 @@ ksp {
 dependencies {
     implementation(libs.androidx.core.ktx)
     implementation(libs.androidx.lifecycle.runtime.ktx)
+    implementation(libs.androidx.lifecycle.runtime.compose)
     implementation(libs.androidx.lifecycle.process)
     implementation(libs.androidx.activity.compose)
     implementation(platform(libs.androidx.compose.bom))
@@ -74,7 +77,9 @@ dependencies {
     implementation(libs.firebase.auth)
     implementation(libs.firebase.dataconnect)
     implementation(libs.firebase.storage)
-    implementation(libs.play.services.auth)
+    implementation(libs.credentials)
+    implementation(libs.credentials.play.services.auth)
+    implementation(libs.googleid)
     implementation(libs.kotlinx.serialization.core)
 
     // Hilt
@@ -123,6 +128,9 @@ dependencies {
 
     // AdMob
     implementation(libs.play.services.ads)
+
+    // Timber
+    implementation(libs.timber)
 
     // Desugaring (java.time support for minSdk 24)
     coreLibraryDesugaring(libs.desugar.jdk.libs)
