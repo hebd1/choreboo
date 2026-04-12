@@ -19,9 +19,16 @@ data class HabitEntity(
     val createdAt: Long = System.currentTimeMillis(),
     val isArchived: Boolean = false,
     val isHouseholdHabit: Boolean = false,
-    val ownerUid: String? = null,
+    val ownerUid: String = "",
     val householdId: String? = null,
     val assignedToUid: String? = null,
     val assignedToName: String? = null,
     val remoteId: String? = null,
+    /**
+     * D2: True while a write-through is pending (in-flight or awaiting retry).
+     * Cloud-to-local sync skips overwriting rows with pendingSync=true so that
+     * a stale cloud value cannot clobber a local change that hasn't reached the
+     * cloud yet. Cleared to false once the write-through succeeds or exhausts retries.
+     */
+    val pendingSync: Boolean = false,
 )

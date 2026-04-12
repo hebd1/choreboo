@@ -17,17 +17,18 @@ Repositories also call the **Firebase Data Connect generated SDK** for cloud wri
 - **Desugaring**: `isCoreLibraryDesugaringEnabled = true` — `java.time` APIs work on minSdk 24.
 - **TypeConverters**: `data/local/converter/Converters.kt` uses Gson for `List<String>` conversion. Enums are stored as plain Strings (no TypeConverter).
 - **Typography**: Custom `PlusJakartaSans` font family (5 weights: Light, Regular, Medium, SemiBold, Bold) applied to all Material3 typography styles in `Type.kt`.
+- **Logging**: Timber (5.0.1) — `DebugTree` planted in `ChorebooApplication.onCreate()` under `BuildConfig.DEBUG`. No `android.util.Log` calls anywhere in the codebase; all logging uses `Timber.d/w/e/wtf()`.
 
 ## Cloud Sync Architecture
 
 - **Backend**: Firebase Data Connect (PostgreSQL) — project `choreboo-7f36c`.
 - **SDK generation**: `npx firebase-tools@latest dataconnect:sdk:generate` — a `dataconnectCompile` Exec task in root `build.gradle.kts` runs it. Generated SDK goes to `app/build/generated/sources/`.
-- **Auth**: Firebase Auth (email/password + Google sign-in). `AuthRepository` wraps `FirebaseAuth`. `AuthViewModel` orchestrates login/register flows.
+- **Auth**: Firebase Auth (email/password + Google sign-in). `AuthRepository` wraps `FirebaseAuth`. `AuthViewModel` orchestrates login/register flows. Google sign-in uses the **Android Credential Manager API** (`androidx.credentials` 1.5.0 + `googleid` 1.1.1) — the legacy `GoogleSignIn` GMS API is not used. `AuthScreen` builds a `GetCredentialRequest` with `GetGoogleIdOption`, calls `CredentialManager.getCredential()`, extracts the `GoogleIdTokenCredential`, and passes the raw ID token to `AuthRepository.signInWithGoogle(idToken)`.
 - **Write-through**: All Room mutations (habit CRUD, choreboo updates, habit log inserts) also fire the corresponding Data Connect mutation. Failures are **silent** — no user-facing error for write-through.
 - **Cloud-to-local sync**: Triggered **after auth** (`force = true`, bypasses cooldown) and **on every app foreground** (`force = false`, 5-minute cooldown). `SyncManager` orchestrates all sync with a `Mutex` to prevent concurrent runs. `SyncManager.syncAll()` calls `getIdToken(false).await()` before any Data Connect calls to ensure the auth token is cached and available for the gRPC interceptor. Order: habits + choreboo + user points + purchased backgrounds (parallel) → habit logs (sequential, needs habit remoteIds) → household habit logs (best-effort). Conflict resolution: **cloud wins**.
 - **App foreground sync**: `AppLifecycleObserver` (registered via `ProcessLifecycleOwner`) calls `syncManager.syncAll(force = false)` on every `onStart`. Cold-start sync is **skipped** here — `MainViewModel` handles it as part of the coordinated splash-screen startup sequence. Only subsequent warm resumes trigger the observer's sync.
 - **Error visibility**: Only the post-auth sync shows errors (snackbar). Write-through failures are silent.
-- **Security**: All 17 queries and 23 mutations have `@auth(level: USER)` directives with auth-scoped filters. `connector.yaml` has `authMode: PUBLIC` (each operation has its own auth check). 4 household queries (`GetMyHousehold`, `GetMyHouseholdMembers`, `GetMyHouseholdChoreboos`, `GetMyHouseholdHabits`) are **inherently auth-scoped** — they traverse from `auth.uid` to the user's household, so no `householdId` parameter is needed and callers can only see their own household data. 3 habit/log queries (`GetHabitById`, `GetLogsForHabit`, `GetLogsForHabitAndDate`) that allow access to household habits now require household membership verification — the `isHouseholdHabit` branch checks that the caller's `auth.uid` is a member of the habit's household.
+- **Security**: All 16 queries and 27 mutations have `@auth(level: USER)` directives with auth-scoped filters. `connector.yaml` has `authMode: PUBLIC` (each operation has its own auth check). 4 household queries (`GetMyHousehold`, `GetMyHouseholdMembers`, `GetMyHouseholdChoreboos`, `GetMyHouseholdHabits`) are **inherently auth-scoped** — they traverse from `auth.uid` to the user's household, so no `householdId` parameter is needed and callers can only see their own household data. 3 habit/log queries (`GetHabitById`, `GetLogsForHabit`, `GetLogsForHabitAndDate`) that allow access to household habits now require household membership verification — the `isHouseholdHabit` branch checks that the caller's `auth.uid` is a member of the habit's household. Habit updates are split: `UpdateOwnHabit` (owner only, all fields) and `UpdateAssignedHabit` (assignee, safe fields only — no ownership or household fields).
 
 ### Data Connect Schema (6 cloud tables)
 
@@ -47,12 +48,14 @@ Defined in `dataconnect/schema/schema.gql`:
 - `dataconnect/dataconnect.yaml` — project config
 - `dataconnect/schema/schema.gql` — 6 tables
 - `dataconnect/choreboo-connector/connector.yaml` — authMode: PUBLIC
-- `dataconnect/choreboo-connector/queries.gql` — 17 queries, all auth-scoped
-- `dataconnect/choreboo-connector/mutations.gql` — 23 mutations, all auth-scoped (18 operational + 5 dev reset)
+- `dataconnect/choreboo-connector/queries.gql` — 16 queries, all auth-scoped
+- `dataconnect/choreboo-connector/mutations.gql` — 27 mutations, all auth-scoped (22 operational + 5 dev reset). Operational mutations include `UnarchiveHabit`, `NullifyHouseholdForMembers`, and `DeleteLogsForHabit` added since initial implementation.
 
 ## Data Flow Patterns
 
 - **Reactive reads**: DAOs return `Flow<>` → Repositories expose `Flow<>` → ViewModels expose `StateFlow` via `.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), default)`.
+- **Lifecycle-aware collection**: All Screen composables collect `StateFlow` via `collectAsStateWithLifecycle()` (from `androidx.lifecycle.compose`) — not `collectAsState()`. This ensures recomposition only occurs when the lifecycle is at least `STARTED`, preventing wasted work while the app is in the background.
+- **Config-change survival**: `rememberSaveable` (from `androidx.compose.runtime.saveable`) is used for UI state that must survive configuration changes — dialog visibility flags, form text, selected tabs, and similar ephemeral UI state. Import path is `androidx.compose.runtime.saveable.rememberSaveable` (not `androidx.compose.runtime.rememberSaveable`).
 - **One-shot writes**: DAO methods are `suspend`; called from `viewModelScope.launch {}` in ViewModels. Write-through to Data Connect happens in the same suspend function. Point deductions (feeding) also write-through to cloud via `UserRepository.syncPointsToCloud()`.
 - **One-shot events** (snackbars, navigation, level-up): `MutableSharedFlow` exposed as `events` in ViewModels (see `PetEvent`, `AddEditHabitEvent`, `AuthEvent`, `SettingsEvent`, `HouseholdEvent`).
 - **Loading states**: ViewModels expose `isSaving` / `isRefreshing` / `isHatching` / `isCreatingHousehold` / `isJoiningHousehold` / `isLeavingHousehold` as `StateFlow<Boolean>`, guarded by `try/finally` to ensure reset on error. Screens collect these to show `CircularProgressIndicator` and disable interaction.
@@ -95,6 +98,8 @@ Defined in `dataconnect/schema/schema.gql`:
 - **Firebase project**: `choreboo-7f36c`
 - **Data Connect SDK regen**: `npx firebase-tools@latest dataconnect:sdk:generate`
 - **Firebase Storage**: Configured for profile photo uploads (`storage.rules` in project root)
+- **Key build features**: `buildConfig = true` (required for `BuildConfig.DEBUG` access), `compose = true`, `isCoreLibraryDesugaringEnabled = true`
+- **Key dependencies**: Timber 5.0.1 (logging), Compose BOM 2025.05.00, `lifecycle-runtime-compose` 2.10.0 (`collectAsStateWithLifecycle`), Credential Manager 1.5.0 + `googleid` 1.1.1 (Google sign-in)
 
 ### Firebase Deploy
 
@@ -132,7 +137,7 @@ Deploy the backend (Data Connect schema/connectors + Storage rules) to the `chor
 | Gradle version check | `powershell.exe -File build.ps1 --version` |
 | SDK regen | `npx firebase-tools@latest dataconnect:sdk:generate` |
 
-> **Note**: 274 unit tests across domain models, repositories, and ViewModels. See the [Testing](#testing) section for details. No lint configuration, detekt, or ktlint is set up.
+> **Note**: 265 unit tests across domain models, repositories, and ViewModels. See the [Testing](#testing) section for details. No lint configuration, detekt, or ktlint is set up.
 
 ## Code Style
 
@@ -193,13 +198,19 @@ Deploy the backend (Data Connect schema/connectors + Storage rules) to the `chor
 - **Destructive actions** (delete habit) require `AlertDialog` confirmation.
 - **Level-up celebrations** shown via `AlertDialog` when XP causes level/stage change.
 - **Cloud sync**: `remoteId` field on all 3 Room entities links local rows to Data Connect UUIDs. Write-through on every mutation; cloud-to-local on auth + app foreground (via `SyncManager`).
+- **Network security**: `network_security_config.xml` disables cleartext HTTP in release builds. `backup_rules.xml` and `data_extraction_rules.xml` exclude the Room DB, DataStore prefs, and shared prefs from Android Auto Backup.
+- **StateFlow collection**: Always use `collectAsStateWithLifecycle()` (from `androidx.lifecycle.compose`) in Screen composables — never `collectAsState()`. This is lifecycle-aware and prevents unnecessary recomposition when the app is backgrounded.
+- **Saveable state**: Use `rememberSaveable` (import: `androidx.compose.runtime.saveable.rememberSaveable`) for any UI state that must survive configuration changes (dialog flags, form input, selected tabs). Do NOT use the incorrect `androidx.compose.runtime.rememberSaveable` path.
+- **String resources**: All user-facing strings use `stringResource(R.string.*)`. No hardcoded string literals in composables. Add new strings to `res/values/strings.xml` only — do not update `values-de/` or `values-es/` (those are deferred).
 
 ## UI Rules
 
-- Material3 only — use `MaterialTheme.colorScheme.*` and `MaterialTheme.typography.*`. No hardcoded text styles.
+- Material3 only — use `MaterialTheme.colorScheme.*` and `MaterialTheme.typography.*`. No hardcoded text styles or hardcoded colors anywhere in the UI.
 - Dynamic color is **disabled** (`dynamicColor = false`) — custom Choreboo palette always applied. Primary `#006E1C` (deep green), Secondary `#8B5000` (warm orange), Tertiary `#6833EA` (purple). See `Color.kt` for full Stitch design system.
 - Card corners: `RoundedCornerShape(16.dp)`. Input corners: `RoundedCornerShape(12.dp)`.
 - Always handle `innerPadding` from `Scaffold`. Use `Modifier.fillMaxWidth()` over hardcoded widths.
+- **Bottom nav bar** lives in `Scaffold`'s `bottomBar` slot (in `MainActivity`). No hardcoded bottom padding or 80dp spacers in any screen — `innerPadding` from `Scaffold` propagates to content via `Modifier.padding(innerPadding).consumeWindowInsets(innerPadding)` on the nav graph.
+- **Strings**: All user-facing text uses `stringResource(R.string.*)` — no hardcoded strings in composables. `res/values/strings.xml` contains ~548 string resources + 3 plurals. Auth error types use `@StringRes` fields. Only `values/` (English) is maintained; `values-de/` and `values-es/` are not yet updated.
 - Habit icons: **emoji-based** system (`EmojiIcon` data class with 15 preset emoji + custom emoji input). Not Material Icons.
 - Touch targets >= 48dp. Empty states show emoji + friendly message + CTA.
 - Use `AlertDialog` for confirmations; `ModalBottomSheet` for selection lists (feed, background picker).
@@ -209,6 +220,7 @@ Deploy the backend (Data Connect schema/connectors + Storage rules) to the `chor
 - Pet size scales by `ChorebooStage`.
 - **Auth screen**: Syncing overlay blocks interaction during cloud-to-local sync after login.
 - **Splash screen**: `MainActivity` shows a branded splash until `MainViewModel.isAppReady` becomes `true`. For fully authenticated+onboarded users, it waits for Room warmup only (sub-second). Cloud sync and WebP animation loading run in the background without blocking the splash.
+- **CalendarScreen loading**: `CalendarViewModel` exposes `isLoading: StateFlow<Boolean>` (starts `true`, cleared after first data emission). `CalendarScreen` shows a `CircularProgressIndicator` while `isLoading` is true.
 
 ## Package Structure
 
@@ -216,7 +228,7 @@ Deploy the backend (Data Connect schema/connectors + Storage rules) to the `chor
 com.example.choreboo_habittrackerfriend/
 ├── MainActivity.kt                  # @AndroidEntryPoint, dynamic startDestination (Auth/Onboarding/Pet)
 ├── MainViewModel.kt                 # @HiltViewModel — startup sequencer (DataStore → Room warmup → sync); exposes isAppReady StateFlow
-├── ChorebooApplication.kt           # @HiltAndroidApp, notification channels
+├── ChorebooApplication.kt           # @HiltAndroidApp, notification channels, Timber DebugTree (DEBUG builds only)
 ├── navigation/                      # ChorebooNavGraph.kt, Screen sealed class (8 routes)
 ├── data/
 │   ├── local/
@@ -226,7 +238,7 @@ com.example.choreboo_habittrackerfriend/
 │   │   ├── entity/                  # HabitEntity, HabitLogEntity, ChorebooEntity, HouseholdMemberEntity, HouseholdEntity, HouseholdHabitStatusEntity, PurchasedBackgroundEntity
 │   │   └── dao/                     # HabitDao, HabitLogDao, ChorebooDao, HouseholdMemberDao, HouseholdDao, HouseholdHabitStatusDao, PurchasedBackgroundDao
 │   ├── datastore/                   # UserPreferences (theme, onboarding, sound, totalPoints, totalLifetimeXp, profilePhotoUri)
-│   └── repository/                  # HabitRepository, ChorebooRepository, AuthRepository, HouseholdRepository, UserRepository, BadgeRepository, BackgroundRepository, ResetRepository, SyncManager
+│   └── repository/                  # HabitRepository, ChorebooRepository, AuthRepository, HouseholdRepository, UserRepository, BadgeRepository, BackgroundRepository, BillingRepository, ResetRepository, SyncManager
 ├── di/                              # AppModule (DB, DAOs, DataStore, UserPreferences, FirebaseAuth), AppLifecycleObserver
 ├── domain/model/                    # Habit, ChorebooStats, ChorebooMood, ChorebooStage, PetType, Household, AppUser, Badge, Background
 ├── ui/
@@ -306,7 +318,7 @@ The app navigates to the Auth screen. Re-register with the same email (or any em
 |------|------|
 | `MainViewModel.kt` | `@HiltViewModel` — orchestrates startup, exposes `isAppReady` and `themeMode`/`onboardingComplete`/`petMood` state flows |
 | `di/AppLifecycleObserver.kt` | `@Singleton` — skips cold-start `onStart` (handled by `MainViewModel`); triggers `syncAll(force = false)` on subsequent warm resumes |
-| `ChorebooApplication.kt` | `@HiltAndroidApp` — app entry point, sets up notification channels |
+| `ChorebooApplication.kt` | `@HiltAndroidApp` — app entry point, sets up notification channels, plants Timber `DebugTree` |
 | `ui/components/WebmAnimationView.kt` | `AnimatedImageDrawable`-based composable for animated WebP playback with alpha transparency and iteration control |
 
 ### isAppReady derivation
@@ -340,7 +352,7 @@ Additional context lives in `.github/copilot-instructions.md` (color palette hex
 
 ## Testing
 
-274 unit tests across 3 layers: domain models, repositories, and ViewModels. All tests are JVM-only (no Android emulator required).
+265 unit tests across 3 layers: domain models, repositories, and ViewModels. All tests are JVM-only (no Android emulator required).
 
 ### Test Stack
 
@@ -366,23 +378,23 @@ app/src/test/java/com/example/choreboo_habittrackerfriend/
 ├── domain/model/
 │   ├── HabitTest.kt                                   # isScheduledForToday, calculateStreak, calculateSuggestedXp (16)
 │   ├── ChorebooStatsTest.kt                           # fromEntity, mood calculation, stat clamping, decay (33)
-│   ├── ChorebooStageTest.kt                           # fromTotalXp thresholds, edge cases, negative XP (18)
+│   ├── ChorebooStageTest.kt                           # fromTotalXp thresholds, edge cases, negative XP (17)
 │   └── HouseholdPetTest.kt                            # HouseholdPet domain model fields, mood derivation (14)
 ├── data/repository/
-│   ├── AuthRepositoryFriendlyMessageTest.kt           # Firebase exception → user-friendly string mapping (19)
+│   ├── BillingRepositoryTest.kt                       # launchPurchaseFlow + verifyPremiumStatus guards (4)
 │   ├── ChorebooRepositoryAddXpTest.kt                 # XP addition, level-up, stage evolution, validation (12)
 │   ├── HabitRepositoryTest.kt                         # completeHabit, upsertHabit, custom-schedule streaks, validation guards (19)
 │   ├── HouseholdRepositoryValidationTest.kt           # createHousehold / joinHousehold validation guards (6)
 │   ├── SyncManagerTest.kt                             # Cooldown, mutex, force bypass, partial failure (11)
 │   └── UserRepositoryTest.kt                          # Points sync to/from cloud, validation guards (10)
 ├── di/
-│   └── AppLifecycleObserverTest.kt                    # Cold-start skip, warm-resume sync, exception handling (3)
+│   └── AppLifecycleObserverTest.kt                    # Cold-start skip, warm-resume sync, exception handling (4)
 └── ui/
     ├── auth/AuthViewModelTest.kt                       # Form state, validation, Google sign-in, sync, returning-user (23)
     ├── calendar/CalendarViewModelTest.kt               # Month navigation, date parsing, heatmap colors (18)
-    ├── habits/AddEditHabitViewModelTest.kt             # Form state, save/load, XP suggestion, validation (33)
+    ├── habits/AddEditHabitViewModelTest.kt             # Form state, save/load, XP suggestion, validation (34)
     ├── pet/PetViewModelTest.kt                         # Stat display, feeding, sleep, XP events (22)
-    └── settings/SettingsViewModelTest.kt               # Reset account, theme changes, settings state (4)
+    └── settings/SettingsViewModelTest.kt               # Reset account, theme changes, settings state (10)
 ```
 
 ### Test Conventions
@@ -439,7 +451,18 @@ app/src/test/java/com/example/choreboo_habittrackerfriend/
 | AuthRepository | `signInWithEmail()` / `signUpWithEmail()` | email & password non-blank |
 | AuthRepository | `sendPasswordReset()` | email non-blank |
 
-## Known Issues (as of 2026-04-06)
+## Known Issues (as of 2026-04-11)
+
+### UI/UX Improvements (U1–U9, resolved 2026-04-11)
+
+- **U1**: `rememberSaveable` import corrected to `androidx.compose.runtime.saveable.rememberSaveable` in all 7 affected Screen files. Used for dialog flags, form text, and tab selection throughout the UI.
+- **U2**: Google sign-in migrated from legacy GMS `GoogleSignIn` API to **Android Credential Manager** (`androidx.credentials` 1.5.0 + `googleid` 1.1.1). Dead `play-services-auth:21.2.0` dependency removed.
+- **U3**: All Screen composables migrated from `collectAsState()` to `collectAsStateWithLifecycle()` (from `lifecycle-runtime-compose` 2.10.0). Zero legacy `collectAsState()` calls remain.
+- **U4**: `CalendarViewModel` exposes `isLoading: StateFlow<Boolean>`; `CalendarScreen` shows `CircularProgressIndicator` on first load. `StatsViewModel` exposes `isRefreshing`. `PetViewModel` exposes `initError: StateFlow<Boolean>` with retry UI.
+- **U5**: Bottom nav bar moved into `Scaffold`'s `bottomBar` slot in `MainActivity`. All hardcoded 80dp bottom spacers removed from screens; `innerPadding` + `consumeWindowInsets` propagates correct insets to the nav graph.
+- **U7**: All hardcoded `Color(...)` literals replaced with `MaterialTheme.colorScheme.*` tokens across `PetBackgroundImage` and `BackgroundPickerSheet`.
+- **U8**: Notification permission `IconButton` in `AddEditHabitScreen` given explicit `contentDescription` for accessibility.
+- **U9**: ~548 string resources + 3 plurals in `res/values/strings.xml`. All hardcoded user-facing strings in composables replaced with `stringResource(R.string.*)`. Auth error types use `@StringRes` sealed class fields. Compose BOM updated from `2024.12.01` → `2025.05.00`.
 
 ### Bugs (all resolved)
 
@@ -452,6 +475,18 @@ All critical bugs C1–C5 found during the 2026-04-05 audit have been fixed. See
 ### Security Gaps (resolved)
 
 - **G20**: 4 household queries restructured to be inherently auth-scoped (traverse from `auth.uid`). No `householdId` parameter needed. `HouseholdRepository` updated to use new SDK query names and response shapes.
+
+### Security Fixes — Phase 2 (resolved, 2026-04-10)
+
+- **S1**: `network_security_config.xml` added — cleartext HTTP disabled for all domains in release builds. `AndroidManifest.xml` references it via `android:networkSecurityConfig`.
+- **S2**: `backup_rules.xml` and `data_extraction_rules.xml` added — Room DB file, DataStore prefs, and shared preferences excluded from Android Auto Backup and cloud backup (API 31+).
+- **S3**: `AndroidManifest.xml` hardened — `android:allowBackup="true"` retained with explicit exclusion rules; `android:fullBackupContent` (pre-31) and `android:dataExtractionRules` (31+) set.
+- **S4**: `BillingRepository.launchPurchaseFlow()` guards against null `Activity` reference before launching the Play Billing flow. `verifyPremiumStatus()` returns false (not a crash) when the billing client is disconnected.
+- **S5**: `UserPreferences.isPremium` DataStore field removed entirely — premium state is now derived at runtime from `BillingRepository.verifyPremiumStatus()` only. No persistent local premium flag.
+- **S6**: `GetUserById` query removed from `queries.gql` — it was unused and exposed user records by UID without household-membership verification.
+- **S7**: `UpdateHabit` mutation split into `UpdateOwnHabit` (owner only, all fields) and `UpdateAssignedHabit` (assignee, safe fields only — title, description, iconName, customDays, difficulty, baseXp, reminderEnabled, reminderTime). Ownership and household fields cannot be changed by an assignee.
+- **S8**: `BillingRepositoryTest` updated — 2 DataStore `isPremium` seed tests removed (field no longer exists); 4 tests remain covering `launchPurchaseFlow` and `verifyPremiumStatus` guards.
+- **S9**: `ChorebooApplication.kt` duplicate class body bug fixed — file previously had a second empty class body appended, causing a compile error in edge cases.
 
 ### Sync Gaps (resolved)
 
@@ -585,3 +620,4 @@ print('First sub-chunk in ANMF:', tag)  # should be b'ALPH'
 - Sound effects
 - WebP animations for other pet types (AXOLOTL, CAPYBARA, PANDA)
 - Multiple Choreboos
+- IME keyboard padding — `imePadding()` / `WindowInsets.ime` not yet applied to text-input screens (Auth, Onboarding, AddEditHabit, Settings)

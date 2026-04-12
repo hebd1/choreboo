@@ -1,6 +1,5 @@
 package com.example.choreboo_habittrackerfriend.data.repository
 
-import android.util.Log
 import dagger.hilt.android.qualifiers.ApplicationContext
 import com.example.choreboo_habittrackerfriend.data.local.dao.HabitDao
 import com.example.choreboo_habittrackerfriend.data.local.dao.HabitLogDao
@@ -18,11 +17,13 @@ import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.SupervisorJob
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withTimeoutOrNull
+import timber.log.Timber
 import java.time.DayOfWeek
 import java.time.LocalDate
 import java.time.LocalTime
@@ -32,8 +33,13 @@ import java.util.UUID
 import javax.inject.Inject
 import javax.inject.Singleton
 
-private const val TAG = "HabitRepository"
 private const val CLOUD_TIMEOUT_MS = 5000L
+
+/**
+ * D2: Retry delays for write-through failures. 3 attempts total:
+ * 1st attempt immediate, 2nd after 1 s, 3rd after 3 s.
+ */
+private val WRITE_THROUGH_RETRY_DELAYS_MS = listOf(1_000L, 3_000L)
 
 data class CompletionResult(
     val xpEarned: Int,
@@ -54,6 +60,7 @@ class HabitRepository @Inject constructor(
     private val dateFormatter = DateTimeFormatter.ISO_LOCAL_DATE
 
     /** Fire-and-forget scope for silent write-through calls. */
+    @Volatile
     private var writeScope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
 
     /**
@@ -64,6 +71,31 @@ class HabitRepository @Inject constructor(
     fun cancelPendingWrites() {
         writeScope.coroutineContext[Job]?.cancel()
         writeScope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
+    }
+
+    /**
+     * D2: Execute [block] with up to 3 attempts (1 immediate + 2 retries with backoff).
+     * Returns true on success, false after all attempts fail.
+     * Callers set pendingSync=true before calling, clear it after this returns.
+     */
+    private suspend fun retryWithBackoff(tag: String, block: suspend () -> Unit): Boolean {
+        var attempt = 0
+        while (true) {
+            try {
+                block()
+                return true
+            } catch (e: Exception) {
+                if (attempt < WRITE_THROUGH_RETRY_DELAYS_MS.size) {
+                    val delayMs = WRITE_THROUGH_RETRY_DELAYS_MS[attempt]
+                    Timber.w(e, "Write-through [$tag] attempt ${attempt + 1} failed, retrying in ${delayMs}ms")
+                    delay(delayMs)
+                    attempt++
+                } else {
+                    Timber.e(e, "Write-through [$tag] exhausted all retries")
+                    return false
+                }
+            }
+        }
     }
 
     fun getAllHabits(): Flow<List<Habit>> = habitDao.getAllHabits().map { entities ->
@@ -86,51 +118,83 @@ class HabitRepository @Inject constructor(
 
         val localId = habitDao.upsertHabit(habit.toEntity())
 
-        // Write-through to Data Connect (fire-and-forget)
+        // Write-through to Data Connect.
+        // New habits (no remoteId yet): mark pendingSync=true immediately, clear on success/exhaustion.
+        // This prevents the cloud-to-local sync from overwriting local state with a stale cloud
+        // response during the window between local insert and cloud round-trip (D2 fix).
         writeScope.launch {
-            try {
-                if (habit.remoteId != null) {
-                    // Update existing remote habit
+            if (habit.remoteId != null) {
+                // Update existing remote habit — no pendingSync guard needed for updates
+                try {
                     val remoteUuid = UUID.fromString(habit.remoteId)
-                    connector.updateHabit.execute(
-                        habitId = remoteUuid,
-                        title = habit.title,
-                        iconName = habit.iconName,
-                        customDays = habit.customDays.joinToString(","),
-                        difficulty = habit.difficulty,
-                        baseXp = habit.baseXp,
-                        reminderEnabled = habit.reminderEnabled,
-                        isHouseholdHabit = habit.isHouseholdHabit,
-                    ) {
-                        description = habit.description
-                        reminderTime = habit.reminderTime?.toString()
-                        householdId = habit.householdId?.let { UUID.fromString(it) }
-                        assignedToId = habit.assignedToUid
+                    val currentUid = firebaseAuth.currentUser?.uid
+                    if (currentUid != null && habit.ownerUid == currentUid) {
+                        // Owner — update all fields
+                        // S7: Route to the correct mutation based on ownership.
+                        connector.updateOwnHabit.execute(
+                            habitId = remoteUuid,
+                            title = habit.title,
+                            iconName = habit.iconName,
+                            customDays = habit.customDays.joinToString(","),
+                            difficulty = habit.difficulty,
+                            baseXp = habit.baseXp,
+                            reminderEnabled = habit.reminderEnabled,
+                            isHouseholdHabit = habit.isHouseholdHabit,
+                        ) {
+                            description = habit.description
+                            reminderTime = habit.reminderTime?.toString()
+                            householdId = habit.householdId?.let { UUID.fromString(it) }
+                            assignedToId = habit.assignedToUid
+                        }
+                        Timber.d("Updated own habit in cloud: $remoteUuid")
+                    } else {
+                        // Assignee — update safe fields only (no ownership/household changes)
+                        connector.updateAssignedHabit.execute(
+                            habitId = remoteUuid,
+                            title = habit.title,
+                            iconName = habit.iconName,
+                            customDays = habit.customDays.joinToString(","),
+                            reminderEnabled = habit.reminderEnabled,
+                        ) {
+                            description = habit.description
+                            reminderTime = habit.reminderTime?.toString()
+                        }
+                        Timber.d("Updated assigned habit in cloud: $remoteUuid")
                     }
-                    Log.d(TAG, "Updated habit in cloud: $remoteUuid")
-                } else {
-                    // Create new remote habit
-                    val result = connector.createHabit.execute(
-                        title = habit.title,
-                        iconName = habit.iconName,
-                        customDays = habit.customDays.joinToString(","),
-                        difficulty = habit.difficulty,
-                        baseXp = habit.baseXp,
-                        reminderEnabled = habit.reminderEnabled,
-                        isHouseholdHabit = habit.isHouseholdHabit,
-                    ) {
-                        description = habit.description
-                        reminderTime = habit.reminderTime?.toString()
-                        householdId = habit.householdId?.let { UUID.fromString(it) }
-                        assignedToId = habit.assignedToUid
-                    }
-                    // Store the remote ID back in Room
-                    val remoteId = result.data.habit_insert.id.toString()
-                    habitDao.upsertHabit(habit.toEntity().copy(id = localId, remoteId = remoteId))
-                    Log.d(TAG, "Created habit in cloud: $remoteId")
+                } catch (e: Exception) {
+                    Timber.e(e, "Failed to sync habit update to cloud")
                 }
-            } catch (e: Exception) {
-                Log.e(TAG, "Failed to sync habit to cloud", e)
+            } else {
+                // D2 + D4: New habit. Pre-generate UUID, stamp remoteId + pendingSync=true in
+                // Room immediately, then retry the cloud insert up to 3 times. The pendingSync
+                // flag prevents a concurrent sync from overwriting local state with a stale
+                // cloud value before the cloud record actually exists.
+                val preGeneratedId = UUID.randomUUID()
+                val remoteId = preGeneratedId.toString()
+                habitDao.upsertHabit(habit.toEntity().copy(id = localId, remoteId = remoteId, pendingSync = true))
+                val success = retryWithBackoff("createHabit:$localId") {
+                    connector.createHabit.execute(
+                        id = preGeneratedId,
+                        title = habit.title,
+                        iconName = habit.iconName,
+                        customDays = habit.customDays.joinToString(","),
+                        difficulty = habit.difficulty,
+                        baseXp = habit.baseXp,
+                        reminderEnabled = habit.reminderEnabled,
+                        isHouseholdHabit = habit.isHouseholdHabit,
+                    ) {
+                        description = habit.description
+                        reminderTime = habit.reminderTime?.toString()
+                        householdId = habit.householdId?.let { UUID.fromString(it) }
+                        assignedToId = habit.assignedToUid
+                    }
+                }
+                if (success) {
+                    Timber.d("Created habit in cloud with pre-generated id: $remoteId")
+                }
+                // Always clear pendingSync whether success or exhausted — we don't retry
+                // indefinitely; the next full sync will reconcile if still missing.
+                habitDao.clearPendingSync(localId)
             }
         }
 
@@ -142,16 +206,16 @@ class HabitRepository @Inject constructor(
         val entity = habitDao.getHabitByIdSync(id)
         habitDao.deleteHabitById(id)
 
-        // Write-through: delete from Data Connect (fire-and-forget)
+        // Write-through: delete logs then habit from Data Connect with retry.
+        // Logs must be deleted first to avoid FK constraint violations (D5 fix).
+        // Without retry, a transient failure leaves a ghost habit that reappears on next sync.
         entity?.remoteId?.let { remoteId ->
             writeScope.launch {
-                try {
-                    connector.deleteHabit.execute(
-                        habitId = UUID.fromString(remoteId),
-                    )
-                    Log.d(TAG, "Deleted habit from cloud: $remoteId")
-                } catch (e: Exception) {
-                    Log.e(TAG, "Failed to delete habit from cloud", e)
+                retryWithBackoff("deleteHabit:$id") {
+                    val habitUuid = UUID.fromString(remoteId)
+                    connector.deleteLogsForHabit.execute(habitId = habitUuid)
+                    connector.deleteHabit.execute(habitId = habitUuid)
+                    Timber.d("Deleted habit + logs from cloud: $remoteId")
                 }
             }
         }
@@ -168,9 +232,29 @@ class HabitRepository @Inject constructor(
                     connector.archiveHabit.execute(
                         habitId = UUID.fromString(remoteId),
                     )
-                    Log.d(TAG, "Archived habit in cloud: $remoteId")
+                    Timber.d("Archived habit in cloud: $remoteId")
                 } catch (e: Exception) {
-                    Log.e(TAG, "Failed to archive habit in cloud", e)
+                    Timber.e(e, "Failed to archive habit in cloud")
+                }
+            }
+        }
+    }
+
+    /** Un-archive a habit locally and in Data Connect (D6 fix — mirrors archiveHabit). */
+    suspend fun unarchiveHabit(id: Long) {
+        val entity = habitDao.getHabitByIdSync(id)
+        habitDao.unarchiveHabit(id)
+
+        // Write-through: un-archive in Data Connect (fire-and-forget)
+        entity?.remoteId?.let { remoteId ->
+            writeScope.launch {
+                try {
+                    connector.unarchiveHabit.execute(
+                        habitId = UUID.fromString(remoteId),
+                    )
+                    Timber.d("Unarchived habit in cloud: $remoteId")
+                } catch (e: Exception) {
+                    Timber.e(e, "Failed to un-archive habit in cloud")
                 }
             }
         }
@@ -233,7 +317,7 @@ class HabitRepository @Inject constructor(
                         }
                     }
                 } catch (e: Exception) {
-                    Log.w(TAG, "Cloud pre-check for household habit failed — continuing with local completion", e)
+                    Timber.w(e, "Cloud pre-check for household habit failed — continuing with local completion")
                     // Fall through: let local completion proceed; UNIQUE constraint handles duplicates
                 }
             }
@@ -261,35 +345,42 @@ class HabitRepository @Inject constructor(
             return CompletionResult(xpEarned = 0, newStreak = 0, alreadyComplete = true)
         }
 
-        // Read current totals before updating so we can pass the new values to write-through
-        val prevPoints = userPreferences.totalPoints.first()
-        val prevLifetimeXp = userPreferences.totalLifetimeXp.first()
-        userPreferences.addPoints(xpEarned)
-        userPreferences.addLifetimeXp(xpEarned)
-        val newPoints = prevPoints + xpEarned
-        val newLifetimeXp = prevLifetimeXp + xpEarned
+        // addPoints/addLifetimeXp are atomic inside dataStore.edit and return the new value,
+        // eliminating the read-then-compute race that existed with the old read-first pattern.
+        val newPoints = userPreferences.addPoints(xpEarned)
+        val newLifetimeXp = userPreferences.addLifetimeXp(xpEarned)
 
         // Write-through: sync new point totals to cloud (fire-and-forget, silent on failure)
         writeScope.launch {
             userRepository.syncPointsToCloud(newPoints, newLifetimeXp)
         }
 
-        // Write-through: create log in Data Connect and save remoteId back (fire-and-forget)
+        // Write-through: create log in Data Connect using a pre-generated UUID (D4 fix).
+        // D2: Set pendingSync=true before the network call to prevent cloud-wins sync from
+        // overwriting the freshly inserted log while the write-through is in flight.
+        // The remoteId is stamped into Room immediately so if the app is killed before the
+        // cloud response returns, the next sync can still reconcile the log correctly.
         habitEntity.remoteId?.let { remoteHabitId ->
+            val preGeneratedLogId = UUID.randomUUID()
+            val remoteLogId = preGeneratedLogId.toString()
+            // Stamp remoteId + pendingSync before the network call
+            habitLogDao.updateLogRemoteId(localLogId, remoteLogId)
+            habitLogDao.markPendingSync(localLogId)
             writeScope.launch {
-                try {
-                    val result = connector.createHabitLog.execute(
+                val success = retryWithBackoff("createHabitLog:$localLogId") {
+                    connector.createHabitLog.execute(
+                        id = preGeneratedLogId,
                         habitId = UUID.fromString(remoteHabitId),
                         date = today,
                         xpEarned = xpEarned,
                         streakAtCompletion = streak + 1,
                     )
-                    val remoteLogId = result.data.habitLog_insert.id.toString()
-                    habitLogDao.updateLogRemoteId(localLogId, remoteLogId)
-                    Log.d(TAG, "Created habit log in cloud for habit: $remoteHabitId (remoteLogId: $remoteLogId)")
-                } catch (e: Exception) {
-                    Log.e(TAG, "Failed to sync habit log to cloud", e)
                 }
+                if (success) {
+                    Timber.d("Created habit log in cloud for habit: $remoteHabitId (remoteLogId: $remoteLogId)")
+                }
+                // Always clear pendingSync whether success or exhausted.
+                habitLogDao.clearPendingSync(localLogId)
             }
         }
 
@@ -342,9 +433,10 @@ class HabitRepository @Inject constructor(
             if (monthlyDays.isNotEmpty()) {
                 val dom = date.dayOfMonth
                 val lastDom = date.lengthOfMonth()
-                // "D31" matches the last day of any month
+                // Exact match
                 if (dom in monthlyDays) return true
-                if (31 in monthlyDays && dom == lastDom) return true
+                // If any scheduled day exceeds this month's length, it fires on the last day
+                if (monthlyDays.any { it >= lastDom } && dom == lastDom) return true
             }
             return false
         }
@@ -393,7 +485,8 @@ class HabitRepository @Inject constructor(
             dateStrings.mapNotNull { dateStr ->
                 try {
                     LocalDate.parse(dateStr, dateFormatter).dayOfWeek
-                } catch (_: Exception) {
+                } catch (e: Exception) {
+                    Timber.w(e, "Failed to parse date for day-of-week: $dateStr")
                     null
                 }
             }.toSet()
@@ -416,10 +509,6 @@ class HabitRepository @Inject constructor(
     }
 
     /**
-     * Cancel all pending AlarmManager reminder alarms. Called on sign-out to prevent stale
-     * alarms from firing after the user switches accounts.
-     */
-    /**
      * Cancel all pending AlarmManager alarms for this device.
      * Called during sign-out to prevent stale notifications from firing after the user switches accounts.
      * This prevents a stale habit from a previous account being linked to the newly-signed-in user's pet.
@@ -430,9 +519,9 @@ class HabitRepository @Inject constructor(
             for (habit in allHabits) {
                 HabitReminderScheduler.cancelReminder(context, habit.id)
             }
-            Log.d(TAG, "Cancelled ${allHabits.size} pending reminder alarms")
+            Timber.d("Cancelled ${allHabits.size} pending reminder alarms")
         } catch (e: Exception) {
-            Log.w(TAG, "Failed to cancel all reminders", e)
+            Timber.w(e, "Failed to cancel all reminders")
         }
     }
 
@@ -455,11 +544,11 @@ class HabitRepository @Inject constructor(
             val updated = entity.copy(isHouseholdHabit = false, householdId = null, assignedToUid = null, assignedToName = null)
             habitDao.upsertHabit(updated)
 
-            // Write-through: update in Data Connect (fire-and-forget, silent on failure)
+            // Write-through: update in Data Connect as owner (fire-and-forget, silent on failure)
             entity.remoteId?.let { remoteId ->
                 writeScope.launch {
                     try {
-                        connector.updateHabit.execute(
+                        connector.updateOwnHabit.execute(
                             habitId = UUID.fromString(remoteId),
                             title = entity.title,
                             iconName = entity.iconName,
@@ -475,19 +564,14 @@ class HabitRepository @Inject constructor(
                             assignedToId = null
                         }
                     } catch (e: Exception) {
-                        Log.e(TAG, "Failed to convert household habit to personal in cloud: $remoteId", e)
+                        Timber.e(e, "Failed to convert household habit to personal in cloud: $remoteId")
                     }
                 }
             }
         }
-        Log.d(TAG, "Converted ${ownHouseholdHabits.size} household habits to personal for uid=$uid")
+        Timber.d("Converted ${ownHouseholdHabits.size} household habits to personal for uid=$uid")
     }
 
-    /**
-     * Pull habits from Data Connect and merge into Room (cloud wins).
-     * Also syncs household habits owned by other members into Room so they appear
-     * in the habit list. Called once after successful authentication and on every sync.
-     */
     /**
      * Sync all habits from Firebase Data Connect to Room.
      * Two phases:
@@ -505,17 +589,45 @@ class HabitRepository @Inject constructor(
             // ---- 1. Personal habits (owned by current user) ----
             val result = withTimeoutOrNull(CLOUD_TIMEOUT_MS) { connector.getAllMyHabits.execute() }
             if (result == null) {
-                Log.w(TAG, "syncHabitsFromCloud: personal habits timed out")
+                Timber.w("syncHabitsFromCloud: personal habits timed out")
                 return
             }
             val cloudHabits = result.data.habits
-            Log.d(TAG, "Fetched ${cloudHabits.size} personal habits from cloud")
+            Timber.d("Fetched ${cloudHabits.size} personal habits from cloud")
 
             val cloudRemoteIds = mutableSetOf<String>()
             for (cloudHabit in cloudHabits) {
                 val remoteId = cloudHabit.id.toString()
                 cloudRemoteIds.add(remoteId)
                 val existing = habitDao.getHabitByRemoteId(remoteId)
+
+                // D2: Skip overwriting rows that have a pending write-through in flight.
+                // If pendingSync=true, the local state is ahead of the cloud; overwriting it
+                // would clobber the user's change before the cloud has received it.
+                if (existing?.pendingSync == true) {
+                    Timber.d("syncHabitsFromCloud: skipping pendingSync habit remoteId=$remoteId")
+                    val upsertedId = existing.id
+                    if (cloudHabit.reminderEnabled && cloudHabit.reminderTime != null && !cloudHabit.isArchived) {
+                        try {
+                            val parsedTime = try {
+                                LocalTime.parse(cloudHabit.reminderTime)
+                            } catch (e: Exception) {
+                                Timber.w(e, "Failed to parse reminder time (pendingSync path): ${cloudHabit.reminderTime}")
+                                LocalTime.of(9, 0)
+                            }
+                            HabitReminderScheduler.scheduleReminder(
+                                context,
+                                upsertedId,
+                                cloudHabit.title,
+                                parsedTime,
+                                cloudHabit.customDays.split(",").map { it.trim() }.filter { it.isNotEmpty() },
+                            )
+                        } catch (e: Exception) {
+                            Timber.w(e, "Failed to schedule reminder for pendingSync habit ${cloudHabit.title}")
+                        }
+                    }
+                    continue
+                }
 
                 val entity = HabitEntity(
                     id = existing?.id ?: 0,
@@ -536,18 +648,19 @@ class HabitRepository @Inject constructor(
                     assignedToName = cloudHabit.assignedTo?.displayName,
                     remoteId = remoteId,
                 )
-             val upsertedId = habitDao.upsertHabit(entity)
-                 // For new habits (existing == null) entity.id is 0; use the auto-generated ID
-                 // returned by upsertHabit instead so the PendingIntent request code is correct.
-                 val habitLocalId = existing?.id ?: upsertedId
+                val upsertedId = habitDao.upsertHabit(entity)
+                // For new habits (existing == null) entity.id is 0; use the auto-generated ID
+                // returned by upsertHabit instead so the PendingIntent request code is correct.
+                val habitLocalId = existing?.id ?: upsertedId
 
-                 // Schedule reminder immediately after syncing if enabled (fixes B17: new devices signing in for first time).
-                 // On new devices, synced personal habits have reminderEnabled=true but no AlarmManager alarms were registered.
-                 if (cloudHabit.reminderEnabled && cloudHabit.reminderTime != null && !cloudHabit.isArchived) {
+                // Schedule reminder immediately after syncing if enabled (fixes B17: new devices signing in for first time).
+                // On new devices, synced personal habits have reminderEnabled=true but no AlarmManager alarms were registered.
+                if (cloudHabit.reminderEnabled && cloudHabit.reminderTime != null && !cloudHabit.isArchived) {
                     try {
                         val parsedTime = try {
                             LocalTime.parse(cloudHabit.reminderTime)
-                        } catch (_: Exception) {
+                        } catch (e: Exception) {
+                            Timber.w(e, "Failed to parse reminder time (personal habits path): ${cloudHabit.reminderTime}")
                             LocalTime.of(9, 0)
                         }
                         HabitReminderScheduler.scheduleReminder(
@@ -558,24 +671,26 @@ class HabitRepository @Inject constructor(
                             cloudHabit.customDays.split(",").map { it.trim() }.filter { it.isNotEmpty() },
                         )
                     } catch (e: Exception) {
-                        Log.w(TAG, "Failed to schedule reminder for synced habit ${cloudHabit.title}", e)
+                        Timber.w(e, "Failed to schedule reminder for synced habit ${cloudHabit.title}")
                     }
                 }
             }
 
             // G13: Deletion reconciliation for personal habits.
+            // D2: Exclude pendingSync=true rows — they have a write-through in flight and
+            // their remoteId may not appear in the cloud response yet (newly created habit).
             val localSyncedHabits = habitDao.getHabitsWithRemoteId()
             val orphanIds = localSyncedHabits
-                .filter { it.ownerUid == uid && it.remoteId !in cloudRemoteIds }
+                .filter { it.ownerUid == uid && it.remoteId !in cloudRemoteIds && !it.pendingSync }
                 .map { it.id }
             if (orphanIds.isNotEmpty()) {
                 orphanIds.chunked(500).forEach { chunk -> habitDao.deleteByIds(chunk) }
-                Log.d(TAG, "Deleted ${orphanIds.size} orphaned personal habits not present in cloud")
+                Timber.d("Deleted ${orphanIds.size} orphaned personal habits not present in cloud")
             }
 
-            Log.d(TAG, "Synced ${cloudHabits.size} personal habits from cloud to Room")
+            Timber.d("Synced ${cloudHabits.size} personal habits from cloud to Room")
         } catch (e: Exception) {
-            Log.e(TAG, "Failed to sync personal habits from cloud", e)
+            Timber.e(e, "Failed to sync personal habits from cloud")
             throw e
         }
 
@@ -586,7 +701,7 @@ class HabitRepository @Inject constructor(
             val uid = firebaseAuth.currentUser?.uid ?: return
             val hhResult = withTimeoutOrNull(CLOUD_TIMEOUT_MS) { connector.getMyHouseholdHabits.execute() }
             if (hhResult == null) {
-                Log.w(TAG, "syncHabitsFromCloud: household habits timed out")
+                Timber.w("syncHabitsFromCloud: household habits timed out")
                 return
             }
             val householdData = hhResult.data.user?.household
@@ -629,17 +744,18 @@ class HabitRepository @Inject constructor(
                     assignedToName = cloudHabit.assignedTo?.displayName,
                     remoteId = remoteId,
                 )
-                 val upsertedHhId = habitDao.upsertHabit(entity)
-                 // For new habits entity.id is 0; use the auto-generated ID for alarm scheduling.
-                 val hhHabitLocalId = existing?.id ?: upsertedHhId
+                val upsertedHhId = habitDao.upsertHabit(entity)
+                // For new habits entity.id is 0; use the auto-generated ID for alarm scheduling.
+                val hhHabitLocalId = existing?.id ?: upsertedHhId
 
-                 // Schedule reminder for household habits assigned to current user (fixes B17: assignments on new devices).
-                 // User A assigns a habit to User B → User B signs in on a new device → reminder should fire for User B.
-                 if (isAssignedToCurrentUser && reminderEnabled && reminderTime != null && !cloudHabit.isArchived) {
+                // Schedule reminder for household habits assigned to current user (fixes B17: assignments on new devices).
+                // User A assigns a habit to User B → User B signs in on a new device → reminder should fire for User B.
+                if (isAssignedToCurrentUser && reminderEnabled && reminderTime != null && !cloudHabit.isArchived) {
                     try {
                         val parsedTime = try {
                             LocalTime.parse(reminderTime)
-                        } catch (_: Exception) {
+                        } catch (e: Exception) {
+                            Timber.w(e, "Failed to parse reminder time (household habits path): $reminderTime")
                             LocalTime.of(9, 0)
                         }
                         HabitReminderScheduler.scheduleReminder(
@@ -650,7 +766,7 @@ class HabitRepository @Inject constructor(
                             cloudHabit.customDays.split(",").map { it.trim() }.filter { it.isNotEmpty() },
                         )
                     } catch (e: Exception) {
-                        Log.w(TAG, "Failed to schedule reminder for assigned household habit ${cloudHabit.title}", e)
+                        Timber.w(e, "Failed to schedule reminder for assigned household habit ${cloudHabit.title}")
                     }
                 }
             }
@@ -662,12 +778,12 @@ class HabitRepository @Inject constructor(
                 .map { it.id }
             if (staleIds.isNotEmpty()) {
                 staleIds.chunked(500).forEach { chunk -> habitDao.deleteByIds(chunk) }
-                Log.d(TAG, "Deleted ${staleIds.size} stale other-member household habits")
+                Timber.d("Deleted ${staleIds.size} stale other-member household habits")
             }
 
-            Log.d(TAG, "Synced ${cloudHouseholdHabits.size} other-member household habits from cloud")
+            Timber.d("Synced ${cloudHouseholdHabits.size} other-member household habits from cloud")
         } catch (e: Exception) {
-            Log.e(TAG, "Failed to sync household habits from cloud (non-fatal)", e)
+            Timber.e(e, "Failed to sync household habits from cloud (non-fatal)")
             // Silent — household sync failure should not block the rest of the sync
         }
     }
@@ -689,7 +805,7 @@ class HabitRepository @Inject constructor(
                 connector.getHouseholdHabitLogsForDate.execute(date = today)
             }
             if (result == null) {
-                Log.w(TAG, "syncHouseholdHabitLogsForToday: timed out")
+                Timber.w("syncHouseholdHabitLogsForToday: timed out")
                 return
             }
             val habitsWithLogs = result.data.user?.household?.habits_on_household
@@ -722,9 +838,9 @@ class HabitRepository @Inject constructor(
                     habitLogDao.insertLog(logEntity)
                 }
             }
-            Log.d(TAG, "Synced household habit logs for today")
+            Timber.d("Synced household habit logs for today")
         } catch (e: Exception) {
-            Log.e(TAG, "Failed to sync household habit logs for today (non-fatal)", e)
+            Timber.e(e, "Failed to sync household habit logs for today (non-fatal)")
         }
     }
 
@@ -738,6 +854,14 @@ class HabitRepository @Inject constructor(
         val startDate = LocalDate.now().minusDays(30).format(dateFormatter)
 
         try {
+            // D1 fix: Snapshot local remoteIds BEFORE the cloud fetch.
+            // Any log whose remoteId is stamped by a concurrent write-through between the
+            // cloud query and the local reconciliation query would otherwise appear as an
+            // orphan and be wrongly deleted. By snapshotting first, those in-flight logs
+            // are in neither the pre-snapshot set nor the cloud set → excluded from deletion.
+            val preSnapshotLocalLogs = habitLogDao.getLogsWithRemoteIdInRange(startDate, endDate)
+            val preSnapshotRemoteIds = preSnapshotLocalLogs.mapNotNull { it.remoteId }.toSet()
+
             val result = withTimeoutOrNull(CLOUD_TIMEOUT_MS) {
                 connector.getMyLogsForDateRange.execute(
                     startDate = startDate,
@@ -745,11 +869,11 @@ class HabitRepository @Inject constructor(
                 )
             }
             if (result == null) {
-                Log.w(TAG, "syncHabitLogsFromCloud: timed out")
+                Timber.w("syncHabitLogsFromCloud: timed out")
                 return
             }
             val cloudLogs = result.data.habitLogs
-            Log.d(TAG, "Fetched ${cloudLogs.size} habit logs from cloud")
+            Timber.d("Fetched ${cloudLogs.size} habit logs from cloud")
 
             // Build a map of remote habit UUID → local habit ID
             val allLocalHabits = habitDao.getAllHabitsSync()
@@ -780,21 +904,24 @@ class HabitRepository @Inject constructor(
             if (logsToInsert.isNotEmpty()) {
                 habitLogDao.insertLogs(logsToInsert)
             }
-            Log.d(TAG, "Synced ${logsToInsert.size} new habit logs from cloud to Room")
+            Timber.d("Synced ${logsToInsert.size} new habit logs from cloud to Room")
 
-            // G13: Deletion reconciliation — remove local logs within the synced date range
-            // that no longer exist in cloud. Logs outside the 30-day window are untouched.
+            // G13: Deletion reconciliation — only consider logs that were already in the
+            // pre-snapshot set (i.e. had a remoteId before the cloud fetch started).
+            // D2: Also exclude pendingSync=true rows — they have a write-through in flight
+            // and won't appear in the cloud set yet (log was just created).
+            // Logs stamped by concurrent write-throughs during the fetch are excluded,
+            // preventing the race where a freshly-completed log's remoteId is deleted.
             val cloudLogRemoteIds = cloudLogs.map { it.id.toString() }.toSet()
-            val localSyncedLogs = habitLogDao.getLogsWithRemoteIdInRange(startDate, endDate)
-            val orphanLogIds = localSyncedLogs
-                .filter { it.remoteId !in cloudLogRemoteIds }
+            val orphanLogIds = preSnapshotLocalLogs
+                .filter { it.remoteId != null && it.remoteId in preSnapshotRemoteIds && it.remoteId !in cloudLogRemoteIds && !it.pendingSync }
                 .map { it.id }
             if (orphanLogIds.isNotEmpty()) {
                 orphanLogIds.chunked(500).forEach { chunk -> habitLogDao.deleteLogsByIds(chunk) }
-                Log.d(TAG, "Deleted ${orphanLogIds.size} orphaned habit logs not present in cloud")
+                Timber.d("Deleted ${orphanLogIds.size} orphaned habit logs not present in cloud")
             }
         } catch (e: Exception) {
-            Log.e(TAG, "Failed to sync habit logs from cloud", e)
+            Timber.e(e, "Failed to sync habit logs from cloud")
             throw e
         }
     }
@@ -812,7 +939,8 @@ private fun HabitEntity.toDomain() = Habit(
     reminderTime = reminderTime?.let { timeStr ->
         try {
             LocalTime.parse(timeStr)
-        } catch (_: Exception) {
+        } catch (e: Exception) {
+            Timber.w(e, "Failed to parse reminderTime in toDomain(): $timeStr")
             null
         }
     },
@@ -839,7 +967,7 @@ private fun Habit.toEntity() = HabitEntity(
     createdAt = createdAt,
     isArchived = isArchived,
     isHouseholdHabit = isHouseholdHabit,
-    ownerUid = ownerUid,
+    ownerUid = ownerUid ?: "",
     householdId = householdId,
     assignedToUid = assignedToUid,
     assignedToName = assignedToName,

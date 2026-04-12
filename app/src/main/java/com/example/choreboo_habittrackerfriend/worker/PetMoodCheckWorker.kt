@@ -10,7 +10,7 @@ import com.example.choreboo_habittrackerfriend.MainActivity
 import com.example.choreboo_habittrackerfriend.ChorebooApplication
 import com.example.choreboo_habittrackerfriend.R
 import com.example.choreboo_habittrackerfriend.data.datastore.UserPreferences
-import com.example.choreboo_habittrackerfriend.data.local.ChorebooDatabase
+import com.example.choreboo_habittrackerfriend.data.local.dao.ChorebooDao
 import com.example.choreboo_habittrackerfriend.data.repository.ChorebooRepository
 import dagger.assisted.Assisted
 import dagger.assisted.AssistedInject
@@ -27,15 +27,14 @@ class PetMoodCheckWorker @AssistedInject constructor(
     @Assisted params: WorkerParameters,
     private val chorebooRepository: ChorebooRepository,
     private val userPreferences: UserPreferences,
+    private val chorebooDao: ChorebooDao,
 ) : CoroutineWorker(context, params) {
 
     override suspend fun doWork(): Result {
         return try {
             Timber.d("PetMoodCheckWorker: running periodic mood check")
 
-            val database = ChorebooDatabase.getInstance(applicationContext)
-
-            val choreboo = database.chorebooDao().getChorebooSync() ?: run {
+            val choreboo = chorebooDao.getChorebooSync() ?: run {
                 Timber.d("PetMoodCheckWorker: no choreboo found, skipping")
                 return Result.success()
             }
@@ -46,7 +45,7 @@ class PetMoodCheckWorker @AssistedInject constructor(
             chorebooRepository.applyStatDecay()
 
             // Re-fetch the now-decayed choreboo
-            val decayedChoreboo = database.chorebooDao().getChorebooSync() ?: return Result.success()
+            val decayedChoreboo = chorebooDao.getChorebooSync() ?: return Result.success()
 
             // Check if any stat is critical (< 20)
             val isCritical =

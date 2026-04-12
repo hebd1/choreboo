@@ -39,11 +39,12 @@ data class Habit(
         if (monthlyDays.isNotEmpty()) {
             val todayDayOfMonth = LocalDate.now().dayOfMonth
             val lastDayOfMonth = LocalDate.now().lengthOfMonth()
-            
+
             return monthlyDays.any { dayStr ->
                 val day = dayStr.substring(1).toIntOrNull() ?: return@any false
-                // Handle special case: D31 matches the last day of the month for months with fewer days
-                if (day == 31 && todayDayOfMonth == lastDayOfMonth) {
+                // If the scheduled day exceeds the month's length, treat the last day of
+                // the month as the trigger (e.g. D31 fires on Feb 28, Apr 30, etc.).
+                if (day >= lastDayOfMonth && todayDayOfMonth == lastDayOfMonth) {
                     true
                 } else {
                     day == todayDayOfMonth

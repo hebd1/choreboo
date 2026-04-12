@@ -1,6 +1,5 @@
 package com.example.choreboo_habittrackerfriend.data.repository
 
-import android.util.Log
 import androidx.core.net.toUri
 import com.example.choreboo_habittrackerfriend.data.datastore.UserPreferences
 import com.example.choreboo_habittrackerfriend.dataconnect.ChorebooConnector
@@ -13,11 +12,11 @@ import com.google.firebase.storage.FirebaseStorage
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.tasks.await
 import kotlinx.coroutines.withTimeoutOrNull
+import timber.log.Timber
 import java.io.File
 import javax.inject.Inject
 import javax.inject.Singleton
 
-private const val TAG = "UserRepository"
 private const val CLOUD_TIMEOUT_MS = 5000L
 
 @Singleton
@@ -62,12 +61,12 @@ class UserRepository @Inject constructor(
                 }
             }
             if (timedOut == null) {
-                Log.w(TAG, "syncCurrentUserToCloud: timed out")
+                Timber.w("syncCurrentUserToCloud: timed out")
                 return
             }
-            Log.d(TAG, "Synced user ${user.uid} to cloud")
+            Timber.d("Synced user ${user.uid} to cloud")
         } catch (e: Exception) {
-            Log.e(TAG, "Failed to sync user to cloud", e)
+            Timber.e(e, "Failed to sync user to cloud")
         }
     }
 
@@ -87,7 +86,7 @@ class UserRepository @Inject constructor(
             .setDisplayName(trimmed)
             .build()
         user.updateProfile(request).await()
-        Log.d(TAG, "Updated Firebase Auth displayName to: $trimmed")
+        Timber.d("Updated Firebase Auth displayName to: $trimmed")
 
         // Write-through: sync the updated profile (reads fresh from FirebaseAuth) to cloud
         syncCurrentUserToCloud()
@@ -101,7 +100,7 @@ class UserRepository @Inject constructor(
         return try {
             val result = withTimeoutOrNull(CLOUD_TIMEOUT_MS) { connector.getCurrentUser.execute() }
             if (result == null) {
-                Log.w(TAG, "fetchCurrentUserFromCloud timed out")
+                Timber.w("fetchCurrentUserFromCloud timed out")
                 return getCurrentAppUser()
             }
             val cloudUser = result.data.user
@@ -121,7 +120,7 @@ class UserRepository @Inject constructor(
                 getCurrentAppUser()
             }
         } catch (e: Exception) {
-            Log.e(TAG, "Failed to fetch user from cloud", e)
+            Timber.e(e, "Failed to fetch user from cloud")
             getCurrentAppUser()
         }
     }
@@ -144,12 +143,12 @@ class UserRepository @Inject constructor(
                 )
             }
             if (timedOut == null) {
-                Log.w(TAG, "syncPointsToCloud: timed out")
+                Timber.w("syncPointsToCloud: timed out")
                 return
             }
-            Log.d(TAG, "Synced points to cloud: totalPoints=$totalPoints, totalLifetimeXp=$totalLifetimeXp")
+            Timber.d("Synced points to cloud: totalPoints=$totalPoints, totalLifetimeXp=$totalLifetimeXp")
         } catch (e: Exception) {
-            Log.e(TAG, "Failed to sync points to cloud", e)
+            Timber.e(e, "Failed to sync points to cloud")
         }
     }
 
@@ -164,7 +163,7 @@ class UserRepository @Inject constructor(
         try {
             val result = withTimeoutOrNull(CLOUD_TIMEOUT_MS) { connector.getCurrentUser.execute() }
             if (result == null) {
-                Log.w(TAG, "syncPointsFromCloud timed out")
+                Timber.w("syncPointsFromCloud timed out")
                 return
             }
             val cloudUser = result.data.user ?: return
@@ -178,21 +177,19 @@ class UserRepository @Inject constructor(
             val mergedPoints = maxOf(localPoints, cloudPoints)
             val mergedLifetimeXp = maxOf(localLifetimeXp, cloudLifetimeXp)
 
-            userPreferences.setPoints(mergedPoints)
-            userPreferences.setLifetimeXp(mergedLifetimeXp)
+            userPreferences.setPointsAndLifetimeXp(mergedPoints, mergedLifetimeXp)
 
             // Push merged values back to cloud if they differ from what the cloud had
             if (mergedPoints != cloudPoints || mergedLifetimeXp != cloudLifetimeXp) {
                 syncPointsToCloud(mergedPoints, mergedLifetimeXp)
             }
 
-            Log.d(
-                TAG,
+            Timber.d(
                 "Synced points from cloud: local=($localPoints,$localLifetimeXp) " +
                     "cloud=($cloudPoints,$cloudLifetimeXp) merged=($mergedPoints,$mergedLifetimeXp)",
             )
         } catch (e: Exception) {
-            Log.e(TAG, "Failed to sync points from cloud", e)
+            Timber.e(e, "Failed to sync points from cloud")
             throw e
         }
     }
@@ -215,27 +212,27 @@ class UserRepository @Inject constructor(
             val storageRef = firebaseStorage.reference.child("profile_photos/${user.uid}.jpg")
             val uploadTask = storageRef.putFile(photoFile.toUri())
             uploadTask.await()
-            Log.d(TAG, "Uploaded profile photo to Storage for ${user.uid}")
+            Timber.d("Uploaded profile photo to Storage for ${user.uid}")
 
             // Get the download URL
             val downloadUrl = storageRef.downloadUrl.await()
-            Log.d(TAG, "Got download URL for profile photo: $downloadUrl")
+            Timber.d("Got download URL for profile photo: $downloadUrl")
 
             // Update FirebaseAuth.photoUrl with the Storage URL
             val request = UserProfileChangeRequest.Builder()
                 .setPhotoUri(downloadUrl)
                 .build()
             user.updateProfile(request).await()
-            Log.d(TAG, "Updated Firebase Auth photoUrl to: $downloadUrl")
+            Timber.d("Updated Firebase Auth photoUrl to: $downloadUrl")
 
             // Save to DataStore for instant display (avoids waiting for cloud sync)
             userPreferences.setProfilePhotoUri(downloadUrl.toString())
-            Log.d(TAG, "Saved profile photo URL to DataStore")
+            Timber.d("Saved profile photo URL to DataStore")
 
             // Write-through: sync to cloud so other devices and household members see it
             syncCurrentUserToCloud()
         } catch (e: Exception) {
-            Log.e(TAG, "Failed to upload profile photo", e)
+            Timber.e(e, "Failed to upload profile photo")
             throw e
         }
     }
@@ -260,9 +257,9 @@ class UserRepository @Inject constructor(
             val storageRef = firebaseStorage.reference.child("profile_photos/${user.uid}.jpg")
             try {
                 storageRef.delete().await()
-                Log.d(TAG, "Deleted profile photo from Storage for ${user.uid}")
+                Timber.d("Deleted profile photo from Storage for ${user.uid}")
             } catch (e: Exception) {
-                Log.w(TAG, "Failed to delete photo from Storage, continuing anyway", e)
+                Timber.w(e, "Failed to delete photo from Storage, continuing anyway")
             }
 
             // Restore FirebaseAuth.photoUrl to the original Google photo (if available)
@@ -274,22 +271,22 @@ class UserRepository @Inject constructor(
                 .setPhotoUri(googlePhotoUrl)
                 .build()
             user.updateProfile(request).await()
-            Log.d(TAG, "Restored Firebase Auth photoUrl to: ${googlePhotoUrl ?: "null (email user)"}")
+            Timber.d("Restored Firebase Auth photoUrl to: ${googlePhotoUrl ?: "null (email user)"}")
 
             // Clear DataStore
             userPreferences.setProfilePhotoUri(null)
-            Log.d(TAG, "Cleared profile photo URI from DataStore")
+            Timber.d("Cleared profile photo URI from DataStore")
 
             // Delete local file
             if (localPhotoFile.exists()) {
                 localPhotoFile.delete()
-                Log.d(TAG, "Deleted local photo file")
+                Timber.d("Deleted local photo file")
             }
 
             // Write-through: sync to cloud so other devices and household members see the change
             syncCurrentUserToCloud()
         } catch (e: Exception) {
-            Log.e(TAG, "Failed to delete profile photo", e)
+            Timber.e(e, "Failed to delete profile photo")
             throw e
         }
     }

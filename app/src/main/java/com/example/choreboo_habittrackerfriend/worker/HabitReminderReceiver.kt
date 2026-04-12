@@ -8,15 +8,25 @@ import androidx.core.app.NotificationManagerCompat
 import com.example.choreboo_habittrackerfriend.MainActivity
 import com.example.choreboo_habittrackerfriend.ChorebooApplication
 import com.example.choreboo_habittrackerfriend.R
-import com.example.choreboo_habittrackerfriend.data.local.ChorebooDatabase
+import com.example.choreboo_habittrackerfriend.data.local.dao.ChorebooDao
+import com.example.choreboo_habittrackerfriend.data.local.dao.HabitLogDao
+import dagger.hilt.android.AndroidEntryPoint
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import java.time.LocalDate
 import java.time.LocalTime
 import java.time.format.DateTimeFormatter
+import javax.inject.Inject
 
+@AndroidEntryPoint
 class HabitReminderReceiver : BroadcastReceiver() {
+
+    @Inject
+    lateinit var habitLogDao: HabitLogDao
+
+    @Inject
+    lateinit var chorebooDao: ChorebooDao
 
     override fun onReceive(context: Context?, intent: Intent?) {
         if (context == null || intent == null) return
@@ -35,15 +45,13 @@ class HabitReminderReceiver : BroadcastReceiver() {
 
         CoroutineScope(Dispatchers.Default).launch {
             try {
-                val database = ChorebooDatabase.getInstance(context)
-
                 // Suppress the notification if the habit was already completed today
                 val today = LocalDate.now().format(DateTimeFormatter.ISO_LOCAL_DATE)
-                val todayCount = database.habitLogDao().getCompletionCountForDate(habitId, today)
+                val todayCount = habitLogDao.getCompletionCountForDate(habitId, today)
                 if (todayCount >= 1) return@launch
 
                 // Get pet name from database
-                val choreboo = database.chorebooDao().getChorebooSync()
+                val choreboo = chorebooDao.getChorebooSync()
                 val petName = choreboo?.name ?: context.getString(R.string.notif_pet_name_fallback)
 
                 // Parse reminder time

@@ -1,3 +1,5 @@
+import java.util.Properties
+
 plugins {
     alias(libs.plugins.android.application)
     alias(libs.plugins.kotlin.android)
@@ -7,6 +9,15 @@ plugins {
     alias(libs.plugins.kotlin.serialization)
     id("com.google.gms.google-services")
 }
+
+// Load signing credentials from local.properties (not checked in) or environment variables.
+// local.properties keys: KEYSTORE_PATH, KEYSTORE_PASSWORD, KEY_ALIAS, KEY_PASSWORD
+// Fallback: environment variables of the same names (for CI).
+val localProps = Properties().also { props ->
+    val f = rootProject.file("local.properties")
+    if (f.exists()) props.load(f.inputStream())
+}
+fun prop(name: String): String? = localProps.getProperty(name) ?: System.getenv(name)
 
 android {
     namespace = "com.example.choreboo_habittrackerfriend"
@@ -23,6 +34,21 @@ android {
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
     }
 
+    signingConfigs {
+        create("release") {
+            val keystorePath = prop("KEYSTORE_PATH")
+            val keystorePassword = prop("KEYSTORE_PASSWORD")
+            val keyAlias = prop("KEY_ALIAS")
+            val keyPassword = prop("KEY_PASSWORD")
+            if (keystorePath != null && keystorePassword != null && keyAlias != null && keyPassword != null) {
+                storeFile = file(keystorePath)
+                storePassword = keystorePassword
+                this.keyAlias = keyAlias
+                this.keyPassword = keyPassword
+            }
+        }
+    }
+
     buildTypes {
         release {
             isMinifyEnabled = true
@@ -31,6 +57,10 @@ android {
                 getDefaultProguardFile("proguard-android-optimize.txt"),
                 "proguard-rules.pro"
             )
+            val releaseSigning = signingConfigs.getByName("release")
+            if (releaseSigning.storeFile != null) {
+                signingConfig = releaseSigning
+            }
         }
     }
     compileOptions {
@@ -85,6 +115,7 @@ dependencies {
     // Hilt
     implementation(libs.hilt.android)
     ksp(libs.hilt.compiler)
+    ksp("androidx.hilt:hilt-compiler:1.2.0") // required for @HiltWorker code generation
     implementation(libs.hilt.navigation.compose)
     implementation(libs.hilt.work)
 

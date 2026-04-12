@@ -4,39 +4,48 @@ import androidx.room.Dao
 import androidx.room.Insert
 import androidx.room.OnConflictStrategy
 import androidx.room.Query
+import androidx.room.Transaction
 import com.example.choreboo_habittrackerfriend.data.local.entity.HouseholdHabitStatusEntity
 import kotlinx.coroutines.flow.Flow
 
 @Dao
-interface HouseholdHabitStatusDao {
+abstract class HouseholdHabitStatusDao {
     /**
      * Get all household habit statuses (reactive, unfiltered).
      */
     @Query("SELECT * FROM household_habit_statuses")
-    fun getAllHabitStatuses(): Flow<List<HouseholdHabitStatusEntity>>
+    abstract fun getAllHabitStatuses(): Flow<List<HouseholdHabitStatusEntity>>
 
     /**
      * Get household habit statuses for a specific date (reactive).
      * Returns only rows whose cachedDate matches the given date string.
      */
     @Query("SELECT * FROM household_habit_statuses WHERE cachedDate = :date")
-    fun getHabitStatusesForDate(date: String): Flow<List<HouseholdHabitStatusEntity>>
+    abstract fun getHabitStatusesForDate(date: String): Flow<List<HouseholdHabitStatusEntity>>
 
     /**
      * Get all household habit statuses (synchronous).
      */
     @Query("SELECT * FROM household_habit_statuses")
-    suspend fun getAllHabitStatusesSync(): List<HouseholdHabitStatusEntity>
+    abstract suspend fun getAllHabitStatusesSync(): List<HouseholdHabitStatusEntity>
+
+    @Insert(onConflict = OnConflictStrategy.REPLACE)
+    protected abstract suspend fun insertAll(statuses: List<HouseholdHabitStatusEntity>)
 
     /**
-     * Insert or replace a list of habit statuses (replaceAll upsert).
+     * Atomically replace all household habit statuses.
+     * Deletes every existing row first, then inserts the fresh set, so stale rows for habits
+     * that were deleted in the cloud are never left behind.
      */
-    @Insert(onConflict = OnConflictStrategy.REPLACE)
-    suspend fun replaceAll(statuses: List<HouseholdHabitStatusEntity>)
+    @Transaction
+    open suspend fun replaceAll(statuses: List<HouseholdHabitStatusEntity>) {
+        deleteAll()
+        insertAll(statuses)
+    }
 
     /**
      * Delete all habit statuses (used when leaving a household or on sign-out).
      */
     @Query("DELETE FROM household_habit_statuses")
-    suspend fun deleteAll()
+    abstract suspend fun deleteAll()
 }

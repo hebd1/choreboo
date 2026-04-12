@@ -5,12 +5,11 @@ import android.content.Context
 import android.content.Intent
 import androidx.core.app.NotificationCompat
 import androidx.core.app.NotificationManagerCompat
-import androidx.hilt.work.HiltWorkerFactory
 import com.example.choreboo_habittrackerfriend.MainActivity
 import com.example.choreboo_habittrackerfriend.ChorebooApplication
 import com.example.choreboo_habittrackerfriend.R
 import com.example.choreboo_habittrackerfriend.data.datastore.UserPreferences
-import com.example.choreboo_habittrackerfriend.data.local.ChorebooDatabase
+import com.example.choreboo_habittrackerfriend.data.local.dao.ChorebooDao
 import com.example.choreboo_habittrackerfriend.data.repository.ChorebooRepository
 import dagger.hilt.android.AndroidEntryPoint
 import kotlinx.coroutines.CoroutineScope
@@ -29,6 +28,9 @@ class PetMoodReceiver : BroadcastReceiver() {
     @Inject
     lateinit var userPreferences: UserPreferences
 
+    @Inject
+    lateinit var chorebooDao: ChorebooDao
+
     override fun onReceive(context: Context?, intent: Intent?) {
         if (context == null || intent == null) return
         if (intent.action != "com.example.choreboo_habittrackerfriend.PET_MOOD_CHECK") return
@@ -39,10 +41,8 @@ class PetMoodReceiver : BroadcastReceiver() {
 
         CoroutineScope(Dispatchers.Default).launch {
             try {
-                val database = ChorebooDatabase.getInstance(context)
-
                 // Get current choreboo and apply decay
-                val choreboo = database.chorebooDao().getChorebooSync() ?: run {
+                val choreboo = chorebooDao.getChorebooSync() ?: run {
                     Timber.w("PetMoodReceiver: no choreboo found")
                     return@launch
                 }
@@ -51,7 +51,7 @@ class PetMoodReceiver : BroadcastReceiver() {
                 chorebooRepository.applyStatDecay()
 
                 // Re-fetch the now-decayed choreboo
-                val decayedChoreboo = database.chorebooDao().getChorebooSync() ?: return@launch
+                val decayedChoreboo = chorebooDao.getChorebooSync() ?: return@launch
                 val petName = decayedChoreboo.name
 
                 // Check if any stat is critical (< 20)

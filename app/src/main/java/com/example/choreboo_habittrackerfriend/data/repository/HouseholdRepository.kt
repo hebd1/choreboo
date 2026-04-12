@@ -1,6 +1,5 @@
 package com.example.choreboo_habittrackerfriend.data.repository
 
-import android.util.Log
 import com.example.choreboo_habittrackerfriend.data.local.dao.HouseholdMemberDao
 import com.example.choreboo_habittrackerfriend.data.local.dao.HouseholdDao
 import com.example.choreboo_habittrackerfriend.data.local.dao.HouseholdHabitStatusDao
@@ -24,11 +23,12 @@ import kotlinx.coroutines.flow.flatMapLatest
 import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withTimeoutOrNull
+import timber.log.Timber
+import java.security.SecureRandom
 import java.time.LocalDate
 import javax.inject.Inject
 import javax.inject.Singleton
 
-private const val TAG = "HouseholdRepository"
 private const val CLOUD_TIMEOUT_MS = 5000L
 
 sealed class HouseholdResult {
@@ -45,6 +45,7 @@ class HouseholdRepository @Inject constructor(
     private val habitRepository: HabitRepository,
 ) {
     private val connector by lazy { ChorebooConnector.instance }
+    private val secureRandom = SecureRandom()
 
     /**
      * Tracks today's date so householdHabits re-filters when the date rolls over.
@@ -99,15 +100,19 @@ class HouseholdRepository @Inject constructor(
     }
 
     /**
-     * Generate a random 6-character alphanumeric invite code.
+     * Generate a cryptographically secure 8-character alphanumeric invite code.
+     * Uses SecureRandom and retries up to 3 times on collision.
      */
     private fun generateInviteCode(): String {
         val chars = "ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789"
-        return (1..6).map { chars.random() }.joinToString("")
+        return buildString(8) {
+            repeat(8) { append(chars[secureRandom.nextInt(chars.length)]) }
+        }
     }
 
     /**
      * Create a new household and set the current user as creator.
+     * Retries invite code generation up to 3 times on collision (duplicate inviteCode error).
      */
     suspend fun createHousehold(name: String): HouseholdResult {
         require(name.isNotBlank()) { "Household name must not be blank" }
@@ -116,38 +121,42 @@ class HouseholdRepository @Inject constructor(
         val uid = userRepository.getCurrentUid()
             ?: return HouseholdResult.Error("Not authenticated")
 
-        val inviteCode = generateInviteCode()
+        var lastError: Exception? = null
+        repeat(3) { attempt ->
+            val inviteCode = generateInviteCode()
+            try {
+                // Create the household in Data Connect
+                val createResult = withTimeoutOrNull(CLOUD_TIMEOUT_MS) {
+                    connector.createHousehold.execute(
+                        name = name,
+                        inviteCode = inviteCode,
+                    )
+                } ?: return HouseholdResult.Error("Request timed out. Please try again.")
+                val householdId = createResult.data.household_insert.id
 
-        return try {
-            // Create the household in Data Connect
-            val createResult = withTimeoutOrNull(CLOUD_TIMEOUT_MS) {
-                connector.createHousehold.execute(
+                // Assign the household to the current user
+                withTimeoutOrNull(CLOUD_TIMEOUT_MS) {
+                    connector.updateUserHousehold.execute {
+                        this.householdId = householdId
+                    }
+                } ?: return HouseholdResult.Error("Request timed out. Please try again.")
+
+                val household = HouseholdEntity(
+                    id = householdId.toString(),
                     name = name,
                     inviteCode = inviteCode,
+                    createdByUid = uid,
                 )
-            } ?: return HouseholdResult.Error("Request timed out. Please try again.")
-            val householdId = createResult.data.household_insert.id
-
-            // Assign the household to the current user
-            withTimeoutOrNull(CLOUD_TIMEOUT_MS) {
-                connector.updateUserHousehold.execute {
-                    this.householdId = householdId
-                }
-            } ?: return HouseholdResult.Error("Request timed out. Please try again.")
-
-            val household = HouseholdEntity(
-                id = householdId.toString(),
-                name = name,
-                inviteCode = inviteCode,
-                createdByUid = uid,
-            )
-            householdDao.upsertHousehold(household)
-            Log.d(TAG, "Created household: $name ($householdId)")
-            HouseholdResult.Success(household.toDomain())
-        } catch (e: Exception) {
-            Log.e(TAG, "Failed to create household", e)
-            HouseholdResult.Error(e.message ?: "Failed to create household")
+                householdDao.upsertHousehold(household)
+                Timber.d("Created household: $name ($householdId)")
+                return HouseholdResult.Success(household.toDomain())
+            } catch (e: Exception) {
+                lastError = e
+                Timber.w(e, "createHousehold attempt ${attempt + 1} failed (possible invite code collision)")
+            }
         }
+        Timber.e(lastError, "Failed to create household after 3 attempts")
+        return HouseholdResult.Error(lastError?.message ?: "Failed to create household")
     }
 
     /**
@@ -184,7 +193,7 @@ class HouseholdRepository @Inject constructor(
                 createdByName = found.createdBy.displayName,
             )
             householdDao.upsertHousehold(household)
-            Log.d(TAG, "Joined household: ${found.name} (${found.id})")
+            Timber.d("Joined household: ${found.name} (${found.id})")
 
             // Refresh members and pets (pets write-through to Room)
             refreshHouseholdMembers()
@@ -193,7 +202,7 @@ class HouseholdRepository @Inject constructor(
 
             HouseholdResult.Success(household.toDomain())
         } catch (e: Exception) {
-            Log.e(TAG, "Failed to join household", e)
+            Timber.e(e, "Failed to join household")
             HouseholdResult.Error(e.message ?: "Failed to join household")
         }
     }
@@ -220,12 +229,12 @@ class HouseholdRepository @Inject constructor(
             householdDao.deleteAll()
             householdMemberDao.deleteAll()
             householdHabitStatusDao.deleteAll()
-            Log.d(TAG, "Left household")
+            Timber.d("Left household")
             HouseholdResult.Success(
                 Household(id = "", name = "", inviteCode = "", createdByUid = ""),
             )
         } catch (e: Exception) {
-            Log.e(TAG, "Failed to leave household", e)
+            Timber.e(e, "Failed to leave household")
             HouseholdResult.Error(e.message ?: "Failed to leave household")
         }
     }
@@ -242,7 +251,7 @@ class HouseholdRepository @Inject constructor(
         try {
             val result = withTimeoutOrNull(CLOUD_TIMEOUT_MS) { connector.getMyHouseholdMembers.execute() }
             if (result == null) {
-                Log.w(TAG, "refreshHouseholdMembers: timed out")
+                Timber.w("refreshHouseholdMembers: timed out")
                 return
             }
             val members = result.data.user?.household?.users_on_household
@@ -263,12 +272,12 @@ class HouseholdRepository @Inject constructor(
                     // Reconcile: remove any cached member no longer in the household
                     householdMemberDao.deleteMembersNotIn(members.map { it.id })
                 }
-                Log.d(TAG, "Refreshed ${members.size} household members")
+                Timber.d("Refreshed ${members.size} household members")
             } else {
                 householdMemberDao.deleteAll()
             }
         } catch (e: Exception) {
-            Log.e(TAG, "Failed to refresh household members", e)
+            Timber.e(e, "Failed to refresh household members")
         }
     }
 
@@ -286,15 +295,13 @@ class HouseholdRepository @Inject constructor(
         try {
             val result = withTimeoutOrNull(CLOUD_TIMEOUT_MS) { connector.getMyHouseholdChoreboos.execute() }
             if (result == null) {
-                Log.w(TAG, "refreshHouseholdPets: timed out")
+                Timber.w("refreshHouseholdPets: timed out")
                 return
             }
             val users = result.data.user?.household?.users_on_household
             if (users != null) {
                 val petUsers = users.filter { it.choreboo_on_owner != null }
-                if (petUsers.isEmpty()) {
-                    householdMemberDao.deleteAll()
-                } else {
+                if (petUsers.isNotEmpty()) {
                     val now = System.currentTimeMillis()
                     petUsers.forEach { user ->
                         val pet = user.choreboo_on_owner!!
@@ -318,13 +325,15 @@ class HouseholdRepository @Inject constructor(
                     // Reconcile: remove any cached member no longer in the household
                     householdMemberDao.deleteMembersNotIn(petUsers.map { it.id })
                 }
-                Log.d(TAG, "Persisted ${petUsers.size} household pets to Room")
+                // If petUsers is empty, identity rows (name/email/photo) from refreshHouseholdMembers()
+                // are intentionally preserved — no members have created a Choreboo yet.
+                Timber.d("Persisted ${petUsers.size} household pets to Room")
             } else {
                 // User has no household — clear the local cache
                 householdMemberDao.deleteAll()
             }
         } catch (e: Exception) {
-            Log.e(TAG, "Failed to refresh household pets", e)
+            Timber.e(e, "Failed to refresh household pets")
         }
     }
 
@@ -342,7 +351,7 @@ class HouseholdRepository @Inject constructor(
                 val habitsDeferred = async {
                     val habitsResult = withTimeoutOrNull(CLOUD_TIMEOUT_MS) { connector.getMyHouseholdHabits.execute() }
                     if (habitsResult == null) {
-                        Log.w(TAG, "refreshHouseholdHabits: habits timed out")
+                        Timber.w("refreshHouseholdHabits: habits timed out")
                         return@async null
                     }
                     habitsResult.data.user?.household?.habits_on_household
@@ -350,7 +359,7 @@ class HouseholdRepository @Inject constructor(
                 val logsDeferred = async {
                     val logsResult = withTimeoutOrNull(CLOUD_TIMEOUT_MS) { connector.getHouseholdHabitLogsForDate.execute(date = today) }
                     if (logsResult == null) {
-                        Log.w(TAG, "refreshHouseholdHabits: logs timed out")
+                        Timber.w("refreshHouseholdHabits: logs timed out")
                         return@async emptyMap<String, Pair<String, String>>()
                     }
                     buildMap<String, Pair<String, String>> {
@@ -389,9 +398,9 @@ class HouseholdRepository @Inject constructor(
                 )
             }
             householdHabitStatusDao.replaceAll(entities)
-            Log.d(TAG, "Persisted ${entities.size} household habits to Room")
+            Timber.d("Persisted ${entities.size} household habits to Room")
         } catch (e: Exception) {
-            Log.e(TAG, "Failed to refresh household habits", e)
+            Timber.e(e, "Failed to refresh household habits")
         }
     }
 
@@ -413,7 +422,7 @@ class HouseholdRepository @Inject constructor(
         try {
             val result = withTimeoutOrNull(CLOUD_TIMEOUT_MS) { connector.getMyHousehold.execute() }
             if (result == null) {
-                Log.w(TAG, "refreshAll: timed out")
+                Timber.w("refreshAll: timed out")
                 return
             }
             val h = result.data.user?.household
@@ -441,7 +450,7 @@ class HouseholdRepository @Inject constructor(
                 launch { refreshHouseholdHabits() }
             }
         } catch (e: Exception) {
-            Log.e(TAG, "Failed to refresh all household data", e)
+            Timber.e(e, "Failed to refresh all household data")
         }
     }
 }
@@ -459,13 +468,13 @@ private fun HouseholdEntity.toDomain(): Household = Household(
 private fun HouseholdMemberEntity.toDomain(): HouseholdPet = HouseholdPet(
     chorebooId = chorebooId,
     name = chorebooName,
-    stage = try { ChorebooStage.valueOf(chorebooStage) } catch (_: Exception) { ChorebooStage.EGG },
+    stage = try { ChorebooStage.valueOf(chorebooStage) } catch (e: Exception) { Timber.w(e, "Unknown ChorebooStage value in HouseholdMember: $chorebooStage"); ChorebooStage.EGG },
     level = chorebooLevel,
     xp = chorebooXp,
     hunger = chorebooHunger,
     happiness = chorebooHappiness,
     energy = chorebooEnergy,
-    petType = try { PetType.valueOf(chorebooPetType) } catch (_: Exception) { PetType.FOX },
+    petType = try { PetType.valueOf(chorebooPetType) } catch (e: Exception) { Timber.w(e, "Unknown PetType value in HouseholdMember: $chorebooPetType"); PetType.FOX },
     ownerName = displayName,
     ownerUid = uid,
     ownerPhotoUrl = photoUrl,
