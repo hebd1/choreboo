@@ -247,7 +247,7 @@ mutation CreateHabit(
   query @redact {
     user(key: { id_expr: "auth.uid" })
       @check(
-        expr: "this != null && this.householdId == vars.householdId",
+        expr: "this != null && (vars.householdId == null || this.householdId == vars.householdId)",
         message: "You are not a member of the specified household"
       ) {
       householdId
@@ -466,15 +466,23 @@ mutation DeleteHabitLog($logId: UUID!) @auth(level: USER) {
 # The previous version filtered by completedById (auth.uid) which only deleted the
 # caller's own logs — other household members' logs were left behind, causing FK
 # violations when DeleteHabit ran next. Now the WHERE filter traverses
-# HabitLog → Habit → ownerId so only the habit owner can invoke this, but ALL logs
-# for that habit are removed regardless of who completed them.
+# HabitLog → Habit → (ownerId OR assignedToId) so both the owner and assignee can
+# invoke this, and ALL logs for that habit are removed regardless of who completed them.
 # Must be called before DeleteHabit to prevent FK constraint violations (D5/P3-10 fix).
+# Allows both the habit owner and assignee to delete logs, matching DeleteHabit's permission model.
 mutation DeleteLogsForHabit($habitId: UUID!) @auth(level: USER) {
   habitLog_deleteMany(
     where: {
       _and: [
         { habitId: { eq: $habitId } }
-        { habit: { ownerId: { eq_expr: "auth.uid" } } }
+        {
+          habit: {
+            _or: [
+              { ownerId: { eq_expr: "auth.uid" } }
+              { assignedToId: { eq_expr: "auth.uid" } }
+            ]
+          }
+        }
       ]
     }
   )
