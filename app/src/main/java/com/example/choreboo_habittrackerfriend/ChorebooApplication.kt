@@ -30,7 +30,10 @@ class ChorebooApplication : Application(), Configuration.Provider {
         createNotificationChannels()
         ProcessLifecycleOwner.get().lifecycle.addObserver(appLifecycleObserver)
         // Initialize AdMob — must be called before loading any ads.
-        MobileAds.initialize(this)
+        // Skip in debug builds to avoid polluting real ad metrics.
+        if (!BuildConfig.DEBUG) {
+            MobileAds.initialize(this)
+        }
     }
 
     override val workManagerConfiguration: Configuration

@@ -121,7 +121,7 @@ fun ChorebooNavGraph(
                 onNavigateBack = { navController.popBackStack() },
                 onSignOut = {
                     navController.navigate(Screen.Auth.route) {
-                        popUpTo(0) { inclusive = true }
+                        popUpTo(navController.graph.id) { inclusive = true }
                     }
                 },
             )

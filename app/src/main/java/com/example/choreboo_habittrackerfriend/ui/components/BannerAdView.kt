@@ -9,6 +9,7 @@ import androidx.compose.runtime.remember
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.viewinterop.AndroidView
+import com.example.choreboo_habittrackerfriend.BuildConfig
 import com.google.android.gms.ads.AdRequest
 import com.google.android.gms.ads.AdSize
 import com.google.android.gms.ads.AdView
@@ -18,14 +19,14 @@ import com.google.android.gms.ads.AdView
  *
  * Renders nothing when [isPremium] is true — no layout space is consumed.
  *
- * Replace [adUnitId] with your real AdMob banner unit ID before release.
- * The current value is Google's public test banner unit ID.
+ * The ad unit ID is sourced from [BuildConfig.AD_UNIT_BANNER], set per build type in
+ * app/build.gradle.kts. Update the release buildConfigField to the real unit ID before shipping.
  */
 @Composable
 fun BannerAdView(
     isPremium: Boolean,
     modifier: Modifier = Modifier,
-    adUnitId: String = "ca-app-pub-3940256099942544/9214589741", // Test ad unit ID
+    adUnitId: String = BuildConfig.AD_UNIT_BANNER,
 ) {
     if (isPremium) return
 

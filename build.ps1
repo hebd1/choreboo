@@ -28,7 +28,7 @@ if (-not $env:JAVA_HOME) {
     }
 }
 
-$ProjectDir = 'C:\Users\elihebdon\AndroidStudioProjects\ChorebooHabitTrackerFriend'
+$ProjectDir = $PSScriptRoot
 Set-Location $ProjectDir
 
 if ($GradleArgs.Count -eq 0) {

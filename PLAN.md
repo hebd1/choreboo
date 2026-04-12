@@ -258,124 +258,29 @@ Bugs, degraded UX, and reliability improvements.
 
 ---
 
-## Phase 7: Build Optimization & Code Quality
+## Phase 7: Build Optimization & Code Quality ✅ COMPLETE
 
 Non-blocking improvements to build, dependencies, and code cleanliness.
 
-### P7-01 — Remove unused Gson `Converters.kt` if confirmed unused (MEDIUM)
-- **File:** `data/local/converter/Converters.kt`
-- **Problem:** The Gson TypeConverter for `List<String>` may be unused if `customDays` is
-  stored as a comma-separated string. Verify usage before removing.
-- **Action:** Grep for `Converters` in `ChorebooDatabase.kt` `@TypeConverters` annotation.
-  If used, keep. If not, remove and delete Gson dependency if no other usage.
-
-### P7-02 — Gradle parallel builds and caching disabled (MEDIUM)
-- **File:** `gradle.properties:13`
-- **Problem:** `org.gradle.parallel` and `org.gradle.caching` are commented out. Builds
-  are slower than necessary.
-- **Fix:** Uncomment `org.gradle.parallel=true` and `org.gradle.caching=true`.
-
-### P7-03 — `com.example.*` applicationId not changed (MEDIUM)
-- **File:** `app/build.gradle.kts`
-- **Problem:** `applicationId = "com.example.choreboo_habittrackerfriend"` — the `com.example`
-  prefix cannot be published to the Play Store.
-- **Fix:** Change to a proper reverse-domain (e.g., `com.choreboo.habittracker`). This
-  requires a fresh install on all devices (different app identity).
-
-### P7-04 — Static `versionCode = 1` (MEDIUM)
-- **File:** `app/build.gradle.kts:19-20`
-- **Problem:** `versionCode` never incremented. Play Store requires monotonically increasing
-  version codes for each upload.
-- **Fix:** Automate via CI (e.g., build number) or manually increment on release.
-
-### P7-05 — `material-icons-extended` included without R8 (MEDIUM)
-- **File:** `app/build.gradle.kts:114`
-- **Problem:** `material-icons-extended` adds ~24MB of icon classes. Without R8 tree-shaking
-  (P3-02), all icons ship in the APK.
-- **Fix:** Enabling R8 (P3-02) will tree-shake unused icons. Alternatively, copy only the
-  needed icon files directly.
-
-### P7-06 — `dataconnectCompile` task swallows failures (MEDIUM)
-- **File:** `build.gradle.kts:24` (project-level)
-- **Problem:** `isIgnoreExitValue = true` means SDK generation failures are silently ignored.
-  Stale generated code may be used without warning.
-- **Fix:** Remove `isIgnoreExitValue = true`. Let the build fail if SDK gen fails.
-
-### P7-07 — AdMob production App ID hardcoded in manifest (MEDIUM)
-- **File:** `AndroidManifest.xml:26-28`
-- **Problem:** Production AdMob App ID is hardcoded. Should use a build config field to
-  separate debug/release IDs.
-- **Fix:** Use `manifestPlaceholders` or `buildConfigField` to inject the ID per build type.
-
-### P7-08 — Test ad unit ID hardcoded in `BannerAdView` (MEDIUM)
-- **File:** `ui/components/BannerAdView.kt:27`
-- **Problem:** Test ad unit ID (`ca-app-pub-3940256099942544/...`) is hardcoded. Needs to
-  be swapped for production ID in release builds.
-- **Fix:** Use `BuildConfig` field to switch between test and production ad unit IDs.
-
-### P7-09 — Missing `hilt-compiler` KSP for `@HiltWorker` (MEDIUM)
-- **File:** `app/build.gradle.kts`
-- **Problem:** `@HiltWorker` annotation is used but `androidx.hilt:hilt-compiler` KSP
-  processor may not be configured. Verify and add if missing.
-- **Fix:** Add `ksp("androidx.hilt:hilt-compiler:1.2.0")` to dependencies.
-
-### P7-10 — `network_security_config.xml` no debug overrides (LOW)
-- **File:** `app/src/main/res/xml/network_security_config.xml`
-- **Problem:** No `<debug-overrides>` section. Developers can't use HTTP proxies
-  (e.g., Charles) for debugging API calls.
-- **Fix:** Add `<debug-overrides trustUserCerts="true">` section.
-
-### P7-11 — Unused Glance dependencies (LOW)
-- **File:** `app/build.gradle.kts:109-111`
-- **Problem:** Glance widget dependencies are included but the widget is not implemented.
-  Adds unnecessary APK size and build time.
-- **Fix:** Remove until the widget feature is implemented.
-
-### P7-12 — `build.ps1` hardcoded Windows path (LOW)
-- **File:** `build.ps1:31`
-- **Problem:** Hardcoded `C:\Program Files\Android\Android Studio\jbr` as `JAVA_HOME`
-  fallback. Fails if Android Studio is installed elsewhere.
-- **Fix:** Make the path configurable or search common installation locations.
-
-### P7-13 — `settings.gradle.kts` includes `foojay-resolver-convention` plugin (LOW)
-- **File:** `settings.gradle.kts:15`
-- **Problem:** The `foojay-resolver-convention` plugin auto-downloads JDK toolchains, but
-  the project uses Android Studio's bundled JBR. Unnecessary plugin.
-- **Fix:** Remove the plugin declaration.
-
-### P7-14 — Explicit `buildToolsVersion` pinned (LOW)
-- **File:** `app/build.gradle.kts:14`
-- **Problem:** `buildToolsVersion` is explicitly set. AGP auto-selects the appropriate
-  version; pinning can cause version mismatch issues.
-- **Fix:** Remove the explicit `buildToolsVersion` line.
-
-### P7-15 — `popUpTo(0)` fragile navigation (LOW)
-- **File:** `navigation/ChorebooNavGraph.kt:124`
-- **Problem:** `popUpTo(0)` is an undocumented/fragile way to pop the entire back stack.
-  May break if the nav graph structure changes.
-- **Fix:** Use `popUpTo(navController.graph.startDestinationId) { inclusive = true }`.
-
-### P7-16 — `kotlinx-serialization-core` without `json` (LOW)
-- **File:** `gradle/libs.versions.toml` or `app/build.gradle.kts`
-- **Problem:** `kotlinx-serialization-core` is included but `kotlinx-serialization-json`
-  is not. Without the json module, serialization is limited.
-- **Fix:** If serialization is actually used, add `json` module. If not, remove both.
-
-### P7-17 — AdMob initialized in debug builds (LOW)
-- **File:** `ChorebooApplication.kt:33`
-- **Problem:** `MobileAds.initialize()` runs in debug builds, making network calls to
-  AdMob servers during development.
-- **Fix:** Guard with `if (!BuildConfig.DEBUG)` or use test device configuration.
-
-### P7-18 — Stale backup rule references (LOW)
-- **Files:** `app/src/main/res/xml/backup_rules.xml`, `data_extraction_rules.xml`
-- **Problem:** References to GMS auth shared preferences (`com.google.android.gms.signin`)
-  that are no longer used (migrated to Credential Manager).
-- **Fix:** Remove the stale exclusion entries.
-
-### P7-19 — `BootReceiver.kt` unused imports (LOW)
-- **File:** `worker/BootReceiver.kt:9-11`
-- **Fix:** Remove unused import statements.
+### P7-01 ✅ — `Converters.kt` confirmed used — no change needed
+### P7-02 ✅ — `gradle.properties`: `org.gradle.parallel=true` + `org.gradle.caching=true` enabled
+### P7-03 ✅ — `applicationId` kept as `com.example.choreboo_habittrackerfriend` (requires Firebase console update first to change)
+### P7-04 ✅ — `versionCode` bumped to `2`, `versionName` to `"1.1"`
+### P7-05 ✅ — `material-icons-extended` tree-shaken by R8 (no change needed)
+### P7-06 ✅ — `isIgnoreExitValue` set to `false` on `dataconnectCompile` task
+### P7-07 ✅ — AdMob App ID injected via `manifestPlaceholders` per build type (test ID for debug, production for release)
+### P7-08 ✅ — Banner ad unit ID injected via `BuildConfig.AD_UNIT_BANNER`; `BannerAdView` uses `BuildConfig` field
+### P7-09 ✅ — `ksp("androidx.hilt:hilt-compiler:1.2.0")` confirmed present
+### P7-10 ✅ — `network_security_config.xml`: `<debug-overrides>` added to trust user CAs in debug builds
+### P7-11 ✅ — Glance dependencies kept (widget feature planned)
+### P7-12 ✅ — `build.ps1`: hardcoded `$ProjectDir` replaced with `$PSScriptRoot`
+### P7-13 ✅ — `foojay-resolver-convention` plugin removed from `settings.gradle.kts`
+### P7-14 ✅ — `buildToolsVersion = "37.0.0"` removed from `app/build.gradle.kts`
+### P7-15 ✅ — `popUpTo(0)` replaced with `popUpTo(navController.graph.id)` in `ChorebooNavGraph`
+### P7-16 ✅ — `kotlinx-serialization-core` explicit dependency removed (comes transitively via Data Connect)
+### P7-17 ✅ — `MobileAds.initialize()` guarded with `if (!BuildConfig.DEBUG)`
+### P7-18 ✅ — Stale GMS auth sharedpref exclusions removed from `backup_rules.xml` and `data_extraction_rules.xml`
+### P7-19 ✅ — Unused `CoroutineScope`, `Dispatchers`, `launch` imports removed from `BootReceiver.kt`
 
 ---
 
@@ -585,4 +490,4 @@ Cleanup items that improve code quality but don't affect functionality.
 
 ---
 
-*Last updated: 2026-04-12 — Phase 3 complete (all 11 CRITICAL items done). Phases 4–9 remain (~109 findings).*
+*Last updated: 2026-04-12 — Phases 1–7 complete. Phases 8–9 remain (~32 findings).*

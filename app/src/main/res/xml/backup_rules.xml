@@ -13,6 +13,5 @@
     <!-- Exclude DataStore preferences (contains points, theme, onboarding state) -->
     <exclude domain="file" path="datastore/choreboo_preferences.preferences_pb" />
 
-    <!-- Exclude any cached auth/session tokens -->
-    <exclude domain="sharedpref" path="com.google.android.gms.auth.api.signin.StoredSignInOptions" />
+    <!-- Exclude any cached auth/session tokens (Firebase Auth uses secure storage, not sharedpref) -->
 </full-backup-content>

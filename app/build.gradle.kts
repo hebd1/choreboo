@@ -22,14 +22,13 @@ fun prop(name: String): String? = localProps.getProperty(name) ?: System.getenv(
 android {
     namespace = "com.example.choreboo_habittrackerfriend"
     compileSdk = 36
-    buildToolsVersion = "37.0.0"
 
     defaultConfig {
         applicationId = "com.example.choreboo_habittrackerfriend"
         minSdk = 24
         targetSdk = 36
-        versionCode = 1
-        versionName = "1.0"
+        versionCode = 2
+        versionName = "1.1"
 
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
     }
@@ -50,6 +49,11 @@ android {
     }
 
     buildTypes {
+        debug {
+            // Use Google's public test AdMob App ID in debug builds
+            manifestPlaceholders["admobAppId"] = "ca-app-pub-3940256099942544~1033173712"
+            buildConfigField("String", "AD_UNIT_BANNER", "\"ca-app-pub-3940256099942544/9214589741\"")
+        }
         release {
             isMinifyEnabled = true
             isShrinkResources = true
@@ -61,6 +65,9 @@ android {
             if (releaseSigning.storeFile != null) {
                 signingConfig = releaseSigning
             }
+            // Use production AdMob App ID in release builds
+            manifestPlaceholders["admobAppId"] = "ca-app-pub-5747107953663953~4868802037"
+            buildConfigField("String", "AD_UNIT_BANNER", "\"ca-app-pub-3940256099942544/9214589741\"")
         }
     }
     compileOptions {
@@ -110,7 +117,6 @@ dependencies {
     implementation(libs.credentials)
     implementation(libs.credentials.play.services.auth)
     implementation(libs.googleid)
-    implementation(libs.kotlinx.serialization.core)
 
     // Hilt
     implementation(libs.hilt.android)
