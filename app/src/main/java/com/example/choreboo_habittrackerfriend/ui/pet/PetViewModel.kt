@@ -355,6 +355,7 @@ class PetViewModel @Inject constructor(
         viewModelScope.launch {
             try {
                 val cost = item.cost
+                val newPoints: Int
                 if (cost > 0) {
                     val deducted = userPreferences.deductPoints(cost)
                     if (!deducted) {
@@ -362,11 +363,13 @@ class PetViewModel @Inject constructor(
                         return@launch
                     }
                     // Write-through deducted points
-                    val newPoints = userPreferences.totalPoints.first()
+                    newPoints = userPreferences.totalPoints.first()
                     val newLifetimeXp = userPreferences.totalLifetimeXp.first()
                     userRepository.syncPointsToCloud(newPoints, newLifetimeXp)
+                } else {
+                    newPoints = userPreferences.totalPoints.first()
                 }
-                backgroundRepository.purchaseBackground(item.id)
+                backgroundRepository.purchaseBackground(item.id, cost, newPoints)
                 _events.emit(PetEvent.BackgroundPurchased(item))
             } catch (e: Exception) {
                 Timber.e(e, "purchaseBackground failed for item=${item.id}")

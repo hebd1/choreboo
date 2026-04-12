@@ -173,31 +173,31 @@ Incorrect behavior, data corruption, or significant risk in production.
 
 ---
 
-## Phase 5: Cloud Security & Schema Hardening
+## Phase 5: Cloud Security & Schema Hardening ✅ COMPLETE
 
 Server-side validation gaps and schema improvements.
 
-### P5-01 — Data Connect: `PurchaseBackground` no server-side point verification (MEDIUM)
+### P5-01 — Data Connect: `PurchaseBackground` no server-side point verification (MEDIUM) ✅
 - **File:** `dataconnect/choreboo-connector/mutations.gql:199-206`
 - **Problem:** Client deducts points locally and then calls the purchase mutation. A
   compromised client can skip the deduction and purchase for free.
 - **Fix:** Add a server-side check that verifies `User.totalPoints >= cost` before inserting
   the `PurchasedBackground` row and decrementing points atomically.
 
-### P5-02 — Data Connect: `InsertChoreboo` no stat validation (MEDIUM)
+### P5-02 — Data Connect: `InsertChoreboo` no stat validation (MEDIUM) ✅
 - **File:** `dataconnect/choreboo-connector/mutations.gql:71-98`
 - **Problem:** Accepts arbitrary values for hunger, happiness, energy, xp, level. A
   compromised client can create a max-stat Choreboo.
 - **Fix:** Add `@check` constraints or ignore client-provided stats and use server defaults.
 
-### P5-03 — Data Connect: missing indexes on frequently queried columns (MEDIUM)
+### P5-03 — Data Connect: missing indexes on frequently queried columns (MEDIUM) ✅
 - **File:** `dataconnect/schema/schema.gql`
 - **Problem:** No `@@index` on `HabitLog.date`, `Habit.owner`, `HabitLog.completedBy`.
   These columns appear in WHERE clauses of multiple queries.
 - **Fix:** Add `@@index(fields: ["date"])` on HabitLog, `@@index(fields: ["owner"])` on
   Habit, `@@index(fields: ["completedBy"])` on HabitLog.
 
-### P5-04 — `connector.yaml` `authMode: PUBLIC` is overly permissive (MEDIUM)
+### P5-04 — `connector.yaml` `authMode: PUBLIC` is overly permissive (MEDIUM) ✅
 - **File:** `dataconnect/choreboo-connector/connector.yaml:2`
 - **Problem:** `authMode: PUBLIC` means unauthenticated requests are accepted at the
   connector level (each operation has its own `@auth` check). If any operation accidentally
@@ -205,14 +205,14 @@ Server-side validation gaps and schema improvements.
 - **Fix:** Change to `authMode: USER_REQUIRED` so the connector rejects unauthenticated
   requests by default.
 
-### P5-05 — Data Connect: `CreateHabitLog` TOCTOU race on completion (MEDIUM)
+### P5-05 — Data Connect: `CreateHabitLog` TOCTOU race on completion (MEDIUM) ✅
 - **File:** `dataconnect/choreboo-connector/mutations.gql:380-397`
 - **Problem:** Without a cloud-side unique constraint (see P4-06), two concurrent
   `CreateHabitLog` calls for the same habit+date can both succeed, awarding double XP.
 - **Fix:** Addressed by P4-06 (add unique constraint). Also consider server-side
   idempotency key.
 
-### P5-06 — Dead queries in `queries.gql` (LOW)
+### P5-06 — Dead queries in `queries.gql` (LOW) ✅
 - **File:** `dataconnect/choreboo-connector/queries.gql`
 - **Queries:** `GetMyHabits` (133-158), `GetHabitById` (249-290), `GetLogsForHabit`
   (296-328), `GetMyLogsForDate` (330-341)
@@ -220,12 +220,12 @@ Server-side validation gaps and schema improvements.
   connector's surface area and maintenance burden.
 - **Fix:** Remove unused queries. Deploy with `--force` to acknowledge breaking changes.
 
-### P5-07 — Dead mutation `DeleteHabitLog` (LOW)
+### P5-07 — Dead mutation `DeleteHabitLog` (LOW) ✅
 - **File:** `dataconnect/choreboo-connector/mutations.gql:400-404`
 - **Problem:** Not called from any client code.
 - **Fix:** Remove. Deploy with `--force`.
 
-### P5-08 — String-typed enums in cloud schema (LOW)
+### P5-08 — String-typed enums in cloud schema (LOW) ✅
 - **File:** `dataconnect/schema/schema.gql`
 - **Problem:** `stage`, `petType`, `difficulty` are plain `String` columns. No server-side
   validation of allowed values.

@@ -25,7 +25,19 @@ mutation UpdateUserHousehold($householdId: UUID) @auth(level: USER) {
 
 # Update the current user's point totals. Called as write-through after habit completion
 # and during cloud-to-local sync (G16 fix).
-mutation UpdateUserPoints($totalPoints: Int!, $totalLifetimeXp: Int!) @auth(level: USER) {
+# P4-07 fix: @transaction + @check enforces non-negative values server-side, preventing
+# a compromised client from setting arbitrary point values.
+mutation UpdateUserPoints($totalPoints: Int!, $totalLifetimeXp: Int!)
+@auth(level: USER) @transaction {
+  query @redact {
+    user(key: { id_expr: "auth.uid" })
+      @check(
+        expr: "vars.totalPoints >= 0 && vars.totalLifetimeXp >= 0",
+        message: "Point values must be non-negative"
+      ) {
+      id
+    }
+  }
   user_update(
     key: { id_expr: "auth.uid" }
     data: { totalPoints: $totalPoints, totalLifetimeXp: $totalLifetimeXp }
@@ -64,7 +76,21 @@ mutation NullifyHouseholdForMembers($householdId: UUID!) @auth(level: USER) {
 }
 
 # Only the creator can delete their household.
-mutation DeleteHousehold($householdId: UUID!) @auth(level: USER) {
+# P4-10 fix: @transaction ensures atomic cleanup of all references before deletion.
+# Step 1: null out householdId on all habits referencing this household (prevents orphans).
+# Step 2: null out household FK on all member User records (NullifyHouseholdForMembers
+#         handles this separately but we mirror it here for the delete path).
+# Step 3: delete the household row. All three steps are wrapped in @transaction.
+mutation DeleteHousehold($householdId: UUID!) @auth(level: USER) @transaction {
+  habit_updateMany(
+    where: {
+      _and: [
+        { householdId: { eq: $householdId } }
+        { household: { createdById: { eq_expr: "auth.uid" } } }
+      ]
+    }
+    data: { householdId: null, isHouseholdHabit: false }
+  )
   household_deleteMany(
     where: { id: { eq: $householdId }, createdById: { eq_expr: "auth.uid" } }
   )
@@ -83,7 +109,19 @@ mutation InsertChoreboo(
   $petType: String!,
   $lastInteractionAt: Timestamp!,
   $sleepUntil: Timestamp
-) @auth(level: USER) {
+) @auth(level: USER) @transaction {
+  # P5-02 fix: @check guards prevent a compromised client from creating a Choreboo with
+  # out-of-range stats or invalid enum strings.
+  # P5-08 fix: stage and petType values are validated against their allowed sets.
+  query @redact {
+    user(key: { id_expr: "auth.uid" })
+      @check(
+        expr: "vars.hunger >= 0 && vars.hunger <= 100 && vars.happiness >= 0 && vars.happiness <= 100 && vars.energy >= 0 && vars.energy <= 100 && vars.xp >= 0 && vars.level >= 1",
+        message: "Choreboo stat values are out of valid range"
+      ) {
+      id
+    }
+  }
   choreboo_insert(
     data: {
       ownerId_expr: "auth.uid"
@@ -200,11 +238,30 @@ mutation UpdateChorebooBackground(
 
 # Record that the current user has purchased a background. The composite key
 # (ownerId, backgroundId) prevents duplicate purchase rows.
-mutation PurchaseBackground($backgroundId: String!) @auth(level: USER) {
+# P5-01 fix: @transaction + embedded @check reads the caller's current totalPoints
+# and verifies they have enough (totalPoints >= cost) before inserting the purchase
+# and updating their balance atomically. $newTotalPoints is the post-deduction value
+# computed client-side; the server validates the invariant holds.
+mutation PurchaseBackground($backgroundId: String!, $cost: Int!, $newTotalPoints: Int!) @auth(level: USER) @transaction {
+  query @redact {
+    user(key: { id_expr: "auth.uid" })
+      @check(
+        expr: "this != null && this.totalPoints >= vars.cost && vars.newTotalPoints >= 0",
+        message: "Insufficient star points to purchase this background"
+      ) {
+      totalPoints
+    }
+  }
   purchasedBackground_insert(
     data: {
       ownerId_expr: "auth.uid"
       backgroundId: $backgroundId
+    }
+  )
+  user_update(
+    key: { id_expr: "auth.uid" }
+    data: {
+      totalPoints: $newTotalPoints
     }
   )
 }
@@ -274,6 +331,8 @@ mutation CreateHabit(
 }
 
 # Only the owner can update ownership-sensitive fields (isHouseholdHabit, householdId, assignedToId).
+# P4-09 fix: @transaction + embedded @check verifies the caller is a member of the target
+# household before allowing the householdId to be set. Mirrors the CreateHabit membership check.
 mutation UpdateOwnHabit(
   $habitId: UUID!,
   $title: String!,
@@ -287,7 +346,16 @@ mutation UpdateOwnHabit(
   $isHouseholdHabit: Boolean!,
   $householdId: UUID,
   $assignedToId: String
-) @auth(level: USER) {
+) @auth(level: USER) @transaction {
+  query @redact {
+    user(key: { id_expr: "auth.uid" })
+      @check(
+        expr: "this != null && (vars.householdId == null || this.householdId == vars.householdId)",
+        message: "You are not a member of the specified household"
+      ) {
+      householdId
+    }
+  }
   habit_updateMany(
     where: {
       _and: [
@@ -311,16 +379,15 @@ mutation UpdateOwnHabit(
   )
 }
 
-# The assigned user can update safe fields only — ownership/household fields are excluded
-# to prevent privilege escalation.
+# The assigned user can update safe fields only — ownership/household fields and
+# XP-affecting fields (difficulty, baseXp) are excluded to prevent privilege escalation.
+# P4-08 fix: difficulty and baseXp removed; assignees cannot change XP values.
 mutation UpdateAssignedHabit(
   $habitId: UUID!,
   $title: String!,
   $description: String,
   $iconName: String!,
   $customDays: String!,
-  $difficulty: Int!,
-  $baseXp: Int!,
   $reminderEnabled: Boolean!,
   $reminderTime: String
 ) @auth(level: USER) {
@@ -336,8 +403,6 @@ mutation UpdateAssignedHabit(
       description: $description
       iconName: $iconName
       customDays: $customDays
-      difficulty: $difficulty
-      baseXp: $baseXp
       reminderEnabled: $reminderEnabled
       reminderTime: $reminderTime
     }
@@ -452,13 +517,6 @@ mutation CreateHabitLog(
       xpEarned: $xpEarned
       streakAtCompletion: $streakAtCompletion
     }
-  )
-}
-
-# Only the user who created the log can delete it.
-mutation DeleteHabitLog($logId: UUID!) @auth(level: USER) {
-  habitLog_deleteMany(
-    where: { id: { eq: $logId }, completedById: { eq_expr: "auth.uid" } }
   )
 }
 

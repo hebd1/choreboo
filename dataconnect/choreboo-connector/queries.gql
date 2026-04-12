@@ -21,18 +21,6 @@ query GetCurrentUser @auth(level: USER) {
   }
 }
 
-query GetUserById($userId: String!) @auth(level: USER) {
-  user(key: { id: $userId }) {
-    id
-    displayName
-    photoUrl
-    household {
-      id
-      name
-    }
-  }
-}
-
 # ---- Household Queries ----
 
 # Inherently scoped: traverses from the authenticated user to their household.
@@ -142,33 +130,6 @@ query GetMyPurchasedBackgrounds @auth(level: USER) {
 
 # ---- Habit Queries ----
 
-query GetMyHabits @auth(level: USER) {
-  habits(
-    where: { ownerId: { eq_expr: "auth.uid" }, isArchived: { eq: false } }
-  ) {
-    id
-    title
-    description
-    iconName
-    customDays
-    difficulty
-    baseXp
-    reminderEnabled
-    reminderTime
-    isHouseholdHabit
-    isArchived
-    createdAt
-    household {
-      id
-      name
-    }
-    assignedTo {
-      id
-      displayName
-    }
-  }
-}
-
 # Returns ALL habits for the current user including archived ones — used for cloud-to-local sync
 # so that archive status can propagate across devices (G12 fix).
 query GetAllMyHabits @auth(level: USER) {
@@ -255,102 +216,7 @@ query GetHouseholdHabitLogsForDate($date: String!) @auth(level: USER) {
   }
 }
 
-# Restricted to habits owned by the caller OR household habits where the caller
-# is a member of the habit's household. The household membership check traverses:
-# Habit → Household → users_on_household and verifies auth.uid is present.
-query GetHabitById($habitId: UUID!) @auth(level: USER) {
-  habits(
-    where: {
-      _and: [
-        { id: { eq: $habitId } }
-        {
-          _or: [
-            { ownerId: { eq_expr: "auth.uid" } }
-            {
-              _and: [
-                { isHouseholdHabit: { eq: true } }
-                { household: { users_on_household: { exist: { id: { eq_expr: "auth.uid" } } } } }
-              ]
-            }
-          ]
-        }
-      ]
-    }
-    limit: 1
-  ) {
-    id
-    title
-    description
-    iconName
-    customDays
-    difficulty
-    baseXp
-    reminderEnabled
-    reminderTime
-    isHouseholdHabit
-    isArchived
-    createdAt
-    owner {
-      id
-      displayName
-    }
-    household {
-      id
-      name
-    }
-  }
-}
-
 # ---- HabitLog Queries ----
-
-# Returns logs for a specific habit. Caller must be the owner, or the habit must be a
-# household habit and the caller must be a member of that household.
-query GetLogsForHabit($habitId: UUID!) @auth(level: USER) {
-  habitLogs(
-    where: {
-      _and: [
-        { habitId: { eq: $habitId } }
-        {
-          habit: {
-            _or: [
-              { ownerId: { eq_expr: "auth.uid" } }
-              {
-                _and: [
-                  { isHouseholdHabit: { eq: true } }
-                  { household: { users_on_household: { exist: { id: { eq_expr: "auth.uid" } } } } }
-                ]
-              }
-            ]
-          }
-        }
-      ]
-    }
-    orderBy: [{ completedAt: DESC }]
-  ) {
-    id
-    completedAt
-    date
-    xpEarned
-    streakAtCompletion
-    completedBy {
-      id
-      displayName
-    }
-  }
-}
-
-query GetMyLogsForDate($date: String!) @auth(level: USER) {
-  habitLogs(
-    where: { completedById: { eq_expr: "auth.uid" }, date: { eq: $date } }
-  ) {
-    id
-    habitId
-    completedAt
-    date
-    xpEarned
-    streakAtCompletion
-  }
-}
 
 query GetMyLogsForDateRange($startDate: String!, $endDate: String!) @auth(level: USER) {
   habitLogs(

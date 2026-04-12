@@ -7,6 +7,11 @@
 # ---- User ----
 # Keyed by Firebase Auth UID (String PK, not auto UUID).
 # Created on first sign-in.
+# D7 fix: household @ref uses onDelete: NO_ACTION (Data Connect default; PostgreSQL FK is
+# RESTRICT). The ResetRepository nulls out the creator's User.household FK via
+# UpdateUserHousehold before deleting the Household row, avoiding FK violations.
+# Other members' User.household FKs are cleared by a NullifyHouseholdForMembers mutation
+# called before the Household delete in the reset flow — see ResetRepository.kt.
 type User @table {
   id: String! @col(name: "uid")
   displayName: String!
@@ -63,6 +68,8 @@ type PurchasedBackground @table(key: ["owner", "backgroundId"]) {
 # Supports both personal and household habits.
 # ownerUid = creator's UID. householdId populated for shared habits.
 # assignedTo: optional single member the habit is assigned to (household habits only).
+# P5-03 note: ownerId column is already automatically indexed by Data Connect for FK
+# references (@ref), so no explicit @index is needed for the owner field.
 type Habit @table {
   id: UUID! @default(expr: "uuidV4()")
   owner: User! @ref
@@ -83,7 +90,13 @@ type Habit @table {
 
 # ---- HabitLog ----
 # One row per completion. Links to Habit and the completing User.
-type HabitLog @table {
+# Room enforces UNIQUE(habitId, date) locally via OnConflictStrategy.IGNORE.
+# P4-06 fix: @unique(fields: ["habit", "date", "completedBy"]) enforces cloud-side
+# uniqueness, preventing duplicate completion logs from race conditions or retries.
+# The UUID id PK is retained so remoteId stamping still works correctly.
+# P5-03 fix: @index on date for fast per-date log queries. habitId and completedById
+# columns are already indexed automatically by Data Connect for FK references (@ref).
+type HabitLog @table @unique(fields: ["habit", "date", "completedBy"]) @index(fields: ["date"]) {
   id: UUID! @default(expr: "uuidV4()")
   habit: Habit! @ref
   completedBy: User! @ref

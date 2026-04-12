@@ -1,5 +1,9 @@
 connectorId: choreboo
-authMode: PUBLIC
+# P5-04 fix: USER_REQUIRED rejects unauthenticated requests at the connector level,
+# providing a defence-in-depth layer. Each operation still has its own @auth(level: USER)
+# directive, but this ensures no operation can accidentally be exposed unauthenticated
+# even if the per-operation @auth annotation is mistakenly omitted.
+authMode: USER_REQUIRED
 generate:
   kotlinSdk:
     package: com.example.choreboo_habittrackerfriend.dataconnect
