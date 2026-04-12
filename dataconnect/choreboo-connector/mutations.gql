@@ -45,6 +45,24 @@ mutation CreateHousehold($name: String!, $inviteCode: String!)
   )
 }
 
+# P3-09 fix: NullifyHouseholdForMembers is scoped to the household creator via a WHERE
+# filter that traverses User → Household → createdById. Only members of a household
+# whose createdById matches auth.uid are updated. This replaces the previous
+# insecureReason suppression with an enforced server-side auth check — the creator
+# ownership is now verified in the database rather than relying on the caller obtaining
+# householdId from a scoped query.
+mutation NullifyHouseholdForMembers($householdId: UUID!) @auth(level: USER) {
+  user_updateMany(
+    where: {
+      _and: [
+        { householdId: { eq: $householdId } }
+        { household: { createdById: { eq_expr: "auth.uid" } } }
+      ]
+    }
+    data: { householdId: null }
+  )
+}
+
 # Only the creator can delete their household.
 mutation DeleteHousehold($householdId: UUID!) @auth(level: USER) {
   household_deleteMany(
@@ -198,7 +216,22 @@ mutation DeleteAllMyPurchasedBackgrounds @auth(level: USER) {
 
 # ---- Habit Mutations ----
 
+# P3-08 fix: @transaction + embedded @check verifies, when creating a household habit,
+# that the caller is actually a member of the target household. The embedded query
+# fetches the caller's User record and checks their householdId matches $householdId.
+# For non-household habits ($householdId == null) the embedded query returns a User
+# with a null householdId; the @check uses a CEL expression that allows this through
+# only when isHouseholdHabit is false (verified client-side — the @check here gates
+# the household case: if isHouseholdHabit=true, the user's householdId must match).
+# The simplest enforceable invariant: caller's User.householdId == $householdId
+# (null == null passes for personal habits; UUID == UUID passes for household members).
+# @redact prevents the user data from being returned to the client.
+# D4 fix: $id is pre-generated client-side (UUID.randomUUID()) so the remoteId can be
+# stamped into Room before the network round-trip completes. This eliminates the window
+# where the app is killed after local insert but before the cloud response arrives,
+# which previously left habits with null remoteId that couldn't be reconciled on next sync.
 mutation CreateHabit(
+  $id: UUID!,
   $title: String!,
   $description: String,
   $iconName: String!,
@@ -210,9 +243,19 @@ mutation CreateHabit(
   $isHouseholdHabit: Boolean!,
   $householdId: UUID,
   $assignedToId: String
-) @auth(level: USER) {
+) @auth(level: USER) @transaction {
+  query @redact {
+    user(key: { id_expr: "auth.uid" })
+      @check(
+        expr: "this != null && this.householdId == vars.householdId",
+        message: "You are not a member of the specified household"
+      ) {
+      householdId
+    }
+  }
   habit_insert(
     data: {
+      id: $id
       ownerId_expr: "auth.uid"
       title: $title
       description: $description
@@ -230,11 +273,8 @@ mutation CreateHabit(
   )
 }
 
-# The owner or the assigned user can update the habit.
-# Sensitive fields (isHouseholdHabit, householdId, assignedToId) are included but the
-# client is responsible for preserving them when the editor is not the owner (enforced in
-# AddEditHabitViewModel via the isOwner flag).
-mutation UpdateHabit(
+# Only the owner can update ownership-sensitive fields (isHouseholdHabit, householdId, assignedToId).
+mutation UpdateOwnHabit(
   $habitId: UUID!,
   $title: String!,
   $description: String,
@@ -252,12 +292,7 @@ mutation UpdateHabit(
     where: {
       _and: [
         { id: { eq: $habitId } }
-        {
-          _or: [
-            { ownerId: { eq_expr: "auth.uid" } }
-            { assignedToId: { eq_expr: "auth.uid" } }
-          ]
-        }
+        { ownerId: { eq_expr: "auth.uid" } }
       ]
     }
     data: {
@@ -272,6 +307,39 @@ mutation UpdateHabit(
       isHouseholdHabit: $isHouseholdHabit
       householdId: $householdId
       assignedToId: $assignedToId
+    }
+  )
+}
+
+# The assigned user can update safe fields only — ownership/household fields are excluded
+# to prevent privilege escalation.
+mutation UpdateAssignedHabit(
+  $habitId: UUID!,
+  $title: String!,
+  $description: String,
+  $iconName: String!,
+  $customDays: String!,
+  $difficulty: Int!,
+  $baseXp: Int!,
+  $reminderEnabled: Boolean!,
+  $reminderTime: String
+) @auth(level: USER) {
+  habit_updateMany(
+    where: {
+      _and: [
+        { id: { eq: $habitId } }
+        { assignedToId: { eq_expr: "auth.uid" } }
+      ]
+    }
+    data: {
+      title: $title
+      description: $description
+      iconName: $iconName
+      customDays: $customDays
+      difficulty: $difficulty
+      baseXp: $baseXp
+      reminderEnabled: $reminderEnabled
+      reminderTime: $reminderTime
     }
   )
 }
@@ -294,6 +362,24 @@ mutation ArchiveHabit($habitId: UUID!) @auth(level: USER) {
   )
 }
 
+# The owner or the assigned user can un-archive the habit (D6 fix — mirrors ArchiveHabit).
+mutation UnarchiveHabit($habitId: UUID!) @auth(level: USER) {
+  habit_updateMany(
+    where: {
+      _and: [
+        { id: { eq: $habitId } }
+        {
+          _or: [
+            { ownerId: { eq_expr: "auth.uid" } }
+            { assignedToId: { eq_expr: "auth.uid" } }
+          ]
+        }
+      ]
+    }
+    data: { isArchived: false }
+  )
+}
+
 # The owner or the assigned user can delete the habit.
 mutation DeleteHabit($habitId: UUID!) @auth(level: USER) {
   habit_deleteMany(
@@ -313,14 +399,53 @@ mutation DeleteHabit($habitId: UUID!) @auth(level: USER) {
 
 # ---- HabitLog Mutations ----
 
+# P3-07 fix: @transaction + embedded @check verifies the caller has access to the habit
+# before inserting a log. The embedded query fetches habits where:
+#   - id matches $habitId, AND
+#   - caller is owner OR assignee OR (household habit AND caller is a household member)
+# If no matching habit is found (empty list), @check fails and the insert is rolled back.
+# @redact prevents the habit list from being returned to the client.
+# D4 fix: $id is pre-generated client-side so remoteId is stamped before the round-trip.
 mutation CreateHabitLog(
+  $id: UUID!,
   $habitId: UUID!,
   $date: String!,
   $xpEarned: Int!,
   $streakAtCompletion: Int!
-) @auth(level: USER) {
+) @auth(level: USER) @transaction {
+  query @redact {
+    habits(
+      where: {
+        _and: [
+          { id: { eq: $habitId } }
+          {
+            _or: [
+              { ownerId: { eq_expr: "auth.uid" } }
+              { assignedToId: { eq_expr: "auth.uid" } }
+              {
+                _and: [
+                  { isHouseholdHabit: { eq: true } }
+                  {
+                    household: {
+                      users_on_household: {
+                        exist: { id: { eq_expr: "auth.uid" } }
+                      }
+                    }
+                  }
+                ]
+              }
+            ]
+          }
+        ]
+      }
+      limit: 1
+    ) @check(expr: "this.exists(h, true)", message: "You do not have permission to log this habit") {
+      id
+    }
+  }
   habitLog_insert(
     data: {
+      id: $id
       habitId: $habitId
       completedById_expr: "auth.uid"
       date: $date
@@ -334,6 +459,24 @@ mutation CreateHabitLog(
 mutation DeleteHabitLog($logId: UUID!) @auth(level: USER) {
   habitLog_deleteMany(
     where: { id: { eq: $logId }, completedById: { eq_expr: "auth.uid" } }
+  )
+}
+
+# P3-10 fix: Delete ALL logs for a specific habit, scoped to the habit owner.
+# The previous version filtered by completedById (auth.uid) which only deleted the
+# caller's own logs — other household members' logs were left behind, causing FK
+# violations when DeleteHabit ran next. Now the WHERE filter traverses
+# HabitLog → Habit → ownerId so only the habit owner can invoke this, but ALL logs
+# for that habit are removed regardless of who completed them.
+# Must be called before DeleteHabit to prevent FK constraint violations (D5/P3-10 fix).
+mutation DeleteLogsForHabit($habitId: UUID!) @auth(level: USER) {
+  habitLog_deleteMany(
+    where: {
+      _and: [
+        { habitId: { eq: $habitId } }
+        { habit: { ownerId: { eq_expr: "auth.uid" } } }
+      ]
+    }
   )
 }
 
