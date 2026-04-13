@@ -54,6 +54,8 @@ val StitchInversePrimary          = Color(0xFF78DC77)
 // Outline & borders
 val StitchOutline        = Color(0xFF6F7A6B)
 val StitchOutlineVariant = Color(0xFFBECAB9)
+// StitchSurfaceTint intentionally mirrors StitchPrimary (0xFF006E1C): M3 spec calls for
+// the tint color to match the primary color so that surface tonal elevation layers look correct.
 val StitchSurfaceTint    = Color(0xFF006E1C)
 
 // Error
@@ -82,6 +84,7 @@ val StitchDarkBackground              = Color(0xFF0F1416)
 val StitchDarkOnBackground            = Color(0xFFE1E3E6)
 val StitchDarkSurface                 = Color(0xFF0F1416)
 val StitchDarkOnSurface               = Color(0xFFE1E3E6)
+val StitchDarkSurfaceBright           = Color(0xFF1B2023) // elevated surface for dark mode
 val StitchDarkSurfaceDim              = Color(0xFF0F1416)
 val StitchDarkSurfaceVariant          = Color(0xFF3A4640)
 val StitchDarkOnSurfaceVariant        = Color(0xFFBBC8BB)
@@ -137,7 +140,11 @@ val HeatmapHigh = StitchPrimaryContainer   // 4+ tasks: primary green at 30% alp
 val HeatmapLow  = Color(0xFFFFC107)        // 1-3 tasks: amber yellow at 30% alpha
 val HeatmapNone = StitchSurfaceVariant     // No tasks: surface variant
 
-// ── Legacy aliases (kept for backward-compat with PetScreen imports) ─────────
+// ── Legacy aliases (semantic aliases for PetScreen gradient use) ──────────────
+// These are intentional re-exports of theme tokens so that PetScreen gradient
+// code can use descriptive names without importing full theme color names.
+// XpPurple, PetHappyGreen, PetHungryOrange → map to tertiary / container tokens.
+// PetTiredBlue, PetSadGrey → standalone accent values not covered by the token system.
 val XpPurple       = StitchTertiary
 val PetHappyGreen  = StitchPrimaryContainer
 val PetHungryOrange = StitchSecondaryContainer

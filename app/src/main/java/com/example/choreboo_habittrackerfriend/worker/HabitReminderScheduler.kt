@@ -6,7 +6,11 @@ import android.content.Context
 import android.content.Intent
 import java.time.LocalDate
 import java.time.LocalTime
+import java.time.ZoneId
 import java.time.ZonedDateTime
+
+/** Delivery window used when exact-alarm permission is not granted (API 31+). */
+private const val ALARM_WINDOW_MS = 15 * 60 * 1000L
 
 object HabitReminderScheduler {
 
@@ -51,17 +55,19 @@ object HabitReminderScheduler {
                         pendingIntent,
                     )
                 } else {
-                    alarmManager.setAndAllowWhileIdle(
+                    alarmManager.setWindow(
                         AlarmManager.RTC_WAKEUP,
                         nextTriggerTime.toInstant().toEpochMilli(),
+                        ALARM_WINDOW_MS,
                         pendingIntent,
                     )
                 }
             } catch (_: SecurityException) {
-                // If SCHEDULE_EXACT_ALARM permission isn't granted, fall back to inexact
-                alarmManager.setAndAllowWhileIdle(
+                // If SCHEDULE_EXACT_ALARM permission isn't granted, fall back to windowed inexact
+                alarmManager.setWindow(
                     AlarmManager.RTC_WAKEUP,
                     nextTriggerTime.toInstant().toEpochMilli(),
+                    ALARM_WINDOW_MS,
                     pendingIntent,
                 )
             }
@@ -91,7 +97,9 @@ object HabitReminderScheduler {
     ): ZonedDateTime? {
         if (scheduledDays.isEmpty()) return null
 
-        val today = LocalDate.now()
+        // Capture a single consistent "now" so sub-functions don't diverge across midnight.
+        val now = ZonedDateTime.now()
+        val today = now.toLocalDate()
         
         // Check if any scheduled day is a weekly pattern (MON-SUN)
         val weeklyDays = scheduledDays.filter { it.length == 3 && it.all { c -> c.isLetter() } }
@@ -100,11 +108,11 @@ object HabitReminderScheduler {
 
         // Try to find the next occurrence
         val nextWeeklyTrigger = if (weeklyDays.isNotEmpty()) {
-            calculateNextWeeklyTrigger(reminderTime, weeklyDays)
+            calculateNextWeeklyTrigger(reminderTime, weeklyDays, today, now)
         } else null
 
         val nextMonthlyTrigger = if (monthlyDays.isNotEmpty()) {
-            calculateNextMonthlyTrigger(reminderTime, monthlyDays)
+            calculateNextMonthlyTrigger(reminderTime, monthlyDays, today, now)
         } else null
 
         // Return whichever is sooner
@@ -121,14 +129,14 @@ object HabitReminderScheduler {
     private fun calculateNextWeeklyTrigger(
         reminderTime: LocalTime,
         weeklyDays: List<String>,
+        today: LocalDate,
+        now: ZonedDateTime,
     ): ZonedDateTime? {
-        val today = LocalDate.now()
-        
         // First, try today if it's a scheduled day
         val todayShort = today.dayOfWeek.name.take(3).uppercase()
         if (weeklyDays.any { it.uppercase() == todayShort }) {
-            val todayTrigger = today.atTime(reminderTime).atZone(java.time.ZoneId.systemDefault())
-            if (todayTrigger.isAfter(ZonedDateTime.now())) {
+            val todayTrigger = today.atTime(reminderTime).atZone(ZoneId.systemDefault())
+            if (todayTrigger.isAfter(now)) {
                 return todayTrigger
             }
         }
@@ -138,7 +146,7 @@ object HabitReminderScheduler {
             val checkDate = today.plusDays(i.toLong())
             val dayShort = checkDate.dayOfWeek.name.take(3).uppercase()
             if (weeklyDays.any { it.uppercase() == dayShort }) {
-                return checkDate.atTime(reminderTime).atZone(java.time.ZoneId.systemDefault())
+                return checkDate.atTime(reminderTime).atZone(ZoneId.systemDefault())
             }
         }
 
@@ -148,10 +156,9 @@ object HabitReminderScheduler {
     private fun calculateNextMonthlyTrigger(
         reminderTime: LocalTime,
         monthlyDays: List<Int>,
+        today: LocalDate,
+        now: ZonedDateTime,
     ): ZonedDateTime? {
-        val today = LocalDate.now()
-        val now = ZonedDateTime.now()
-        
         val lastDayOfMonth = today.lengthOfMonth()
         val normalizedDays = monthlyDays.map { day ->
             if (day > lastDayOfMonth) lastDayOfMonth else day
@@ -159,7 +166,7 @@ object HabitReminderScheduler {
 
         // Check if today is a scheduled day
         if (today.dayOfMonth in normalizedDays) {
-            val todayTrigger = today.atTime(reminderTime).atZone(java.time.ZoneId.systemDefault())
+            val todayTrigger = today.atTime(reminderTime).atZone(ZoneId.systemDefault())
             if (todayTrigger.isAfter(now)) {
                 return todayTrigger
             }
@@ -168,7 +175,7 @@ object HabitReminderScheduler {
         // Find the next scheduled day in this month
         for (day in normalizedDays) {
             if (day > today.dayOfMonth) {
-                return today.withDayOfMonth(day).atTime(reminderTime).atZone(java.time.ZoneId.systemDefault())
+                return today.withDayOfMonth(day).atTime(reminderTime).atZone(ZoneId.systemDefault())
             }
         }
 
@@ -182,7 +189,7 @@ object HabitReminderScheduler {
         return if (nextMonthNormalizedDays.isNotEmpty()) {
             nextMonth.withDayOfMonth(nextMonthNormalizedDays.first())
                 .atTime(reminderTime)
-                .atZone(java.time.ZoneId.systemDefault())
+                .atZone(ZoneId.systemDefault())
         } else null
     }
 }

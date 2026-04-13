@@ -2,8 +2,8 @@ package com.example.choreboo_habittrackerfriend.domain.model
 
 /**
  * Pricing tier for a background item.
- * COMMON = 50 points, RARE = 100 points.
- * (The old PREMIUM tier has been replaced by the subscription-gated requiresPremium flag.)
+ * COMMON = 50 points, RARE = 100 points, PREMIUM = 200 points (reserved/legacy — currently
+ * unused by the shop; premium-gated backgrounds use [BackgroundItem.requiresPremium] instead).
  */
 enum class BackgroundTier(val cost: Int) {
     COMMON(50),

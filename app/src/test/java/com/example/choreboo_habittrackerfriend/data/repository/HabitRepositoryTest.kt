@@ -191,11 +191,12 @@ class HabitRepositoryTest {
     fun `completeHabit XP is capped at baseXp times 3`() = runTest {
         coEvery { habitDao.getHabitByIdSync(1L) } returns habitEntity(baseXp = 10)
         coEvery { habitLogDao.getCompletionCountForDate(1L, any()) } returns 0
-        // Build 100 consecutive dates ending yesterday (sorted DESC for calculateStreak)
+        // Build 100 consecutive dates ending yesterday relative to runtime date,
+        // so calculateStreak (which calls LocalDate.now() internally) walks back correctly.
         val today = LocalDate.now()
         val consecutiveDates = (1..100).map {
             today.minusDays(it.toLong()).format(DateTimeFormatter.ISO_LOCAL_DATE)
-        } // already in DESC order since day 1 = yesterday
+        } // DESC order: day 1 = yesterday, day 100 = 100 days ago
         coEvery { habitLogDao.getCompletionDatesForHabit(1L) } returns consecutiveDates
         coEvery { habitLogDao.insertLog(any()) } returns 100L
 
@@ -236,13 +237,10 @@ class HabitRepositoryTest {
 
     @Test
     fun `completeHabit streak counts consecutive scheduled days for weekly habit`() = runTest {
-        // Mon/Wed/Fri habit — calculate on a Friday with Mon and Wed completed this week
-        val today = LocalDate.now()
-        // Find the most recent Friday, then backtrack to its Monday and Wednesday
-        val daysUntilFriday = (5 - today.dayOfWeek.value + 7) % 7
-        val friday = today.plusDays(daysUntilFriday.toLong())
-        val wednesday = friday.minusDays(2)
-        val monday = friday.minusDays(4)
+        // Mon/Wed/Fri habit — use a fixed Friday (2026-01-16) with Mon and Wed completed this week
+        val friday = LocalDate.of(2026, 1, 16)   // known Friday
+        val wednesday = friday.minusDays(2)       // 2026-01-14
+        val monday = friday.minusDays(4)          // 2026-01-12
 
         val fmt = DateTimeFormatter.ISO_LOCAL_DATE
         val fridayStr = friday.format(fmt)
@@ -255,46 +253,32 @@ class HabitRepositoryTest {
         coEvery { habitLogDao.getCompletionCountForDate(1L, fridayStr) } returns 0
         // Completions on Mon and Wed (DESC order)
         coEvery { habitLogDao.getCompletionDatesForHabit(1L) } returns listOf(wednesdayStr, mondayStr)
-        coEvery { habitLogDao.insertLog(any()) } returns 100L
-
-        // We need today to be friday for the calculation — use a mock via reflection isn't
-        // feasible; instead verify the stored streakAtCompletion in the inserted log.
         val logSlot = slot<HabitLogEntity>()
         coEvery { habitLogDao.insertLog(capture(logSlot)) } returns 100L
 
-        // For this test we're verifying the algorithm logic directly by inspecting the log:
-        // if the scheduling is respected, streak should be 2 (Mon + Wed) → stored as 3
-        // We can't control LocalDate.now() without dependency injection, so we verify
-        // the streak is at least 1 (confirming the weekly dates did not break the streak)
-        // by checking that XP > baseXp (which only happens when streak > 0).
-        // The full algorithmic correctness is covered by the daily habit tests above.
-
-        // This test primarily guards: non-daily habits no longer always get streak=0
-        // by verifying the habit entity's customDays are passed to calculateStreak.
+        // We cannot inject a fake "today" into HabitRepository — completeHabit uses
+        // LocalDate.now() internally for the completion date string. Since the test
+        // always runs against the real clock, we verify only that the log was inserted
+        // (not short-circuited as alreadyComplete) and that streakAtCompletion is >= 1.
         repo.completeHabit(1L)
 
-        // With Mon and Wed completed and a Mon/Wed/Fri schedule, streak is >= 0 (not necessarily
-        // 2 since "today" may not be Friday). The key assertion: the log was inserted successfully
-        // (not short-circuited as alreadyComplete).
-        assertFalse(logSlot.captured.completedByUid == null && logSlot.captured.streakAtCompletion < 0)
+        assertTrue(logSlot.captured.streakAtCompletion >= 1)
     }
 
     @Test
     fun `completeHabit streak ignores non-scheduled days for Mon-Wed-Fri habit`() = runTest {
-        // Simulate: today is Wednesday, Mon was completed, Tue was not scheduled (correctly skipped)
-        val today = LocalDate.now()
+        // Use a fixed Wednesday (2026-01-14). Monday two days prior was completed;
+        // Tuesday (not scheduled) has no log — streak algorithm should skip it.
+        val wednesday = LocalDate.of(2026, 1, 14)
+        val monday = wednesday.minusDays(2)
         val fmt = DateTimeFormatter.ISO_LOCAL_DATE
-        val todayStr = today.format(fmt)
-
-        // Build completion history: yesterday (Tue) has no entry (not scheduled),
-        // day before yesterday (Mon) has entry
-        val monday = today.minusDays(2)
+        val wednesdayStr = wednesday.format(fmt)
         val mondayStr = monday.format(fmt)
 
         coEvery { habitDao.getHabitByIdSync(1L) } returns habitEntity(
             customDays = "MON,WED,FRI",
         )
-        coEvery { habitLogDao.getCompletionCountForDate(1L, todayStr) } returns 0
+        coEvery { habitLogDao.getCompletionCountForDate(1L, any()) } returns 0
         // Only Monday logged (Tuesday not scheduled, so no entry there is correct)
         coEvery { habitLogDao.getCompletionDatesForHabit(1L) } returns listOf(mondayStr)
         val logSlot = slot<HabitLogEntity>()
@@ -302,10 +286,9 @@ class HabitRepositoryTest {
 
         repo.completeHabit(1L)
 
-        // The log should be inserted (not alreadyComplete)
-        // If today is Wednesday, streak should be >= 1 (Monday counted, Tuesday skipped)
-        // If today is not Wednesday, streak may be 0 — we just ensure no crash and insertion succeeds
-        assertEquals(1L, 1L) // insertion reached without crash
+        // The log should be inserted (not alreadyComplete).
+        // streakAtCompletion >= 1 regardless of what day the test actually runs —
+        // the history list (Monday) is present, so the algorithm counts at least 1.
         assertTrue(logSlot.captured.streakAtCompletion >= 1)
     }
 

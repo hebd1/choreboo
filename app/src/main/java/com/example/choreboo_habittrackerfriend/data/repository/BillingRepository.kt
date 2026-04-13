@@ -232,9 +232,14 @@ class BillingRepository @Inject constructor(
     }
 
     /**
-     * Releases the BillingClient connection. Should be called when the billing client is no
-     * longer needed (e.g., when the Application is destroyed) to avoid leaking the Play Billing
-     * service connection and risking ANRs.
+     * Releases the BillingClient connection. Should be called only at process shutdown
+     * (e.g., from [android.app.Application.onTerminate]).
+     *
+     * **Not called from any ViewModel** — this repository is `@Singleton`-scoped and outlives
+     * all ViewModels. Calling `release()` from a ViewModel's `onCleared()` would terminate
+     * the connection whenever the user navigates away from that screen, breaking billing for
+     * the rest of the session. The Play Billing Library recommends maintaining the connection
+     * for the process lifetime.
      */
     fun release() {
         if (billingClient.isReady) {

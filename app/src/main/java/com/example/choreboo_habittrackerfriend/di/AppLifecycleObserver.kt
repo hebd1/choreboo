@@ -41,7 +41,18 @@ class AppLifecycleObserver @Inject constructor(
     private val chorebooRepository: ChorebooRepository,
 ) : DefaultLifecycleObserver {
 
-    private val scope = CoroutineScope(
+    /** Secondary constructor used in tests to inject a controllable [CoroutineScope]. */
+    internal constructor(
+        context: Context,
+        syncManager: SyncManager,
+        billingRepository: BillingRepository,
+        chorebooRepository: ChorebooRepository,
+        scope: CoroutineScope,
+    ) : this(context, syncManager, billingRepository, chorebooRepository) {
+        this.scope = scope
+    }
+
+    private var scope: CoroutineScope = CoroutineScope(
         SupervisorJob() +
             Dispatchers.IO +
             CoroutineExceptionHandler { _, throwable ->

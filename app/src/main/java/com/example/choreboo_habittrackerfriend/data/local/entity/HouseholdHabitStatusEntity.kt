@@ -1,9 +1,13 @@
 package com.example.choreboo_habittrackerfriend.data.local.entity
 
 import androidx.room.Entity
+import androidx.room.Index
 import androidx.room.PrimaryKey
 
-@Entity(tableName = "household_habit_statuses")
+@Entity(
+    tableName = "household_habit_statuses",
+    indices = [Index(value = ["cachedDate"])],
+)
 data class HouseholdHabitStatusEntity(
     @PrimaryKey
     val habitId: String, // Data Connect UUID of the habit

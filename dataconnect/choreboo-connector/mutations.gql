@@ -78,8 +78,8 @@ mutation NullifyHouseholdForMembers($householdId: UUID!) @auth(level: USER) {
 # Only the creator can delete their household.
 # P4-10 fix: @transaction ensures atomic cleanup of all references before deletion.
 # Step 1: null out householdId on all habits referencing this household (prevents orphans).
-# Step 2: null out household FK on all member User records (NullifyHouseholdForMembers
-#         handles this separately but we mirror it here for the delete path).
+# Step 2: null out household FK on all member User records so the household row can be
+#         deleted without FK violations (PostgreSQL RESTRICT default on @ref).
 # Step 3: delete the household row. All three steps are wrapped in @transaction.
 mutation DeleteHousehold($householdId: UUID!) @auth(level: USER) @transaction {
   habit_updateMany(
@@ -90,6 +90,15 @@ mutation DeleteHousehold($householdId: UUID!) @auth(level: USER) @transaction {
       ]
     }
     data: { householdId: null, isHouseholdHabit: false }
+  )
+  user_updateMany(
+    where: {
+      _and: [
+        { householdId: { eq: $householdId } }
+        { household: { createdById: { eq_expr: "auth.uid" } } }
+      ]
+    }
+    data: { householdId: null }
   )
   household_deleteMany(
     where: { id: { eq: $householdId }, createdById: { eq_expr: "auth.uid" } }

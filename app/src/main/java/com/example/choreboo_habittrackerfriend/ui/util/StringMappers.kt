@@ -4,7 +4,19 @@ import android.app.Activity
 import android.content.Context
 import android.content.ContextWrapper
 import androidx.annotation.StringRes
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.Bolt
+import androidx.compose.material.icons.filled.CheckCircle
+import androidx.compose.material.icons.filled.Diamond
+import androidx.compose.material.icons.filled.EmojiEvents
+import androidx.compose.material.icons.filled.FitnessCenter
+import androidx.compose.material.icons.filled.Inventory2
+import androidx.compose.material.icons.filled.LocalFireDepartment
+import androidx.compose.material.icons.filled.Stars
+import androidx.compose.material.icons.filled.Whatshot
+import androidx.compose.material.icons.filled.WorkspacePremium
 import androidx.compose.runtime.Composable
+import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.res.stringResource
 import com.example.choreboo_habittrackerfriend.R
 import com.example.choreboo_habittrackerfriend.domain.model.BadgeDefinition
@@ -134,6 +146,24 @@ fun BadgeDefinition.descriptionRes(): Int = when (this) {
 
 @Composable
 fun BadgeDefinition.localizedDescription(): String = stringResource(descriptionRes())
+
+/**
+ * Resolves the [BadgeDefinition.iconName] string key to its corresponding Material
+ * [ImageVector]. Kept in the UI layer so the domain model stays free of Compose dependencies.
+ */
+fun BadgeDefinition.resolveIcon(): ImageVector = when (iconName) {
+    "CheckCircle" -> Icons.Default.CheckCircle
+    "LocalFireDepartment" -> Icons.Default.LocalFireDepartment
+    "EmojiEvents" -> Icons.Default.EmojiEvents
+    "Whatshot" -> Icons.Default.Whatshot
+    "WorkspacePremium" -> Icons.Default.WorkspacePremium
+    "FitnessCenter" -> Icons.Default.FitnessCenter
+    "Inventory2" -> Icons.Default.Inventory2
+    "Stars" -> Icons.Default.Stars
+    "Bolt" -> Icons.Default.Bolt
+    "Diamond" -> Icons.Default.Diamond
+    else -> Icons.Default.Stars
+}
 
 // ------------------------------------------------------------------------------------------------
 // BackgroundItem

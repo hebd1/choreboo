@@ -1,18 +1,5 @@
 package com.example.choreboo_habittrackerfriend.domain.model
 
-import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.Bolt
-import androidx.compose.material.icons.filled.CheckCircle
-import androidx.compose.material.icons.filled.Diamond
-import androidx.compose.material.icons.filled.EmojiEvents
-import androidx.compose.material.icons.filled.FitnessCenter
-import androidx.compose.material.icons.filled.Inventory2
-import androidx.compose.material.icons.filled.LocalFireDepartment
-import androidx.compose.material.icons.filled.Stars
-import androidx.compose.material.icons.filled.Whatshot
-import androidx.compose.material.icons.filled.WorkspacePremium
-import androidx.compose.ui.graphics.vector.ImageVector
-
 /**
  * Represents a badge that the user has earned (or can earn).
  */
@@ -22,61 +9,67 @@ data class Badge(
 )
 
 /**
- * All available badges in the app. Each badge has an icon and a category that determines
- * which stat is checked for unlocking. Display name and description are managed as string resources.
+ * All available badges in the app. Each badge has an iconName (a string key resolved to an
+ * [androidx.compose.ui.graphics.vector.ImageVector] by [com.example.choreboo_habittrackerfriend.ui.util.resolveIcon])
+ * and a category that determines which stat is checked for unlocking.
+ * Display name and description are managed as string resources.
+ *
+ * The [iconName] field is a plain String to avoid coupling the domain layer to Compose/Material
+ * icon APIs. Call [com.example.choreboo_habittrackerfriend.ui.util.resolveIcon] in UI code to
+ * obtain the actual [androidx.compose.ui.graphics.vector.ImageVector].
  */
 enum class BadgeDefinition(
-    val icon: ImageVector,
+    val iconName: String,
     val category: BadgeCategory,
     val threshold: Int,
 ) {
     FIRST_STEP(
-        icon = Icons.Default.CheckCircle,
+        iconName = "CheckCircle",
         category = BadgeCategory.TOTAL_COMPLETIONS,
         threshold = 1,
     ),
     ON_FIRE(
-        icon = Icons.Default.LocalFireDepartment,
+        iconName = "LocalFireDepartment",
         category = BadgeCategory.MAX_STREAK,
         threshold = 3,
     ),
     WEEK_WARRIOR(
-        icon = Icons.Default.EmojiEvents,
+        iconName = "EmojiEvents",
         category = BadgeCategory.MAX_STREAK,
         threshold = 7,
     ),
     FORTNIGHT_FORCE(
-        icon = Icons.Default.Whatshot,
+        iconName = "Whatshot",
         category = BadgeCategory.MAX_STREAK,
         threshold = 14,
     ),
     MONTHLY_MASTER(
-        icon = Icons.Default.WorkspacePremium,
+        iconName = "WorkspacePremium",
         category = BadgeCategory.MAX_STREAK,
         threshold = 30,
     ),
     HABIT_STARTER(
-        icon = Icons.Default.FitnessCenter,
+        iconName = "FitnessCenter",
         category = BadgeCategory.HABITS_CREATED,
         threshold = 3,
     ),
     HABIT_COLLECTOR(
-        icon = Icons.Default.Inventory2,
+        iconName = "Inventory2",
         category = BadgeCategory.HABITS_CREATED,
         threshold = 5,
     ),
     CENTURION(
-        icon = Icons.Default.Stars,
+        iconName = "Stars",
         category = BadgeCategory.LIFETIME_XP,
         threshold = 100,
     ),
     XP_MACHINE(
-        icon = Icons.Default.Bolt,
+        iconName = "Bolt",
         category = BadgeCategory.LIFETIME_XP,
         threshold = 500,
     ),
     LEGENDARY_GRINDER(
-        icon = Icons.Default.Diamond,
+        iconName = "Diamond",
         category = BadgeCategory.LIFETIME_XP,
         threshold = 1000,
     ),
@@ -88,3 +81,4 @@ enum class BadgeCategory {
     HABITS_CREATED,
     LIFETIME_XP,
 }
+

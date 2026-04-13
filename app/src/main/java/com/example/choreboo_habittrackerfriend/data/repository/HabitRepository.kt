@@ -231,36 +231,32 @@ class HabitRepository @Inject constructor(
         val entity = habitDao.getHabitByIdSync(id)
         habitDao.archiveHabit(id)
 
-        // Write-through: archive in Data Connect (fire-and-forget)
+        // Write-through: archive in Data Connect with retry
         entity?.remoteId?.let { remoteId ->
             writeScope.launch {
-                try {
+                retryWithBackoff("archiveHabit:$id") {
                     connector.archiveHabit.execute(
                         habitId = UUID.fromString(remoteId),
                     )
                     Timber.d("Archived habit in cloud: $remoteId")
-                } catch (e: Exception) {
-                    Timber.e(e, "Failed to archive habit in cloud")
                 }
             }
         }
     }
 
-    /** Un-archive a habit locally and in Data Connect (D6 fix — mirrors archiveHabit). */
+    /** Un-archive a habit locally and in Data Connect (mirrors archiveHabit). */
     suspend fun unarchiveHabit(id: Long) {
         val entity = habitDao.getHabitByIdSync(id)
         habitDao.unarchiveHabit(id)
 
-        // Write-through: un-archive in Data Connect (fire-and-forget)
+        // Write-through: un-archive in Data Connect with retry
         entity?.remoteId?.let { remoteId ->
             writeScope.launch {
-                try {
+                retryWithBackoff("unarchiveHabit:$id") {
                     connector.unarchiveHabit.execute(
                         habitId = UUID.fromString(remoteId),
                     )
                     Timber.d("Unarchived habit in cloud: $remoteId")
-                } catch (e: Exception) {
-                    Timber.e(e, "Failed to un-archive habit in cloud")
                 }
             }
         }

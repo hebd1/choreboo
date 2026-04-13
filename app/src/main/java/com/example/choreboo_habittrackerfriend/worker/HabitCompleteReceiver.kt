@@ -37,7 +37,7 @@ class HabitCompleteReceiver : BroadcastReceiver() {
         if (habitId <= 0) return
 
         val pendingResult = goAsync()
-        val notificationId = ((2000L + habitId) and 0x7FFFFFFF).toInt()
+        val notificationId = ((NotificationUtils.HABIT_REMINDER_NOTIF_OFFSET + habitId) and 0x7FFFFFFF).toInt()
 
         CoroutineScope(Dispatchers.Default).launch {
             try {
@@ -130,7 +130,7 @@ class HabitCompleteReceiver : BroadcastReceiver() {
                 context,
                 // Use a unique request code offset to avoid colliding with HabitReminderReceiver's
                 // pending intents which use habitId directly.
-                ((3000L + habitId) and 0x7FFFFFFF).toInt(),
+                ((NotificationUtils.HABIT_COMPLETE_NOTIF_OFFSET + habitId) and 0x7FFFFFFF).toInt(),
                 intent,
                 PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE,
             )

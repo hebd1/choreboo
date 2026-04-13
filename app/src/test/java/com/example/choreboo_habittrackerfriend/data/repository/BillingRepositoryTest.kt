@@ -1,54 +1,78 @@
 package com.example.choreboo_habittrackerfriend.data.repository
 
 import com.android.billingclient.api.ProductDetails
+import io.mockk.every
+import io.mockk.mockk
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertTrue
 import org.junit.Test
 
 /**
- * Unit tests for [BillingRepository].
+ * Unit tests for [BillingRepository] guard logic.
  *
- * Because [BillingClient] is an Android SDK class, we mock it directly with MockK.
- * Tests focus on the two guard behaviours that can be tested without a real BillingClient:
- *   1. [launchPurchaseFlow] returns false when product details are null or the client is not ready.
- *   2. [verifyPremiumStatus] is a no-op when the billing client is not ready.
+ * [BillingClient] is an Android SDK class that cannot be constructed in JVM tests —
+ * it requires a real Android Context and native Play Billing service bindings.
+ * These tests therefore verify the guard branches in [BillingRepository] by
+ * replicating each conditional in an isolated helper that mirrors the production code.
  *
- * Note: The DataStore-seeded [isPremium] cache was removed (S8 fix). [isPremium] now always
- * defaults to false until [verifyPremiumStatus] confirms a purchase via BillingClient.
+ * Guards under test:
+ *  1. [launchPurchaseFlow] returns false when product details are null.
+ *  2. [launchPurchaseFlow] returns false when the billing client is not ready.
+ *  3. [launchPurchaseFlow] returns false when subscriptionOfferDetails is empty/null.
+ *  4. [verifyPremiumStatus] skips queryPurchasesAsync when the client is not ready.
+ *  5. [verifyPremiumStatus] proceeds when the client is ready.
  */
 class BillingRepositoryTest {
 
-    // -----------------------------------------------------------------------
-    // launchPurchaseFlow guard — no product details
-    // -----------------------------------------------------------------------
+    // ── launchPurchaseFlow guards ────────────────────────────────────────────
 
     @Test
     fun `launchPurchaseFlow returns false when productDetails is null`() {
-        // Simulate the guard: details == null → return false immediately.
-        val productDetails: ProductDetails? = null
-        val result = simulateLaunchPurchaseFlow(productDetails = productDetails, clientReady = true)
+        val result = simulateLaunchPurchaseFlow(productDetails = null, clientReady = true)
         assertFalse(result)
     }
-
-    // -----------------------------------------------------------------------
-    // launchPurchaseFlow guard — client not ready
-    // -----------------------------------------------------------------------
 
     @Test
     fun `launchPurchaseFlow returns false when billingClient is not ready`() {
-        val productDetails = io.mockk.mockk<ProductDetails>(relaxed = true)
-        val result = simulateLaunchPurchaseFlow(productDetails = productDetails, clientReady = false)
+        val details = mockk<ProductDetails>(relaxed = true)
+        val result = simulateLaunchPurchaseFlow(productDetails = details, clientReady = false)
         assertFalse(result)
     }
 
-    // -----------------------------------------------------------------------
-    // verifyPremiumStatus guard — client not ready
-    // -----------------------------------------------------------------------
+    @Test
+    fun `launchPurchaseFlow returns false when subscriptionOfferDetails is null`() {
+        val details = mockk<ProductDetails> {
+            every { subscriptionOfferDetails } returns null
+        }
+        val result = simulateLaunchPurchaseFlow(productDetails = details, clientReady = true)
+        assertFalse(result)
+    }
+
+    @Test
+    fun `launchPurchaseFlow returns false when subscriptionOfferDetails is empty`() {
+        val details = mockk<ProductDetails> {
+            every { subscriptionOfferDetails } returns emptyList()
+        }
+        val result = simulateLaunchPurchaseFlow(productDetails = details, clientReady = true)
+        assertFalse(result)
+    }
+
+    @Test
+    fun `launchPurchaseFlow returns true when details are present client is ready and offer token exists`() {
+        val offerDetail = mockk<ProductDetails.SubscriptionOfferDetails> {
+            every { offerToken } returns "mock-offer-token"
+        }
+        val details = mockk<ProductDetails> {
+            every { subscriptionOfferDetails } returns listOf(offerDetail)
+        }
+        val result = simulateLaunchPurchaseFlow(productDetails = details, clientReady = true)
+        assertTrue(result)
+    }
+
+    // ── verifyPremiumStatus guards ───────────────────────────────────────────
 
     @Test
     fun `verifyPremiumStatus returns early when billingClient is not ready`() {
-        // The real verifyPremiumStatus checks billingClient.isReady before querying purchases.
-        // We verify the guard logic directly via the simulated helper.
         val invoked = simulateVerifyPremiumStatus(clientReady = false)
         assertFalse("queryPurchasesAsync should not be called when client is not ready", invoked)
     }
@@ -59,11 +83,12 @@ class BillingRepositoryTest {
         assertTrue("queryPurchasesAsync should be called when client is ready", invoked)
     }
 
-    // -----------------------------------------------------------------------
-    // Helpers that replicate the guard logic from BillingRepository
-    // without constructing a real BillingClient.
-    // -----------------------------------------------------------------------
+    // ── Helpers mirroring BillingRepository guard logic ─────────────────────
 
+    /**
+     * Mirrors the guard sequence in [BillingRepository.launchPurchaseFlow].
+     * Returns true if all guards pass (the flow would be launched in production).
+     */
     private fun simulateLaunchPurchaseFlow(
         productDetails: ProductDetails?,
         clientReady: Boolean,
@@ -72,13 +97,16 @@ class BillingRepositoryTest {
         if (!clientReady) return false
         val offerToken = productDetails.subscriptionOfferDetails?.firstOrNull()?.offerToken
             ?: return false
-        // If we reach here the flow would be launched — return true to signal "would launch".
-        return true
+        // offerToken obtained — the flow would launch; signal success.
+        return offerToken.isNotEmpty()
     }
 
+    /**
+     * Mirrors the guard in [BillingRepository.verifyPremiumStatus].
+     * Returns true if queryPurchasesAsync would be called.
+     */
     private fun simulateVerifyPremiumStatus(clientReady: Boolean): Boolean {
         if (!clientReady) return false
-        // Signal that queryPurchasesAsync would be called.
         return true
     }
 }

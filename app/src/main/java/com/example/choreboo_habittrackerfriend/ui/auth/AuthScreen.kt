@@ -163,7 +163,7 @@ fun AuthScreen(
     }
 
     Scaffold(
-        snackbarHost = { },
+        snackbarHost = { SnackbarHost(snackbarHostState) { data -> StitchSnackbar(data) } },
         containerColor = MaterialTheme.colorScheme.surface,
     ) { padding ->
         Box(
@@ -459,18 +459,6 @@ fun AuthScreen(
                         )
                     }
                 }
-            }
-        }
-
-        // Snackbar pinned to the bottom of the view area
-        Box(
-            modifier = Modifier
-                .fillMaxSize()
-                .padding(bottom = 16.dp),
-            contentAlignment = Alignment.BottomCenter,
-        ) {
-            SnackbarHost(snackbarHostState) { data ->
-                StitchSnackbar(data)
             }
         }
     }

@@ -94,6 +94,14 @@ class PetViewModel @Inject constructor(
         LocalDate.now().format(DateTimeFormatter.ISO_LOCAL_DATE),
     )
 
+    /**
+     * Today's date as a [LocalDate]. Screens should use this instead of calling
+     * [LocalDate.now()] directly so they stay in sync with the ViewModel's reactive date.
+     */
+    val todayLocalDate: StateFlow<LocalDate> = _todayDate
+        .map { LocalDate.parse(it, DateTimeFormatter.ISO_LOCAL_DATE) }
+        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), LocalDate.now())
+
     // -----------------------------------------------------------------------
     // Habit state (absorbed from HabitListViewModel)
     // -----------------------------------------------------------------------

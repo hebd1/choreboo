@@ -140,6 +140,7 @@ fun PetScreen(
     val todayCompletions by viewModel.todayCompletions.collectAsStateWithLifecycle()
     val streaks by viewModel.streaks.collectAsStateWithLifecycle()
     val householdCompleterNames by viewModel.householdCompleterNames.collectAsStateWithLifecycle()
+    val todayLocalDate by viewModel.todayLocalDate.collectAsStateWithLifecycle()
 
     // Background state
     val backgroundId by viewModel.backgroundId.collectAsStateWithLifecycle()
@@ -299,7 +300,7 @@ fun PetScreen(
     )
 
     // Compute daily quest stats
-    val scheduledToday = remember(habits) { habits.filter { it.isScheduledForToday() } }
+    val scheduledToday = remember(habits, todayLocalDate) { habits.filter { it.isScheduledForToday(todayLocalDate) } }
     val completedToday = remember(scheduledToday, todayCompletions) {
         scheduledToday.count { (todayCompletions[it.id] ?: 0) >= 1 }
     }
@@ -369,7 +370,7 @@ fun PetScreen(
                 Icon(Icons.Default.Add, contentDescription = stringResource(R.string.pet_add_habit_cd))
             }
         },
-        snackbarHost = { },
+        snackbarHost = { SnackbarHost(snackbarHostState) { data -> StitchSnackbar(data) } },
     ) { padding ->
         if (choreboo == null) {
             Box(Modifier.fillMaxSize().padding(padding), contentAlignment = Alignment.Center) {
@@ -686,7 +687,7 @@ fun PetScreen(
                             habit = habit,
                             completedToday = todayCompletions[habit.id] ?: 0,
                             currentStreak = streaks[habit.id] ?: 0,
-                            isScheduledToday = habit.isScheduledForToday(),
+                            isScheduledToday = habit.isScheduledForToday(todayLocalDate),
                             onComplete = { viewModel.completeHabit(habit.id) },
                             onEdit = { onEditHabit(habit.id) },
                             onDelete = { habitToDeleteId = habit.id },
@@ -698,18 +699,6 @@ fun PetScreen(
 
                 } // end LazyColumn
             } // end PullToRefreshBox
-
-            // Snackbar above content
-            Box(
-                modifier = Modifier
-                    .fillMaxSize()
-                    .padding(bottom = 8.dp),
-                contentAlignment = Alignment.BottomCenter,
-            ) {
-                SnackbarHost(snackbarHostState) { data ->
-                    StitchSnackbar(data)
-                }
-            }
 
             // Stat detail floating overlay
             AnimatedVisibility(

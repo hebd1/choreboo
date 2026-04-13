@@ -24,11 +24,11 @@ data class Habit(
     val assignedToName: String? = null,
     val remoteId: String? = null,
 ) {
-    fun isScheduledForToday(): Boolean {
+    fun isScheduledForToday(today: LocalDate = LocalDate.now()): Boolean {
         // Check if any day is a weekly day-of-week selector (MON, TUE, etc.)
         val weeklyDays = customDays.filter { it.length == 3 && it.all { c -> c.isLetter() } }
         if (weeklyDays.isNotEmpty()) {
-            val todayShort = LocalDate.now().dayOfWeek.name.take(3).uppercase()
+            val todayShort = today.dayOfWeek.name.take(3).uppercase()
             if (weeklyDays.any { it.uppercase() == todayShort }) {
                 return true
             }
@@ -37,8 +37,8 @@ data class Habit(
         // Check if any day is a monthly day-of-month selector (D1, D15, D31, etc.)
         val monthlyDays = customDays.filter { it.startsWith("D") }
         if (monthlyDays.isNotEmpty()) {
-            val todayDayOfMonth = LocalDate.now().dayOfMonth
-            val lastDayOfMonth = LocalDate.now().lengthOfMonth()
+            val todayDayOfMonth = today.dayOfMonth
+            val lastDayOfMonth = today.lengthOfMonth()
 
             return monthlyDays.any { dayStr ->
                 val day = dayStr.substring(1).toIntOrNull() ?: return@any false

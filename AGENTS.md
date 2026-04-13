@@ -11,7 +11,7 @@ MVVM: `Screen composable → @HiltViewModel → @Singleton Repository → @Dao �
 Repositories also call the **Firebase Data Connect generated SDK** for cloud write-through and cloud-to-local sync.
 
 - **Entities** live in `data/local/entity/` — Room-annotated data classes with String-typed enums, `Long` timestamps, and `remoteId`/`ownerUid` fields for cloud sync.
-- **Domain models** live in `domain/model/` — mirror entities but use Kotlin enums and typed fields. `Habit` has `isScheduledForToday()` helper.
+- **Domain models** live in `domain/model/` — mirror entities but use Kotlin enums and typed fields. `Habit` has `isScheduledForToday(today: LocalDate = LocalDate.now())` helper; screens pass the reactive `todayLocalDate` from their ViewModel to avoid stale default.
 - **Mapping** uses extension functions (`toDomain()` / `toEntity()`) defined at the bottom of each Repository file (private).
 - **DI**: Single `AppModule` provides DB, all DAOs, DataStore, `UserPreferences`, and `FirebaseAuth`. All wiring is constructor injection.
 - **Desugaring**: `isCoreLibraryDesugaringEnabled = true` — `java.time` APIs work on minSdk 24.

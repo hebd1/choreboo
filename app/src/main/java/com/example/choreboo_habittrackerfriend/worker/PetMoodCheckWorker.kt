@@ -129,7 +129,7 @@ class PetMoodCheckWorker @AssistedInject constructor(
         }
         val contentPendingIntent = android.app.PendingIntent.getActivity(
             applicationContext,
-            PET_MOOD_NOTIF_REQUEST_ID,
+            NotificationUtils.PET_MOOD_NOTIF_REQUEST_ID,
             mainIntent,
             android.app.PendingIntent.FLAG_UPDATE_CURRENT or android.app.PendingIntent.FLAG_IMMUTABLE,
         )
@@ -184,11 +184,6 @@ class PetMoodCheckWorker @AssistedInject constructor(
             .setContentIntent(contentPendingIntent)
             .setAutoCancel(true)
 
-        NotificationUtils.notifyIfPermitted(applicationContext, PET_MOOD_NOTIF_ID, notificationBuilder)
-    }
-
-    private companion object {
-        const val PET_MOOD_NOTIF_REQUEST_ID = 9998
-        const val PET_MOOD_NOTIF_ID = 9997
+        NotificationUtils.notifyIfPermitted(applicationContext, NotificationUtils.PET_MOOD_NOTIF_ID, notificationBuilder)
     }
 }

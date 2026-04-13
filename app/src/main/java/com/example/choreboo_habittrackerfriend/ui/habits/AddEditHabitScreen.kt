@@ -165,7 +165,7 @@ fun AddEditHabitScreen(
     }
 
     Scaffold(
-        snackbarHost = { },
+        snackbarHost = { SnackbarHost(snackbarHostState) { data -> StitchSnackbar(data) } },
     ) { padding ->
         Column(
             modifier = Modifier
@@ -609,17 +609,6 @@ fun AddEditHabitScreen(
             }
         }
 
-        // Snackbar pinned to the bottom of the view area
-        Box(
-            modifier = Modifier
-                .fillMaxSize()
-                .padding(bottom = 16.dp),
-            contentAlignment = Alignment.BottomCenter,
-        ) {
-            SnackbarHost(snackbarHostState) { data ->
-                StitchSnackbar(data)
-            }
-        }
     }
 }
 

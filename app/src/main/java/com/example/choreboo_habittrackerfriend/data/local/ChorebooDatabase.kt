@@ -70,6 +70,16 @@ val MIGRATION_17_18 = object : Migration(17, 18) {
     }
 }
 
+val MIGRATION_18_19 = object : Migration(18, 19) {
+    override fun migrate(db: SupportSQLiteDatabase) {
+        // Add index on cachedDate in household_habit_statuses for faster date-filtered queries.
+        db.execSQL(
+            "CREATE INDEX IF NOT EXISTS `index_household_habit_statuses_cachedDate` " +
+                "ON `household_habit_statuses` (`cachedDate`)",
+        )
+    }
+}
+
 @Database(
     entities = [
         HabitEntity::class,
@@ -80,7 +90,7 @@ val MIGRATION_17_18 = object : Migration(17, 18) {
         HouseholdHabitStatusEntity::class,
         PurchasedBackgroundEntity::class,
     ],
-    version = 18, // v18: ownerUid made non-null in habits table (P4-11)
+    version = 19, // v19: cachedDate index added to household_habit_statuses (P9-03)
     exportSchema = true,
 )
 @TypeConverters(Converters::class)
@@ -104,7 +114,7 @@ abstract class ChorebooDatabase : RoomDatabase() {
                     ChorebooDatabase::class.java,
                     "choreboo_database"
                 )
-                    .addMigrations(MIGRATION_17_18)
+                    .addMigrations(MIGRATION_17_18, MIGRATION_18_19)
                     .fallbackToDestructiveMigrationOnDowngrade()
                     .build()
                 INSTANCE = instance

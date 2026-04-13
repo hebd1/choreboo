@@ -12,7 +12,9 @@ import androidx.compose.foundation.layout.Box
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.getValue
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
@@ -72,6 +74,8 @@ private fun AnimatedWebpViewImpl(
     val context = LocalContext.current
     // Use applicationContext so the ImageView does not hold a reference to the Activity.
     val imageView = remember { ImageView(context.applicationContext) }
+    // Capture the latest onComplete lambda without restarting the LaunchedEffect on every recompose.
+    val currentOnComplete by rememberUpdatedState(onComplete)
 
     LaunchedEffect(assetPath) {
         try {
@@ -99,7 +103,7 @@ private fun AnimatedWebpViewImpl(
             drawable.registerAnimationCallback(object : Animatable2.AnimationCallback() {
                 override fun onAnimationEnd(d: Drawable?) {
                     Timber.d("Animation complete: $assetPath")
-                    onComplete()
+                    currentOnComplete()
                 }
             })
 

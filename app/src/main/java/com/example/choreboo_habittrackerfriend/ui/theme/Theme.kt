@@ -40,6 +40,7 @@ private val DarkColorScheme = darkColorScheme(
     onBackground = StitchDarkOnBackground,
     surface = StitchDarkSurface,
     onSurface = StitchDarkOnSurface,
+    surfaceBright = StitchDarkSurfaceBright,
     surfaceVariant = StitchDarkSurfaceVariant,
     onSurfaceVariant = StitchDarkOnSurfaceVariant,
     surfaceContainerLowest = StitchDarkSurfaceContainerLowest,
@@ -76,6 +77,7 @@ private val LightColorScheme = lightColorScheme(
     onBackground = StitchOnBackground,
     surface = StitchSurface,
     onSurface = StitchOnSurface,
+    surfaceBright = StitchSurfaceBright,
     surfaceVariant = StitchSurfaceVariant,
     onSurfaceVariant = StitchOnSurfaceVariant,
     surfaceContainerLowest = StitchSurfaceContainerLowest,
@@ -119,7 +121,7 @@ fun ChorebooHabitTrackerFriendTheme(
     MaterialTheme(
         colorScheme = colorScheme,
         shapes = ChorebooShapes,
-        typography = Typography,
+        typography = ChorebooTypography,
         content = content,
     )
 }

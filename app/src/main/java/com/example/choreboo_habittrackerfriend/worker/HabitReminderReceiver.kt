@@ -109,7 +109,7 @@ class HabitReminderReceiver : BroadcastReceiver() {
                 completePendingIntent,
             )
 
-        val notificationId = ((2000L + habitId) and 0x7FFFFFFF).toInt()
+        val notificationId = ((NotificationUtils.HABIT_REMINDER_NOTIF_OFFSET + habitId) and 0x7FFFFFFF).toInt()
         NotificationUtils.notifyIfPermitted(context, notificationId, notificationBuilder)
     }
 

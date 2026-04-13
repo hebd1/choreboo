@@ -20,7 +20,7 @@ val PlusJakartaSans = FontFamily(
 // ── Stitch Typography – Editorial Gamification ───────────────────────────────
 // Display & Headline: tight tracking (-0.02em ≈ -1sp) for impactful, modern feel
 // Body & Label: comfortable reading weight for instructional content
-val Typography = Typography(
+val ChorebooTypography = Typography(
     displayLarge = TextStyle(
         fontFamily = PlusJakartaSans,
         fontWeight = FontWeight.ExtraBold,

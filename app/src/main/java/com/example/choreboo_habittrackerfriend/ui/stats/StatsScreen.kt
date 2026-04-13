@@ -62,6 +62,7 @@ import com.example.choreboo_habittrackerfriend.ui.theme.XpPurple
 import com.example.choreboo_habittrackerfriend.ui.util.displayNameRes
 import com.example.choreboo_habittrackerfriend.ui.util.descriptionRes
 import com.example.choreboo_habittrackerfriend.ui.util.feelingLabelRes
+import com.example.choreboo_habittrackerfriend.ui.util.resolveIcon
 import java.time.DayOfWeek
 
 @OptIn(ExperimentalMaterial3Api::class)
@@ -82,6 +83,7 @@ fun StatsScreen(
     val monthlyCompletionRate by viewModel.monthlyCompletionRate.collectAsStateWithLifecycle()
     val isRefreshing by viewModel.isRefreshing.collectAsStateWithLifecycle()
     val isLoading by viewModel.isLoading.collectAsStateWithLifecycle()
+    val todayLocalDate by viewModel.todayLocalDate.collectAsStateWithLifecycle()
 
     var showBadgeSheet by rememberSaveable { mutableStateOf(false) }
 
@@ -91,7 +93,7 @@ fun StatsScreen(
     }
 
     // Compute daily quest completion fraction for weekly streak card
-    val scheduledToday = habits.filter { it.isScheduledForToday() }
+    val scheduledToday = habits.filter { it.isScheduledForToday(todayLocalDate) }
     val completedToday = scheduledToday.count { (todayCompletions[it.id] ?: 0) >= 1 }
     val completionFraction = if (scheduledToday.isEmpty()) 0f
     else (completedToday.toFloat() / scheduledToday.size).coerceIn(0f, 1f)
@@ -420,7 +422,7 @@ private fun StreakXpBentoGrid(
                                     contentAlignment = Alignment.Center,
                                 ) {
                                     Icon(
-                                        imageVector = badge.definition.icon,
+                                         imageVector = badge.definition.resolveIcon(),
                                         contentDescription = stringResource(badge.definition.displayNameRes()),
                                         tint = if (isUnlocked) MaterialTheme.colorScheme.onSecondaryContainer
                                         else MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.38f),
@@ -718,7 +720,7 @@ private fun BadgeBottomSheet(
                         contentAlignment = Alignment.Center,
                     ) {
                         Icon(
-                            imageVector = badge.definition.icon,
+                            imageVector = badge.definition.resolveIcon(),
                             contentDescription = stringResource(badge.definition.displayNameRes()),
                             tint = if (isUnlocked) MaterialTheme.colorScheme.onSecondaryContainer
                             else MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.38f),

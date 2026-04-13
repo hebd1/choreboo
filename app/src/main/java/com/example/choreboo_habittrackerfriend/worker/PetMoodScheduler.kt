@@ -7,6 +7,9 @@ import android.content.Intent
 import timber.log.Timber
 import java.time.ZonedDateTime
 
+/** Delivery window used when exact-alarm permission is not granted (API 31+). */
+private const val ALARM_WINDOW_MS = 15 * 60 * 1000L
+
 object PetMoodScheduler {
 
     /**
@@ -73,20 +76,37 @@ object PetMoodScheduler {
         )
 
         try {
-            alarmManager.setExactAndAllowWhileIdle(
-                AlarmManager.RTC_WAKEUP,
-                nextCriticalTime,
-                pendingIntent,
-            )
-            Timber.d("Scheduled pet mood predictive alarm for $nextCriticalTime")
+            val canScheduleExact = if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.S) {
+                alarmManager.canScheduleExactAlarms()
+            } else {
+                true
+            }
+
+            if (canScheduleExact) {
+                alarmManager.setExactAndAllowWhileIdle(
+                    AlarmManager.RTC_WAKEUP,
+                    nextCriticalTime,
+                    pendingIntent,
+                )
+                Timber.d("Scheduled pet mood exact alarm for $nextCriticalTime")
+            } else {
+                alarmManager.setWindow(
+                    AlarmManager.RTC_WAKEUP,
+                    nextCriticalTime,
+                    ALARM_WINDOW_MS,
+                    pendingIntent,
+                )
+                Timber.d("Scheduled pet mood windowed alarm for $nextCriticalTime")
+            }
         } catch (_: SecurityException) {
-            // Fall back to inexact alarm if SCHEDULE_EXACT_ALARM not granted
-            alarmManager.setAndAllowWhileIdle(
+            // Defensive fallback — should not normally be reached after canScheduleExactAlarms() check
+            alarmManager.setWindow(
                 AlarmManager.RTC_WAKEUP,
                 nextCriticalTime,
+                ALARM_WINDOW_MS,
                 pendingIntent,
             )
-            Timber.d("Scheduled pet mood inexact alarm for $nextCriticalTime")
+            Timber.d("Scheduled pet mood windowed alarm (SecurityException fallback) for $nextCriticalTime")
         }
     }
 

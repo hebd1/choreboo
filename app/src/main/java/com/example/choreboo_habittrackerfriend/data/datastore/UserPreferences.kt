@@ -75,16 +75,6 @@ class UserPreferences @Inject constructor(
         return success
     }
 
-    /** Directly set totalPoints — used for cloud-to-local sync (max wins). */
-    suspend fun setPoints(amount: Int) {
-        dataStore.edit { it[TOTAL_POINTS] = amount }
-    }
-
-    /** Directly set totalLifetimeXp — used for cloud-to-local sync (max wins). */
-    suspend fun setLifetimeXp(amount: Int) {
-        dataStore.edit { it[TOTAL_LIFETIME_XP] = amount }
-    }
-
     /**
      * Atomically set both totalPoints and totalLifetimeXp in a single DataStore transaction.
      * Prefer this over calling [setPoints] and [setLifetimeXp] separately to prevent the two
