@@ -8,7 +8,6 @@ plugins {
     alias(libs.plugins.hilt)
     alias(libs.plugins.kotlin.serialization)
     id("com.google.gms.google-services")
-    alias(libs.plugins.gradle.play.publisher)
 }
 
 // Load signing credentials from local.properties (not checked in) or environment variables.
@@ -96,20 +95,6 @@ android {
 
 ksp {
     arg("room.schemaLocation", "$projectDir/schemas")
-}
-
-// Google Play Publisher (Triple-T) — uploads AAB to Play Console via GitHub Actions.
-// Authentication uses Workload Identity Federation; GOOGLE_APPLICATION_CREDENTIALS is set
-// by the google-github-actions/auth step in the workflow.
-play {
-    track.set("internal")
-    val credPath = System.getenv("GOOGLE_APPLICATION_CREDENTIALS")
-    if (credPath != null) {
-        serviceAccountCredentials.set(file(credPath))
-    } else {
-        serviceAccountCredentials.set(file("non-existent-placeholder.json"))
-    }
-    defaultToAppBundles.set(true)
 }
 
 dependencies {

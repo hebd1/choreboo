@@ -74,10 +74,12 @@ jobs:
       #
       # Then grant the service account "Release manager" in Play Console → API access.
       - name: Authenticate to Google Cloud
+        id: auth
         uses: google-github-actions/auth@v2
         with:
           workload_identity_provider: ${{ secrets.WIF_PROVIDER }}
           service_account: ${{ secrets.WIF_SERVICE_ACCOUNT }}
+          token_format: 'access_token'
 
       # ── 6. Compute version numbers ──────────────────────────────────────────
       # versionCode  = GitHub run number (monotonically increasing, never resets)
@@ -100,15 +102,82 @@ jobs:
             -PversionName=${{ env.VERSION_NAME }}
 
       # ── 8. Upload to Play Console (Internal Testing track) ──────────────────
-      - name: Publish release bundle to Play Console
-        env:
-          KEYSTORE_PASSWORD: ${{ secrets.KEYSTORE_PASSWORD }}
-          KEY_ALIAS: ${{ secrets.KEY_ALIAS }}
-          KEY_PASSWORD: ${{ secrets.KEY_PASSWORD }}
+      # Uses the Google Play Developer REST API v3 directly with the WIF access token.
+      # This avoids the Triple-T Gradle plugin which has SSL issues with WIF on GitHub runners.
+      - name: Create Play Console edit
+        id: create_edit
         run: |
-          ./gradlew publishReleaseBundle \
-            -PversionCode=${{ env.VERSION_CODE }} \
-            -PversionName=${{ env.VERSION_NAME }}
+          RESPONSE=$(curl -s -w "\n%{http_code}" -X POST \
+            -H "Authorization: Bearer ${{ steps.auth.outputs.access_token }}" \
+            -H "Content-Type: application/json" \
+            -d '{}' \
+            "https://androidpublisher.googleapis.com/androidpublisher/v3/applications/com.choreboo.app/edits")
+          HTTP_CODE=$(echo "$RESPONSE" | tail -1)
+          BODY=$(echo "$RESPONSE" | sed '$d')
+          echo "HTTP status: $HTTP_CODE"
+          echo "$BODY"
+          if [ "$HTTP_CODE" -ge 400 ]; then
+            echo "::error::Failed to create edit (HTTP $HTTP_CODE)"
+            exit 1
+          fi
+          EDIT_ID=$(echo "$BODY" | jq -r '.id')
+          echo "edit_id=$EDIT_ID" >> $GITHUB_OUTPUT
+
+      - name: Upload AAB to edit
+        id: upload_aab
+        run: |
+          AAB_PATH="app/build/outputs/bundle/release/app-release.aab"
+          RESPONSE=$(curl -s -w "\n%{http_code}" -X POST \
+            -H "Authorization: Bearer ${{ steps.auth.outputs.access_token }}" \
+            -H "Content-Type: application/octet-stream" \
+            --data-binary @"$AAB_PATH" \
+            "https://androidpublisher.googleapis.com/upload/androidpublisher/v3/applications/com.choreboo.app/edits/${{ steps.create_edit.outputs.edit_id }}/bundles?uploadType=media")
+          HTTP_CODE=$(echo "$RESPONSE" | tail -1)
+          BODY=$(echo "$RESPONSE" | sed '$d')
+          echo "HTTP status: $HTTP_CODE"
+          echo "$BODY"
+          if [ "$HTTP_CODE" -ge 400 ]; then
+            echo "::error::Failed to upload AAB (HTTP $HTTP_CODE)"
+            exit 1
+          fi
+          VERSION_CODE=$(echo "$BODY" | jq -r '.versionCode')
+          echo "Uploaded versionCode: $VERSION_CODE"
+
+      - name: Assign AAB to internal track
+        run: |
+          RESPONSE=$(curl -s -w "\n%{http_code}" -X PUT \
+            -H "Authorization: Bearer ${{ steps.auth.outputs.access_token }}" \
+            -H "Content-Type: application/json" \
+            -d '{
+              "releases": [{
+                "versionCodes": ["${{ env.VERSION_CODE }}"],
+                "status": "completed"
+              }]
+            }' \
+            "https://androidpublisher.googleapis.com/androidpublisher/v3/applications/com.choreboo.app/edits/${{ steps.create_edit.outputs.edit_id }}/tracks/internal")
+          HTTP_CODE=$(echo "$RESPONSE" | tail -1)
+          BODY=$(echo "$RESPONSE" | sed '$d')
+          echo "HTTP status: $HTTP_CODE"
+          echo "$BODY"
+          if [ "$HTTP_CODE" -ge 400 ]; then
+            echo "::error::Failed to assign track (HTTP $HTTP_CODE)"
+            exit 1
+          fi
+
+      - name: Commit edit
+        run: |
+          RESPONSE=$(curl -s -w "\n%{http_code}" -X POST \
+            -H "Authorization: Bearer ${{ steps.auth.outputs.access_token }}" \
+            "https://androidpublisher.googleapis.com/androidpublisher/v3/applications/com.choreboo.app/edits/${{ steps.create_edit.outputs.edit_id }}:commit")
+          HTTP_CODE=$(echo "$RESPONSE" | tail -1)
+          BODY=$(echo "$RESPONSE" | sed '$d')
+          echo "HTTP status: $HTTP_CODE"
+          echo "$BODY"
+          if [ "$HTTP_CODE" -ge 400 ]; then
+            echo "::error::Failed to commit edit (HTTP $HTTP_CODE)"
+            exit 1
+          fi
+          echo "Successfully published to Internal Testing track!"
 
       # ── 9. Upload AAB as workflow artifact (optional, useful for debugging) ─
       - name: Upload AAB artifact
