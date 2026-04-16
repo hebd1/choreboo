@@ -80,6 +80,7 @@ jobs:
           workload_identity_provider: ${{ secrets.WIF_PROVIDER }}
           service_account: ${{ secrets.WIF_SERVICE_ACCOUNT }}
           token_format: 'access_token'
+          access_token_scopes: 'https://www.googleapis.com/auth/androidpublisher'
 
       # ── 6. Compute version numbers ──────────────────────────────────────────
       # versionCode  = GitHub run number (monotonically increasing, never resets)
