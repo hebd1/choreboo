@@ -393,8 +393,8 @@
     <string name="settings_household_name_placeholder">e.g. The Smith Family</string>
     <string name="settings_create_button">Create</string>
     <string name="settings_join_household_dialog_title">Join Household</string>
-    <string name="settings_invite_code_input_label">Enter the 6-character invite code…</string>
-    <string name="settings_invite_code_placeholder">ABC123</string>
+    <string name="settings_invite_code_input_label">Enter the 8-character invite code…</string>
+    <string name="settings_invite_code_placeholder">ABCD1234</string>
     <string name="settings_join_button">Join</string>
     <string name="settings_join_household_icon_cd">Join Household</string>
     <string name="settings_join_with_code">Join with Invite Code</string>
@@ -467,7 +467,7 @@
     <string name="settings_create_household_cd">Create Household</string>
     <string name="settings_no_household_body_full">Create or join a household to share habits with family &amp; friends.</string>
     <string name="settings_create_household_body">Give your household a name. You\'ll get an invite code to share.</string>
-    <string name="settings_join_code_body">Enter the 6-character invite code from your housemate.</string>
+    <string name="settings_join_code_body">Enter the 8-character invite code from your housemate.</string>
     <string name="settings_reset_dialog_body_header">This will permanently delete ALL your data:</string>
     <string name="settings_reset_dialog_data_list">• All habits and habit logs\n• Your Choreboo\n• Household membership\n• Your account (Firebase Auth user)</string>
     <string name="settings_reset_reregister_note">You will be able to re-register with the same email afterwards.</string>

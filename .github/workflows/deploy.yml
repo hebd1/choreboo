@@ -74,19 +74,10 @@ jobs:
       #
       # Then grant the service account "Release manager" in Play Console → API access.
       - name: Authenticate to Google Cloud
-        id: auth
         uses: google-github-actions/auth@v2
         with:
           workload_identity_provider: ${{ secrets.WIF_PROVIDER }}
           service_account: ${{ secrets.WIF_SERVICE_ACCOUNT }}
-          token_format: 'access_token'
-
-      # Triple-T Gradle Play Publisher doesn't support WIF external credentials.
-      # Synthesize a minimal JSON with the access token that the plugin accepts.
-      - name: Create Play Publisher credentials
-        run: |
-          echo '{"type":"authorized_user","client_id":"fake","client_secret":"fake","refresh_token":"fake","access_token":"${{ steps.auth.outputs.access_token }}"}' > $RUNNER_TEMP/play-credentials.json
-          echo "ANDROID_PUBLISHER_CREDENTIALS=$RUNNER_TEMP/play-credentials.json" >> $GITHUB_ENV
 
       # ── 6. Compute version numbers ──────────────────────────────────────────
       # versionCode  = GitHub run number (monotonically increasing, never resets)

@@ -364,8 +364,8 @@
     <string name="settings_household_name_placeholder">p. ej. La Familia Smith</string>
     <string name="settings_create_button">Crear</string>
     <string name="settings_join_household_dialog_title">Unirse a Hogar</string>
-    <string name="settings_invite_code_input_label">Ingresa el código de invitación de 6 caracteres…</string>
-    <string name="settings_invite_code_placeholder">ABC123</string>
+    <string name="settings_invite_code_input_label">Ingresa el código de invitación de 8 caracteres…</string>
+    <string name="settings_invite_code_placeholder">ABCD1234</string>
     <string name="settings_join_button">Unirse</string>
     <string name="settings_join_household_icon_cd">Unirse a Hogar</string>
     <string name="settings_join_with_code">Unirse con Código de Invitación</string>

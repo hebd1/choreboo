@@ -103,9 +103,11 @@ ksp {
 // by the google-github-actions/auth step in the workflow.
 play {
     track.set("internal")
-    val credPath = System.getenv("ANDROID_PUBLISHER_CREDENTIALS")
+    val credPath = System.getenv("GOOGLE_APPLICATION_CREDENTIALS")
     if (credPath != null) {
         serviceAccountCredentials.set(file(credPath))
+    } else {
+        serviceAccountCredentials.set(file("non-existent-placeholder.json"))
     }
     defaultToAppBundles.set(true)
 }
