@@ -15,6 +15,7 @@ import com.choreboo.app.domain.model.HouseholdHabitStatus
 import com.choreboo.app.domain.model.HouseholdMember
 import com.choreboo.app.domain.model.HouseholdPet
 import com.choreboo.app.domain.model.PetType
+import com.google.firebase.auth.FirebaseAuth
 import kotlinx.coroutines.async
 import kotlinx.coroutines.coroutineScope
 import kotlinx.coroutines.flow.Flow
@@ -22,6 +23,7 @@ import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.flatMapLatest
 import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.tasks.await
 import kotlinx.coroutines.withTimeoutOrNull
 import timber.log.Timber
 import java.security.SecureRandom
@@ -43,6 +45,7 @@ class HouseholdRepository @Inject constructor(
     private val householdHabitStatusDao: HouseholdHabitStatusDao,
     private val userRepository: UserRepository,
     private val habitRepository: HabitRepository,
+    private val firebaseAuth: FirebaseAuth,
 ) {
     private val connector by lazy { ChorebooConnector.instance }
     private val secureRandom = SecureRandom()
@@ -121,6 +124,14 @@ class HouseholdRepository @Inject constructor(
         val uid = userRepository.getCurrentUid()
             ?: return HouseholdResult.Error("Not authenticated")
 
+        // Ensure the auth token is cached before any Data Connect gRPC calls.
+        // Email/password users may not have a cached token outside the post-auth sync flow.
+        try {
+            firebaseAuth.currentUser?.getIdToken(false)?.await()
+        } catch (e: Exception) {
+            Timber.w(e, "createHousehold: failed to pre-fetch auth token")
+        }
+
         var lastError: Exception? = null
         repeat(3) { attempt ->
             val inviteCode = generateInviteCode()
@@ -167,6 +178,14 @@ class HouseholdRepository @Inject constructor(
 
         val uid = userRepository.getCurrentUid()
             ?: return HouseholdResult.Error("Not authenticated")
+
+        // Ensure the auth token is cached before any Data Connect gRPC calls.
+        // Email/password users may not have a cached token outside the post-auth sync flow.
+        try {
+            firebaseAuth.currentUser?.getIdToken(false)?.await()
+        } catch (e: Exception) {
+            Timber.w(e, "joinHousehold: failed to pre-fetch auth token")
+        }
 
         return try {
             // Look up the household by invite code

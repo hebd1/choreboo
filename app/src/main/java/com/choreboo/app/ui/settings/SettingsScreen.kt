@@ -572,12 +572,12 @@ fun SettingsScreen(
             confirmButton = {
                 Button(
                     onClick = {
-                        if (inviteCode.length == 6) {
+                        if (inviteCode.length == 8) {
                             viewModel.joinHousehold(inviteCode.trim())
                             showJoinDialog = false
                         }
                     },
-                    enabled = inviteCode.length == 6 && !isJoiningHousehold,
+                    enabled = inviteCode.length == 8 && !isJoiningHousehold,
                 ) {
                     if (isJoiningHousehold) {
                         CircularProgressIndicator(
@@ -1294,17 +1294,6 @@ fun SettingsScreen(
 
         }
 
-        // Snackbar pinned above the bottom nav bar
-        Box(
-            modifier = Modifier
-                .fillMaxSize()
-                .padding(bottom = 90.dp),
-            contentAlignment = Alignment.BottomCenter,
-        ) {
-            SnackbarHost(snackbarHostState) { data ->
-                StitchSnackbar(data)
-            }
-        }
     }
 }
 
