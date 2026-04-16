@@ -52,6 +52,10 @@ class UserRepository @Inject constructor(
     suspend fun syncCurrentUserToCloud() {
         val user = getCurrentAppUser() ?: return
         try {
+            // Ensure the auth token is cached for the Data Connect gRPC interceptor.
+            // This is critical for new registrations and post-reset re-registration where
+            // the interceptor may not yet have the fresh token in its cache.
+            firebaseAuth.currentUser?.getIdToken(false)?.await()
             val timedOut = withTimeoutOrNull(CLOUD_TIMEOUT_MS) {
                 connector.upsertUser.execute(
                     displayName = user.displayName,

@@ -103,12 +103,10 @@ ksp {
 // by the google-github-actions/auth step in the workflow.
 play {
     track.set("internal")
-    serviceAccountCredentials.set(
-        if (System.getenv("GOOGLE_APPLICATION_CREDENTIALS") != null)
-            file(System.getenv("GOOGLE_APPLICATION_CREDENTIALS")!!)
-        else
-            file("non-existent-placeholder.json") // local builds skip upload
-    )
+    val credPath = System.getenv("ANDROID_PUBLISHER_CREDENTIALS")
+    if (credPath != null) {
+        serviceAccountCredentials.set(file(credPath))
+    }
     defaultToAppBundles.set(true)
 }
 
