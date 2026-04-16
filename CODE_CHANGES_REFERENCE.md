@@ -55,7 +55,7 @@ class PetMoodReceiver : BroadcastReceiver() {
 
 **Intent filter:**
 ```xml
-<action android:name="com.example.choreboo_habittrackerfriend.PET_MOOD_CHECK" />
+<action android:name="com.choreboo.app.PET_MOOD_CHECK" />
 ```
 
 ---
@@ -179,7 +179,7 @@ suspend fun setLastMoodNotificationTime(time: Long) {
     android:exported="true"
     android:permission="android.permission.SCHEDULE_EXACT_ALARM">
     <intent-filter>
-        <action android:name="com.example.choreboo_habittrackerfriend.PET_MOOD_CHECK" />
+        <action android:name="com.choreboo.app.PET_MOOD_CHECK" />
     </intent-filter>
 </receiver>
 ```
@@ -406,7 +406,7 @@ const val REMINDER_CHANNEL_ID = "choreboo_reminders"  // Existing
 const val PET_ALERT_CHANNEL_ID = "pet_alerts"  // New
 
 // Intent Action
-const val PET_MOOD_CHECK_ACTION = "com.example.choreboo_habittrackerfriend.PET_MOOD_CHECK"
+const val PET_MOOD_CHECK_ACTION = "com.choreboo.app.PET_MOOD_CHECK"
 ```
 
 ---
@@ -416,7 +416,7 @@ const val PET_MOOD_CHECK_ACTION = "com.example.choreboo_habittrackerfriend.PET_M
 ```bash
 # Run specific test class
 powershell.exe -File build.ps1 testDebugUnitTest --tests \
-  "com.example.choreboo_habittrackerfriend.worker.PetMoodSchedulerTest"
+  "com.choreboo.app.worker.PetMoodSchedulerTest"
 
 # Run all unit tests
 powershell.exe -File build.ps1 testDebugUnitTest

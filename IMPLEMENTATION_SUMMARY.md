@@ -116,7 +116,7 @@ Successfully implemented three major features for the Choreboo Habit Tracker app
     android:name=".worker.HabitReminderReceiver"
     android:exported="false">
     <intent-filter>
-        <action android:name="com.example.choreboo_habittrackerfriend.HABIT_REMINDER" />
+        <action android:name="com.choreboo.app.HABIT_REMINDER" />
     </intent-filter>
 </receiver>
 

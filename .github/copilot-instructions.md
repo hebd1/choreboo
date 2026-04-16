@@ -37,7 +37,7 @@ A Tamagotchi-style habit tracker Android app where users complete daily habits t
 - **Pattern:** MVVM (Screen → ViewModel → Repository → DAO → Room), with write-through to Firebase Data Connect
 - **Package structure:**
   ```
-  com.example.choreboo_habittrackerfriend/
+  com.choreboo.app/
   ├── MainActivity.kt                  # @AndroidEntryPoint, dynamic startDestination (Auth/Onboarding/Pet)
   ├── ChorebooApplication.kt           # @HiltAndroidApp, notification channels
   ├── navigation/                      # ChorebooNavGraph.kt, Screen sealed class (8 routes)
@@ -185,7 +185,7 @@ Emoji-based system using `EmojiIcon` data class. 15 preset emoji (e.g., "🥗", 
 - **Auth orchestration**: `AuthViewModel` delegates to `SyncManager.syncAll(force = true)` after login/register
 
 ## When Generating Code
-- Always use the package `com.example.choreboo_habittrackerfriend`
+- Always use the package `com.choreboo.app`
 - Use Material3 APIs (not Material2)
 - Use `Icons.Default.*` or `Icons.AutoMirrored.Filled.*` from material-icons-extended
 - Prefer `Modifier.fillMaxWidth()` over hardcoded widths

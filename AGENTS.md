@@ -130,8 +130,8 @@ Deploy the backend (Data Connect schema/connectors + Storage rules) to the `chor
 | Debug build | `powershell.exe -File build.ps1 assembleDebug` |
 | Release build | `powershell.exe -File build.ps1 assembleRelease` |
 | All unit tests | `powershell.exe -File build.ps1 testDebugUnitTest` |
-| Single test class | `powershell.exe -File build.ps1 testDebugUnitTest --tests "com.example.choreboo_habittrackerfriend.ExampleUnitTest"` |
-| Single test method | `powershell.exe -File build.ps1 testDebugUnitTest --tests "com.example.choreboo_habittrackerfriend.ExampleUnitTest.addition_isCorrect"` |
+| Single test class | `powershell.exe -File build.ps1 testDebugUnitTest --tests "com.choreboo.app.ExampleUnitTest"` |
+| Single test method | `powershell.exe -File build.ps1 testDebugUnitTest --tests "com.choreboo.app.ExampleUnitTest.addition_isCorrect"` |
 | Instrumented tests | `powershell.exe -File build.ps1 connectedDebugAndroidTest` (requires device/emulator) |
 | Lint | `powershell.exe -File build.ps1 lint` |
 | Gradle version check | `powershell.exe -File build.ps1 --version` |
@@ -190,7 +190,7 @@ Deploy the backend (Data Connect schema/connectors + Storage rules) to the `chor
 
 ## Key Conventions
 
-- **Package**: `com.example.choreboo_habittrackerfriend`
+- **Package**: `com.choreboo.app`
 - **Enums stored as `String` in Room** — parse with `try/catch` in `toDomain()`.
 - **Dates**: ISO-8601 strings (`"2026-03-24"`) in `habit_logs.date`; timestamps (`Long`) for `createdAt`, `lastInteractionAt`.
 - **`customDays`**: Comma-separated string in entity (`"MON,TUE,WED"`), `List<String>` in domain model.
@@ -225,7 +225,7 @@ Deploy the backend (Data Connect schema/connectors + Storage rules) to the `chor
 ## Package Structure
 
 ```
-com.example.choreboo_habittrackerfriend/
+com.choreboo.app/
 ├── MainActivity.kt                  # @AndroidEntryPoint, dynamic startDestination (Auth/Onboarding/Pet)
 ├── MainViewModel.kt                 # @HiltViewModel — startup sequencer (DataStore → Room warmup → sync); exposes isAppReady StateFlow
 ├── ChorebooApplication.kt           # @HiltAndroidApp, notification channels, Timber DebugTree (DEBUG builds only)
@@ -352,7 +352,7 @@ Additional context lives in `.github/copilot-instructions.md` (color palette hex
 
 ## Testing
 
-265 unit tests across 3 layers: domain models, repositories, and ViewModels. All tests are JVM-only (no Android emulator required).
+455 unit tests across 3 layers: domain models, repositories, and ViewModels. All tests are JVM-only (no Android emulator required).
 
 ### Test Stack
 
@@ -371,30 +371,47 @@ Additional context lives in `.github/copilot-instructions.md` (color palette hex
 ### Test Structure
 
 ```
-app/src/test/java/com/example/choreboo_habittrackerfriend/
+app/src/test/java/com/example/choreboo.app/
 ├── TestDispatcherRule.kt                              # Shared JUnit rule for coroutine tests
 ├── ExampleUnitTest.kt                                 # Template stub (1 test)
 ├── MainViewModelTest.kt                               # isAppReady, fast-path, full startup, timeout, sync (11)
 ├── domain/model/
-│   ├── HabitTest.kt                                   # isScheduledForToday, calculateStreak, calculateSuggestedXp (16)
+│   ├── HabitTest.kt                                   # isScheduledForToday, calculateStreak, calculateSuggestedXp (18)
 │   ├── ChorebooStatsTest.kt                           # fromEntity, mood calculation, stat clamping, decay (33)
 │   ├── ChorebooStageTest.kt                           # fromTotalXp thresholds, edge cases, negative XP (17)
 │   └── HouseholdPetTest.kt                            # HouseholdPet domain model fields, mood derivation (14)
 ├── data/repository/
-│   ├── BillingRepositoryTest.kt                       # launchPurchaseFlow + verifyPremiumStatus guards (4)
+│   ├── AuthRepositoryTest.kt                          # signIn/signUp validation, Google sign-in, password reset (15)
+│   ├── BackgroundRepositoryTest.kt                    # purchaseBackground, syncFromCloud, selectBackground (9)
+│   ├── BadgeRepositoryTest.kt                         # getAvailableBadges, getEarnedBadges, badge criteria (12)
+│   ├── BillingRepositoryTest.kt                       # launchPurchaseFlow + verifyPremiumStatus guards (7)
 │   ├── ChorebooRepositoryAddXpTest.kt                 # XP addition, level-up, stage evolution, validation (12)
-│   ├── HabitRepositoryTest.kt                         # completeHabit, upsertHabit, custom-schedule streaks, validation guards (19)
+│   ├── ChorebooRepositoryStatDecayTest.kt             # Stat decay calculation, time-based hunger/happiness/energy (19)
+│   ├── ChorebooRepositoryStatsTest.kt                 # getOrCreateChoreboo, updateName, feed, sleep, stats (21)
+│   ├── HabitRepositorySyncTest.kt                     # syncHabitsFromCloud, syncHabitLogsFromCloud, deletion reconciliation (9)
+│   ├── HabitRepositoryTest.kt                         # completeHabit, upsertHabit, custom-schedule streaks, validation guards (20)
+│   ├── HouseholdRepositoryLeaveTest.kt                # leaveHousehold success/error paths, creator vs member (5)
 │   ├── HouseholdRepositoryValidationTest.kt           # createHousehold / joinHousehold validation guards (6)
+│   ├── ResetRepositoryTest.kt                         # resetAll sequence, partial failures, cancelPendingWrites (7)
 │   ├── SyncManagerTest.kt                             # Cooldown, mutex, force bypass, partial failure (11)
-│   └── UserRepositoryTest.kt                          # Points sync to/from cloud, validation guards (10)
+│   ├── UserRepositorySyncTest.kt                      # syncPointsToCloud, syncPointsFromCloud, max-wins merge (6)
+│   ├── UserRepositoryTest.kt                          # Points sync to/from cloud, validation guards (10)
+│   └── UserRepositoryUpdateDisplayNameTest.kt         # updateDisplayName validation: blank, >30 chars, trim, no auth (7)
 ├── di/
 │   └── AppLifecycleObserverTest.kt                    # Cold-start skip, warm-resume sync, exception handling (4)
+├── worker/
+│   └── PetMoodSchedulerTest.kt                        # Alarm scheduling, exact alarm permission, window fallback (11)
 └── ui/
     ├── auth/AuthViewModelTest.kt                       # Form state, validation, Google sign-in, sync, returning-user (23)
     ├── calendar/CalendarViewModelTest.kt               # Month navigation, date parsing, heatmap colors (18)
-    ├── habits/AddEditHabitViewModelTest.kt             # Form state, save/load, XP suggestion, validation (34)
-    ├── pet/PetViewModelTest.kt                         # Stat display, feeding, sleep, XP events (22)
-    └── settings/SettingsViewModelTest.kt               # Reset account, theme changes, settings state (10)
+    ├── habits/AddEditHabitViewModelTest.kt             # Form state, save/load, XP suggestion, validation (35)
+    ├── household/HouseholdViewModelTest.kt             # Household data loading, member habits, refresh (10)
+    ├── onboarding/OnboardingViewModelTest.kt           # Name validation, pet type selection, hatch flow (15)
+    ├── pet/PetViewModelTest.kt                         # Stat display, feeding, sleep, XP events (23)
+    ├── settings/SettingsViewModelTest.kt               # Reset account, theme changes, settings state (10)
+    ├── settings/SettingsViewModelSignOutTest.kt        # Sign-out flow, cancelPendingWrites, local cleanup (14)
+    ├── settings/SettingsViewModelHouseholdTest.kt      # createHousehold, joinHousehold, leaveHousehold, loading flags (12)
+    └── stats/StatsViewModelTest.kt                     # Stats aggregation, habit filtering, date ranges (10)
 ```
 
 ### Test Conventions
@@ -414,8 +431,8 @@ app/src/test/java/com/example/choreboo_habittrackerfriend/
 | Task | Command |
 |------|---------|
 | All unit tests | `powershell.exe -File build.ps1 testDebugUnitTest` |
-| Single test class | `powershell.exe -File build.ps1 testDebugUnitTest --tests "com.example.choreboo_habittrackerfriend.domain.model.HabitTest"` |
-| Single test method | `powershell.exe -File build.ps1 testDebugUnitTest --tests "com.example.choreboo_habittrackerfriend.domain.model.HabitTest.isScheduledForToday returns true for daily habit"` |
+| Single test class | `powershell.exe -File build.ps1 testDebugUnitTest --tests "com.choreboo.app.domain.model.HabitTest"` |
+| Single test method | `powershell.exe -File build.ps1 testDebugUnitTest --tests "com.choreboo.app.domain.model.HabitTest.isScheduledForToday returns true for daily habit"` |
 
 ### Adding Tests for a New Feature
 

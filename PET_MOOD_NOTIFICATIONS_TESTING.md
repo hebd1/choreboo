@@ -51,7 +51,7 @@ All threshold calculation tests pass:
 #### DataStore Reset (Optional)
 To reset the last mood notification timestamp for testing:
 ```bash
-adb shell cmd datastore_mgr delete com.example.choreboo_habittrackerfriend.SettingsProtoStore
+adb shell cmd datastore_mgr delete com.choreboo.app.SettingsProtoStore
 ```
 
 ---
@@ -109,8 +109,8 @@ D/UserPreferences: lastMoodNotificationTime updated to: 1712973000000
 2. **Manually trigger the receiver again** (via adb):
    ```bash
    adb shell am broadcast \
-     -a com.example.choreboo_habittrackerfriend.PET_MOOD_CHECK \
-     -n com.example.choreboo_habittrackerfriend/.worker.PetMoodReceiver
+     -a com.choreboo.app.PET_MOOD_CHECK \
+     -n com.choreboo.app/.worker.PetMoodReceiver
    ```
 3. **Observe the app's behavior:**
    - Receiver applies stat decay
@@ -120,7 +120,7 @@ D/UserPreferences: lastMoodNotificationTime updated to: 1712973000000
 
 4. **Wait 24+ hours** (or manually update DataStore):
    ```bash
-   adb shell cmd datastore_mgr put com.example.choreboo_habittrackerfriend.SettingsProtoStore \
+   adb shell cmd datastore_mgr put com.choreboo.app.SettingsProtoStore \
      last_mood_notification_time 0
    ```
 5. **Trigger receiver again** and verify notification is posted
@@ -154,7 +154,7 @@ D/PetMoodReceiver: Posting mood notification: HUNGRY (cooldown cleared)
    adb shell dumpsys jobscheduler | grep -i "choreboo"
    ```
 3. **Verify periodic work is enqueued:**
-   - Look for `com.example.choreboo_habittrackerfriend.worker.PetMoodCheckWorker`
+   - Look for `com.choreboo.app.worker.PetMoodCheckWorker`
    - FlexInterval: ~6 hours
 4. **Check logcat for periodic execution:**
    ```
@@ -199,7 +199,7 @@ D/PetMoodCheckWorker: [Periodic execution] Checking pet mood...
    ```
 3. **After reboot, verify alarms are restored:**
    ```bash
-   adb shell dumpsys alarm | grep "com.example.choreboo_habittrackerfriend"
+   adb shell dumpsys alarm | grep "com.choreboo.app"
    ```
 4. **Open the app** and check logcat:
    ```
@@ -306,7 +306,7 @@ D/PetMoodScheduler: Using minimum: 40.5 hours (HUNGER)
    - Check logcat for: `Notification skipped (cooldown active)`
    - Fix: Wait 24 hours or reset via:
    ```bash
-   adb shell cmd datastore_mgr put com.example.choreboo_habittrackerfriend.SettingsProtoStore \
+   adb shell cmd datastore_mgr put com.choreboo.app.SettingsProtoStore \
      last_mood_notification_time 0
    ```
 

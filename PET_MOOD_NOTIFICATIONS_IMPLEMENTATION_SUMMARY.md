@@ -49,7 +49,7 @@ fun cancelPredictiveAlarm(context: Context)
 5. Updates `lastMoodNotificationTime` in DataStore
 6. Reschedules next predictive alarm
 
-**Intent action:** `com.example.choreboo_habittrackerfriend.PET_MOOD_CHECK`
+**Intent action:** `com.choreboo.app.PET_MOOD_CHECK`
 
 ### Periodic Worker
 

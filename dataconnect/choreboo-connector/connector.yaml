@@ -6,5 +6,5 @@ connectorId: choreboo
 authMode: USER_REQUIRED
 generate:
   kotlinSdk:
-    package: com.example.choreboo_habittrackerfriend.dataconnect
+    package: com.choreboo.app.dataconnect
     outputDir: ../../app/build/generated/sources

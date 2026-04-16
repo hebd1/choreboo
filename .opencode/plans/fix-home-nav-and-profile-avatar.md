@@ -8,7 +8,7 @@
 ## Changes
 
 ### 1. HabitListScreen.kt
-**File:** `app/src/main/java/com/example/choreboo_habittrackerfriend/ui/habits/HabitListScreen.kt`
+**File:** `app/src/main/java/com/example/choreboo.app/ui/habits/HabitListScreen.kt`
 
 - Remove `onNavigateToSettings: () -> Unit` from function signature (line 71)
 - Remove unused import `Icons.Default.Settings` (line 25)
@@ -17,12 +17,12 @@
 - Keep the points pill in actions
 
 ### 2. ChorebooNavGraph.kt
-**File:** `app/src/main/java/com/example/choreboo_habittrackerfriend/navigation/ChorebooNavGraph.kt`
+**File:** `app/src/main/java/com/example/choreboo.app/navigation/ChorebooNavGraph.kt`
 
 - Remove `onNavigateToSettings = { navController.navigate(Screen.Settings.route) }` from the HabitListScreen call (line 67)
 
 ### 3. CalendarViewModel.kt
-**File:** `app/src/main/java/com/example/choreboo_habittrackerfriend/ui/calendar/CalendarViewModel.kt`
+**File:** `app/src/main/java/com/example/choreboo.app/ui/calendar/CalendarViewModel.kt`
 
 - Add `AuthRepository` import and constructor injection parameter
 - Add `profilePhotoUri` StateFlow (same pattern as HabitListViewModel lines 37-38):
@@ -37,9 +37,9 @@
   ```
 
 ### 4. CalendarScreen.kt
-**File:** `app/src/main/java/com/example/choreboo_habittrackerfriend/ui/calendar/CalendarScreen.kt`
+**File:** `app/src/main/java/com/example/choreboo.app/ui/calendar/CalendarScreen.kt`
 
-- Add import for `ProfileAvatar`: `import com.example.choreboo_habittrackerfriend.ui.components.ProfileAvatar`
+- Add import for `ProfileAvatar`: `import com.choreboo.app.ui.components.ProfileAvatar`
 - Collect profile state from ViewModel:
   ```kotlin
   val profilePhotoUri by viewModel.profilePhotoUri.collectAsState()
@@ -54,12 +54,12 @@
   ```
 
 ### 5. AddEditHabitViewModel.kt
-**File:** `app/src/main/java/com/example/choreboo_habittrackerfriend/ui/habits/AddEditHabitViewModel.kt`
+**File:** `app/src/main/java/com/example/choreboo.app/ui/habits/AddEditHabitViewModel.kt`
 
 - Add imports:
   ```kotlin
-  import com.example.choreboo_habittrackerfriend.data.datastore.UserPreferences
-  import com.example.choreboo_habittrackerfriend.data.repository.AuthRepository
+  import com.choreboo.app.data.datastore.UserPreferences
+  import com.choreboo.app.data.repository.AuthRepository
   import kotlinx.coroutines.flow.SharingStarted
   import kotlinx.coroutines.flow.StateFlow
   import kotlinx.coroutines.flow.stateIn
@@ -84,9 +84,9 @@
   ```
 
 ### 6. AddEditHabitScreen.kt
-**File:** `app/src/main/java/com/example/choreboo_habittrackerfriend/ui/habits/AddEditHabitScreen.kt`
+**File:** `app/src/main/java/com/example/choreboo.app/ui/habits/AddEditHabitScreen.kt`
 
-- Add import: `import com.example.choreboo_habittrackerfriend.ui.components.ProfileAvatar`
+- Add import: `import com.choreboo.app.ui.components.ProfileAvatar`
 - Collect profile state from ViewModel in `AddEditHabitScreen` composable:
   ```kotlin
   val profilePhotoUri by viewModel.profilePhotoUri.collectAsState()
@@ -117,7 +117,7 @@
   ```
 
 ### 7. SettingsScreen.kt
-**File:** `app/src/main/java/com/example/choreboo_habittrackerfriend/ui/settings/SettingsScreen.kt`
+**File:** `app/src/main/java/com/example/choreboo.app/ui/settings/SettingsScreen.kt`
 
 - Replace 🐣 Box (lines 209-217) with:
   ```kotlin

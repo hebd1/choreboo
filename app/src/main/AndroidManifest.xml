@@ -42,7 +42,7 @@
             android:name=".worker.HabitReminderReceiver"
             android:exported="false">
             <intent-filter>
-                <action android:name="com.example.choreboo_habittrackerfriend.HABIT_REMINDER" />
+                <action android:name="com.choreboo.app.HABIT_REMINDER" />
             </intent-filter>
         </receiver>
 
@@ -50,7 +50,7 @@
             android:name=".worker.HabitCompleteReceiver"
             android:exported="false">
             <intent-filter>
-                <action android:name="com.example.choreboo_habittrackerfriend.HABIT_COMPLETE" />
+                <action android:name="com.choreboo.app.HABIT_COMPLETE" />
             </intent-filter>
         </receiver>
 
@@ -67,7 +67,7 @@
             android:name=".worker.PetMoodReceiver"
             android:exported="false">
             <intent-filter>
-                <action android:name="com.example.choreboo_habittrackerfriend.PET_MOOD_CHECK" />
+                <action android:name="com.choreboo.app.PET_MOOD_CHECK" />
             </intent-filter>
         </receiver>
 

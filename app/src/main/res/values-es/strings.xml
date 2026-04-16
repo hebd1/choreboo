@@ -1,7 +1,6 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <resources>
     <string name="app_name">Choreboo - Rastreador de Hábitos</string>
-    <string name="default_web_client_id">1003527545101-vugsienjkf1hu483jtlsnr1d7ivotec8.apps.googleusercontent.com</string>
 
     <!-- ===== BOTTOM NAV BAR ===== -->
     <string name="nav_choreboo">Choreboo</string>

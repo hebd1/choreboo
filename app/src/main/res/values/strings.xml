@@ -1,6 +1,5 @@
 <resources>
     <string name="app_name">Choreboo - Habit Tracker Friend</string>
-    <string name="default_web_client_id">1003527545101-vugsienjkf1hu483jtlsnr1d7ivotec8.apps.googleusercontent.com</string>
 
     <!-- ===== BOTTOM NAV BAR ===== -->
     <string name="nav_choreboo">Choreboo</string>
@@ -248,7 +247,9 @@
     <string name="add_habit_assign_anyone">Anyone</string>
     <string name="add_habit_save_update">Update Habit</string>
     <string name="add_habit_save_create">Create Habit</string>
-    <string name="add_habit_cancel_back">Cancel &amp; Go Back</string>
+     <string name="add_habit_cancel_back">Cancel &amp; Go Back</string>
+     <string name="add_habit_delete_button">Delete Habit</string>
+     <string name="add_habit_delete_confirm_body">Are you sure you want to delete this habit? All completion history will be removed.</string>
     <string name="add_habit_top_bar_title">Choreboo</string>
     <string name="add_habit_notifications_cd">Notifications</string>
     <string name="add_habit_quick_select">Quick select:</string>
@@ -350,7 +351,9 @@
     <string name="household_pending">Pending</string>
     <string name="household_quiet_title">Your household is quiet…</string>
     <string name="household_quiet_body">Invite someone to see their Choreboo here!</string>
-    <string name="household_empty_title">Join the Neighborhood</string>
+    <string name="household_chores_emoji">🍃</string>
+    <string name="household_quiet_emoji">🏠</string>
+    <string name="household_empty_title">Join a Household</string>
     <string name="household_empty_body">Create or join a household to see your housemates\' Choreboos and share habits together!</string>
     <string name="household_invite_housemate">Invite Housemate</string>
     <string name="household_invite_cd">Invite</string>
@@ -557,6 +560,17 @@
     <string name="notif_pet_name_fallback">Your Choreboo</string>
     <string name="notif_habit_name_fallback">Habit</string>
     <string name="notif_mark_complete">Mark Complete</string>
+    <!-- Reminder cute messages (parameterized with habitTitle and petName) -->
+    <string name="notif_msg_time_to">Time to %1$s!</string>
+    <string name="notif_msg_believes_in_you">%2$s believes in you! Complete %1$s!</string>
+    <string name="notif_msg_dont_forget">Don\'t forget about %2$s!</string>
+    <string name="notif_msg_feeling_neglected">%2$s is feeling neglected! Complete %1$s!</string>
+    <string name="notif_msg_cheering_you_on">%2$s is cheering you on!</string>
+    <string name="notif_msg_buddy_waiting">Your buddy %2$s is waiting!</string>
+    <string name="notif_msg_crush_it">%2$s wants to see you crush %1$s!</string>
+    <string name="notif_msg_keep_pet_happy">Keep %2$s happy—time to %1$s!</string>
+    <string name="notif_msg_misses_you">%2$s misses you! Let\'s do this!</string>
+    <string name="notif_msg_rooting_for_you">Let\'s go, champ! %2$s is rooting for you!</string>
     <!-- Reminder quirky messages (parameterized with habitTitle and petName) -->
     <!-- Movie/TV quotes -->
     <string name="notif_msg_1">I am %2$s. And I am… reminding you to %1$s.</string>

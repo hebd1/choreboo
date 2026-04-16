@@ -36,8 +36,8 @@
             <InsightsFilterSettings>
               <option name="connection">
                 <ConnectionSetting>
-                  <option name="appId" value="com.example.choreboo_habittrackerfriend" />
-                  <option name="mobileSdkAppId" value="1:1003527545101:android:6dbb6c8f2477b6cebf5044" />
+                  <option name="appId" value="com.choreboo.app" />
+                  <option name="mobileSdkAppId" value="1:1003527545101:android:1803ad14c61da9a7bf5044" />
                   <option name="projectId" value="choreboo-7f36c" />
                   <option name="projectNumber" value="1003527545101" />
                 </ConnectionSetting>

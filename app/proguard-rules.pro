@@ -23,7 +23,7 @@
 }
 
 # Keep Room type converters
--keep class com.example.choreboo_habittrackerfriend.data.local.converter.** { *; }
+-keep class com.choreboo.app.data.local.converter.** { *; }
 
 # ============ HILT / DAGGER ============
 # Keep Hilt and Dagger annotations and generated code
@@ -52,8 +52,8 @@
 -dontwarn com.google.gson.**
 
 # Keep all domain models and entities (used by Gson reflection)
--keep class com.example.choreboo_habittrackerfriend.domain.model.** { *; }
--keep class com.example.choreboo_habittrackerfriend.data.local.entity.** { *; }
+-keep class com.choreboo.app.domain.model.** { *; }
+-keep class com.choreboo.app.data.local.entity.** { *; }
 
 # ============ FIREBASE DATA CONNECT GENERATED SDK ============
 # Keep all Data Connect generated classes and interfaces
@@ -178,7 +178,7 @@
 
 # ============ PROJECT-SPECIFIC CLASSES ============
 # Keep all app classes to be safe during development
--keep class com.example.choreboo_habittrackerfriend.** { *; }
+-keep class com.choreboo.app.** { *; }
 
 # Keep main activity and all activities
 -keep class * extends android.app.Activity { *; }
