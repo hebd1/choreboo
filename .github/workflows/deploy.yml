@@ -36,6 +36,15 @@ jobs:
       - name: Grant execute permission for gradlew
         run: chmod +x ./gradlew
 
+      # ── 3b. Generate Data Connect SDK ───────────────────────────────────────
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+
+      - name: Generate Data Connect SDK
+        run: npx -y firebase-tools@latest dataconnect:sdk:generate
+
       # ── 4. Decode & write keystore ──────────────────────────────────────────
       # The keystore is stored as a base64-encoded secret. Decode it to a temp
       # file and pass the path to Gradle via environment variable.
