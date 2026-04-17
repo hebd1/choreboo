@@ -152,7 +152,7 @@ jobs:
             -d '{
               "releases": [{
                 "versionCodes": ["${{ env.VERSION_CODE }}"],
-                "status": "completed"
+                "status": "draft"
               }]
             }' \
             "https://androidpublisher.googleapis.com/androidpublisher/v3/applications/com.choreboo.app/edits/${{ steps.create_edit.outputs.edit_id }}/tracks/internal")

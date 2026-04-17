@@ -108,7 +108,11 @@ fun ChorebooNavGraph(
         composable(Screen.Household.route) {
             HouseholdScreen(
                 onNavigateToSettings = {
-                    navController.navigate(Screen.Settings.route)
+                    navController.navigate(Screen.Settings.route) {
+                        popUpTo(Screen.Pet.route) { saveState = true }
+                        launchSingleTop = true
+                        restoreState = true
+                    }
                 },
             )
         }

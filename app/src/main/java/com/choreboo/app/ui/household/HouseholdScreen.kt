@@ -168,14 +168,7 @@ fun HouseholdScreen(
                             }
 
                             items(habits, key = { habit -> "habit_${habit.habitId}" }) { habit ->
-                                HouseholdHabitCard(
-                                    habit = habit,
-                                    assignedToPhotoUrl = if (habit.assignedToUid != null) {
-                                        memberPhotoMap[habit.assignedToUid]
-                                    } else {
-                                        null
-                                    },
-                                )
+                                HouseholdHabitCard(habit = habit)
                                 Spacer(modifier = Modifier.height(8.dp))
                             }
                         }
