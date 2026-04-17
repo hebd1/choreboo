@@ -43,7 +43,13 @@ class ReminderRescheduleWorker @AssistedInject constructor(
                 val isOwnedByUser = habit.ownerUid == currentUid
                 val isAssignedToUser = habit.assignedToUid == currentUid
 
-                if ((isOwnedByUser || isAssignedToUser) && habit.reminderEnabled && habit.reminderTime != null) {
+                // A3: Skip archived habits — they must not fire reminders.
+                // A4: Owners only get reminders when the habit is NOT assigned to someone else.
+                //     If the owner assigned it to another member, only that assignee gets the alarm.
+                val shouldRemind = !habit.isArchived && habit.reminderEnabled && habit.reminderTime != null &&
+                    ((isOwnedByUser && habit.assignedToUid == null) || isAssignedToUser)
+
+                if (shouldRemind) {
                     HabitReminderScheduler.scheduleReminder(
                         applicationContext,
                         habit.id,

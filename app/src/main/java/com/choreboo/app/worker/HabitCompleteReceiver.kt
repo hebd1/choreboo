@@ -9,6 +9,7 @@ import androidx.core.app.NotificationManagerCompat
 import com.choreboo.app.ChorebooApplication
 import com.choreboo.app.R
 import com.choreboo.app.data.datastore.UserPreferences
+import com.choreboo.app.data.local.dao.HabitDao
 import com.choreboo.app.data.repository.ChorebooRepository
 import com.choreboo.app.data.repository.HabitRepository
 import com.choreboo.app.ui.util.displayNameRes
@@ -18,6 +19,7 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withTimeoutOrNull
 import timber.log.Timber
+import java.time.LocalTime
 import javax.inject.Inject
 
 @AndroidEntryPoint
@@ -26,6 +28,7 @@ class HabitCompleteReceiver : BroadcastReceiver() {
     @Inject lateinit var habitRepository: HabitRepository
     @Inject lateinit var chorebooRepository: ChorebooRepository
     @Inject lateinit var userPreferences: UserPreferences
+    @Inject lateinit var habitDao: HabitDao
 
     override fun onReceive(context: Context?, intent: Intent?) {
         if (context == null || intent == null) return
@@ -42,6 +45,26 @@ class HabitCompleteReceiver : BroadcastReceiver() {
         CoroutineScope(Dispatchers.Default).launch {
             try {
                 val timedOut = withTimeoutOrNull(25_000L) {
+                    // B1: Guard — look up the habit and verify today is a scheduled day.
+                    // A notification action could be stale (e.g. user left it overnight); completing
+                    // a habit on an unscheduled day would log an incorrect entry.
+                    val habitEntity = habitDao.getHabitByIdSync(habitId)
+                    if (habitEntity != null) {
+                        val customDays = habitEntity.customDays
+                            .split(",")
+                            .map { it.trim() }
+                            .filter { it.isNotEmpty() }
+                        if (customDays.isNotEmpty() && !customDays.isScheduledForToday()) {
+                            replaceWithConfirmation(
+                                context = context,
+                                notificationId = notificationId,
+                                habitTitle = habitTitle,
+                                message = context.getString(R.string.notif_already_completed),
+                            )
+                            return@withTimeoutOrNull
+                        }
+                    }
+
                     // Delegate to repositories — same flow as HabitListViewModel.completeHabit()
                     val result = habitRepository.completeHabit(habitId)
 
@@ -60,6 +83,30 @@ class HabitCompleteReceiver : BroadcastReceiver() {
 
                     // Auto-feed if hungry (handles point deduction, cloud sync)
                     chorebooRepository.autoFeedIfNeeded(userPreferences)
+
+                    // A5: Reschedule the next alarm for this habit to ensure the reminder chain
+                    // continues. The HabitReminderReceiver normally handles rescheduling when the
+                    // alarm fires, but if the action is tapped quickly before the receiver's
+                    // coroutine finishes or if the alarm was otherwise not rescheduled, this
+                    // guarantees the next occurrence is always armed.
+                    habitDao.getHabitByIdSync(habitId)?.let { entity ->
+                        if (entity.reminderEnabled && entity.reminderTime != null) {
+                            try {
+                                val parsedTime = try {
+                                    LocalTime.parse(entity.reminderTime)
+                                } catch (_: Exception) { LocalTime.of(9, 0) }
+                                val customDays = entity.customDays
+                                    .split(",")
+                                    .map { it.trim() }
+                                    .filter { it.isNotEmpty() }
+                                HabitReminderScheduler.scheduleReminder(
+                                    context, entity.id, entity.title, parsedTime, customDays,
+                                )
+                            } catch (e: Exception) {
+                                Timber.w(e, "A5: failed to reschedule reminder after completion for habitId=$habitId")
+                            }
+                        }
+                    }
 
                     // Build confirmation message
                     val streakText = if (result.newStreak > 1) context.getString(R.string.notif_streak_suffix, result.newStreak) else ""
@@ -136,4 +183,29 @@ class HabitCompleteReceiver : BroadcastReceiver() {
             )
         }
     }
+}
+
+/**
+ * Returns true if today falls on a scheduled day according to [this] list of day codes.
+ * Mirrors [com.choreboo.app.domain.model.Habit.isScheduledForToday].
+ * An empty list is treated as "always scheduled" (daily).
+ */
+private fun List<String>.isScheduledForToday(): Boolean {
+    if (isEmpty()) return true
+    val today = java.time.LocalDate.now()
+    val weeklyDays = filter { it.length == 3 && it.all { c -> c.isLetter() } }
+    if (weeklyDays.isNotEmpty()) {
+        val todayShort = today.dayOfWeek.name.take(3).uppercase()
+        return weeklyDays.any { it.uppercase() == todayShort }
+    }
+    val monthlyDays = filter { it.startsWith("D", ignoreCase = true) }
+    if (monthlyDays.isNotEmpty()) {
+        val todayDom = today.dayOfMonth
+        val lastDom = today.lengthOfMonth()
+        return monthlyDays.any { dayStr ->
+            val day = dayStr.substring(1).toIntOrNull() ?: return@any false
+            (day >= lastDom && todayDom == lastDom) || day == todayDom
+        }
+    }
+    return true
 }

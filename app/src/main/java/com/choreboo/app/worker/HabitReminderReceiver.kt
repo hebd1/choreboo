@@ -4,7 +4,6 @@ import android.content.BroadcastReceiver
 import android.content.Context
 import android.content.Intent
 import androidx.core.app.NotificationCompat
-import androidx.core.app.NotificationManagerCompat
 import com.choreboo.app.MainActivity
 import com.choreboo.app.ChorebooApplication
 import com.choreboo.app.R
@@ -45,6 +44,32 @@ class HabitReminderReceiver : BroadcastReceiver() {
 
         CoroutineScope(Dispatchers.Default).launch {
             try {
+                // Always reschedule the next alarm first, regardless of completion status.
+                // This prevents the alarm chain from breaking when the user completes the habit
+                // via the app before the alarm fires (early return below would otherwise skip the
+                // reschedule, silently killing all future notifications for this habit).
+                if (scheduledDays.isNotEmpty()) {
+                    val reminderTime = try {
+                        LocalTime.parse(reminderTimeStr)
+                    } catch (_: Exception) {
+                        LocalTime.of(9, 0)
+                    }
+                    HabitReminderScheduler.scheduleReminder(
+                        context,
+                        habitId,
+                        habitTitle,
+                        reminderTime,
+                        scheduledDays,
+                    )
+                }
+
+                // B1: Guard — suppress notification if today is not a scheduled day.
+                // This is a safety net in case the alarm fires on an unexpected day (e.g. the
+                // habit's schedule was changed after the alarm was already set).
+                if (scheduledDays.isNotEmpty() && !scheduledDays.isScheduledForToday()) {
+                    return@launch
+                }
+
                 // Suppress the notification if the habit was already completed today
                 val today = LocalDate.now().format(DateTimeFormatter.ISO_LOCAL_DATE)
                 val todayCount = habitLogDao.getCompletionCountForDate(habitId, today)
@@ -54,26 +79,8 @@ class HabitReminderReceiver : BroadcastReceiver() {
                 val choreboo = chorebooDao.getChorebooSync()
                 val petName = choreboo?.name ?: context.getString(R.string.notif_pet_name_fallback)
 
-                // Parse reminder time
-                val reminderTime = try {
-                    LocalTime.parse(reminderTimeStr)
-                } catch (_: Exception) {
-                    LocalTime.of(9, 0)
-                }
-
                 // Post notification with cute message and Mark Complete action
                 postNotification(context, habitId, habitTitle, petName)
-
-                // Reschedule the next alarm
-                if (scheduledDays.isNotEmpty()) {
-                    HabitReminderScheduler.scheduleReminder(
-                        context,
-                        habitId,
-                        habitTitle,
-                        reminderTime,
-                        scheduledDays,
-                    )
-                }
             } finally {
                 // Finish the pending broadcast
                 pendingResult.finish()
@@ -152,4 +159,29 @@ class HabitReminderReceiver : BroadcastReceiver() {
         )
         return messages.random()
     }
+}
+
+/**
+ * Returns true if today falls on a scheduled day according to [this] list of day codes.
+ * Mirrors [com.choreboo.app.domain.model.Habit.isScheduledForToday].
+ * An empty list is treated as "always scheduled" (daily).
+ */
+private fun List<String>.isScheduledForToday(): Boolean {
+    if (isEmpty()) return true
+    val today = LocalDate.now()
+    val weeklyDays = filter { it.length == 3 && it.all { c -> c.isLetter() } }
+    if (weeklyDays.isNotEmpty()) {
+        val todayShort = today.dayOfWeek.name.take(3).uppercase()
+        return weeklyDays.any { it.uppercase() == todayShort }
+    }
+    val monthlyDays = filter { it.startsWith("D", ignoreCase = true) }
+    if (monthlyDays.isNotEmpty()) {
+        val todayDom = today.dayOfMonth
+        val lastDom = today.lengthOfMonth()
+        return monthlyDays.any { dayStr ->
+            val day = dayStr.substring(1).toIntOrNull() ?: return@any false
+            (day >= lastDom && todayDom == lastDom) || day == todayDom
+        }
+    }
+    return true
 }

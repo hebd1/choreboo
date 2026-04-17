@@ -7,4 +7,4 @@ authMode: USER_REQUIRED
 generate:
   kotlinSdk:
     package: com.choreboo.app.dataconnect
-    outputDir: ../../app/build/generated/sources
+    outputDir: ../../app/src/dataconnect

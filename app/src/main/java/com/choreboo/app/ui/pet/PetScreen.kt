@@ -37,6 +37,7 @@ import androidx.compose.material.icons.filled.Palette
 import androidx.compose.material.icons.filled.Stars
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
+import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.CircularProgressIndicator
@@ -85,6 +86,7 @@ import com.choreboo.app.domain.model.Habit
 import com.choreboo.app.domain.model.PetType
 import com.choreboo.app.ui.components.BannerAdView
 import com.choreboo.app.ui.components.ChorebooTopAppBar
+import com.choreboo.app.ui.components.ConfettiOverlay
 import com.choreboo.app.ui.components.FOX_ANIM_EATING
 import com.choreboo.app.ui.components.FOX_ANIM_IDLE
 import com.choreboo.app.ui.components.FOX_ANIM_INTERACT
@@ -1160,10 +1162,12 @@ private fun LevelUpDialog(
         Box(
             modifier = Modifier
                 .fillMaxSize()
-                .padding(bottom = 100.dp)
-                .padding(horizontal = 24.dp),
-            contentAlignment = Alignment.BottomCenter,
+                .padding(horizontal = 32.dp),
+            contentAlignment = Alignment.Center,
         ) {
+            // Confetti behind the card
+            ConfettiOverlay()
+
             Card(
                 shape = RoundedCornerShape(24.dp),
                 colors = CardDefaults.cardColors(
@@ -1173,7 +1177,9 @@ private fun LevelUpDialog(
                 elevation = CardDefaults.cardElevation(defaultElevation = 8.dp),
             ) {
                 Column(
-                    modifier = Modifier.padding(24.dp),
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(28.dp),
                     horizontalAlignment = Alignment.CenterHorizontally,
                 ) {
                     Text(
@@ -1193,13 +1199,21 @@ private fun LevelUpDialog(
                         color = MaterialTheme.colorScheme.onSecondary,
                         textAlign = TextAlign.Center,
                     )
-                    Spacer(modifier = Modifier.height(20.dp))
-                    TextButton(onClick = onDismiss) {
+                    Spacer(modifier = Modifier.height(24.dp))
+                    Button(
+                        onClick = onDismiss,
+                        shape = RoundedCornerShape(16.dp),
+                        colors = ButtonDefaults.buttonColors(
+                            containerColor = MaterialTheme.colorScheme.onSecondary,
+                            contentColor = MaterialTheme.colorScheme.secondary,
+                        ),
+                        modifier = Modifier.fillMaxWidth(),
+                    ) {
                         Text(
                             text = stringResource(R.string.levelup_awesome),
                             style = MaterialTheme.typography.labelLarge,
                             fontWeight = FontWeight.Bold,
-                            color = MaterialTheme.colorScheme.onSecondary,
+                            modifier = Modifier.padding(vertical = 4.dp),
                         )
                     }
                 }

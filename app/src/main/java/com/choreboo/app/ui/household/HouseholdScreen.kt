@@ -91,7 +91,13 @@ fun HouseholdScreen(
 
     // ── Member habits popup ──────────────────────────────────────────
     selectedPet?.let { pet ->
-        val memberHabits = habits.filter { it.assignedToUid == pet.ownerUid }
+        // C4: Show habits the member is responsible for:
+        //   1. Habits explicitly assigned to them (from any owner)
+        //   2. Habits they own that are unassigned (they'll complete it themselves)
+        val memberHabits = habits.filter {
+            it.assignedToUid == pet.ownerUid ||
+                (it.ownerUid == pet.ownerUid && it.assignedToUid == null)
+        }
         MemberHabitsDialog(
             pet = pet,
             habits = memberHabits,

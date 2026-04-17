@@ -247,6 +247,10 @@ class HabitRepository @Inject constructor(
         val entity = habitDao.getHabitByIdSync(id)
         habitDao.archiveHabit(id)
 
+        // A1: Cancel any pending reminder alarm so archived habits never fire notifications.
+        HabitReminderScheduler.cancelReminder(context, id)
+        Timber.d("Cancelled reminder for archived habit id=$id")
+
         // Write-through: archive in Data Connect with retry
         entity?.remoteId?.let { remoteId ->
             writeScope.launch {
@@ -264,6 +268,26 @@ class HabitRepository @Inject constructor(
     suspend fun unarchiveHabit(id: Long) {
         val entity = habitDao.getHabitByIdSync(id)
         habitDao.unarchiveHabit(id)
+
+        // A2: Re-schedule the reminder if it was enabled on this habit before archiving.
+        if (entity != null && entity.reminderEnabled && entity.reminderTime != null) {
+            try {
+                val parsedTime = try {
+                    LocalTime.parse(entity.reminderTime)
+                } catch (e: Exception) {
+                    Timber.w(e, "unarchiveHabit: failed to parse reminderTime ${entity.reminderTime}")
+                    LocalTime.of(9, 0)
+                }
+                val customDays = entity.customDays
+                    .split(",")
+                    .map { it.trim() }
+                    .filter { it.isNotEmpty() }
+                HabitReminderScheduler.scheduleReminder(context, id, entity.title, parsedTime, customDays)
+                Timber.d("Re-scheduled reminder for unarchived habit id=$id")
+            } catch (e: Exception) {
+                Timber.w(e, "unarchiveHabit: failed to re-schedule reminder for habit id=$id")
+            }
+        }
 
         // Write-through: un-archive in Data Connect with retry
         entity?.remoteId?.let { remoteId ->
@@ -304,16 +328,21 @@ class HabitRepository @Inject constructor(
             return CompletionResult(xpEarned = 0, newStreak = 0, alreadyComplete = true)
         }
 
-        // For household habits: check cloud asynchronously to see if anyone else already completed it today.
-        // This is a best-effort pre-check (non-blocking). The local UNIQUE(habitId, date) constraint
-        // is the primary duplicate guard. If the cloud check finds a completion, we sync it locally.
+        // For household habits: perform a blocking cloud pre-check with timeout to see if
+        // another household member already completed this habit today.
+        // C1: Changed from fire-and-forget async (writeScope.launch) to blocking so we can
+        // return alreadyComplete = true immediately instead of racing the local UNIQUE constraint.
+        // On timeout or network error, we fall through to local completion — the UNIQUE(habitId,date)
+        // constraint remains the final duplicate guard.
         if (habitEntity.isHouseholdHabit && habitEntity.remoteId != null) {
-            writeScope.launch {
-                try {
-                    val cloudCheck = connector.getLogsForHabitAndDate.execute(
+            try {
+                val cloudCheck = withTimeoutOrNull(CLOUD_TIMEOUT_MS) {
+                    connector.getLogsForHabitAndDate.execute(
                         habitId = UUID.fromString(habitEntity.remoteId),
                         date = today,
                     )
+                }
+                if (cloudCheck != null) {
                     val existingLogs = cloudCheck.data.habitLogs
                     if (existingLogs.isNotEmpty()) {
                         // Someone else already completed this habit today — sync their log locally
@@ -333,11 +362,14 @@ class HabitRepository @Inject constructor(
                                 ),
                             )
                         }
+                        return CompletionResult(xpEarned = 0, newStreak = 0, alreadyComplete = true)
                     }
-                } catch (e: Exception) {
-                    Timber.w(e, "Cloud pre-check for household habit failed — continuing with local completion")
-                    // Fall through: let local completion proceed; UNIQUE constraint handles duplicates
+                } else {
+                    Timber.w("Cloud pre-check for household habit timed out — continuing with local completion")
                 }
+            } catch (e: Exception) {
+                Timber.w(e, "Cloud pre-check for household habit failed — continuing with local completion")
+                // Fall through: let local completion proceed; UNIQUE constraint handles duplicates
             }
         }
 
@@ -913,6 +945,8 @@ class HabitRepository @Inject constructor(
                     date = cloudLog.date,
                     xpEarned = cloudLog.xpEarned,
                     streakAtCompletion = cloudLog.streakAtCompletion,
+                    // C2 note: GetMyLogsForDateRange filters by auth.uid so completedByUid is
+                    // always the current user. The query does not return a completedBy object.
                     completedByUid = uid,
                     remoteId = remoteLogId,
                 )

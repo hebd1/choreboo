@@ -85,7 +85,7 @@ android {
 
     // Add Data Connect generated SDK sources
     sourceSets.getByName("main") {
-        kotlin.srcDir("build/generated/sources")
+        kotlin.srcDir("src/dataconnect")
     }
 
     testOptions {
