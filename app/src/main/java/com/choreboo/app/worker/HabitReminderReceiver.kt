@@ -94,11 +94,14 @@ class HabitReminderReceiver : BroadcastReceiver() {
         // "Mark Complete" action — fires HabitCompleteReceiver directly without opening the app
         val completePendingIntent = HabitCompleteReceiver.buildPendingIntent(context, habitId, habitTitle)
 
+        // Wrap title in quotes for clarity in notification
+        val quotedTitle = "\"$habitTitle\""
+
         // Generate a cute message with the pet name
-        val cuteMessage = generateCuteMessage(context, habitTitle, petName)
+        val cuteMessage = generateCuteMessage(context, quotedTitle, petName)
 
         val notificationBuilder = NotificationCompat.Builder(context, ChorebooApplication.REMINDER_CHANNEL_ID)
-            .setContentTitle(habitTitle)
+            .setContentTitle(quotedTitle)
             .setContentText(cuteMessage)
             .setSmallIcon(R.drawable.ic_notification)
             .setContentIntent(contentPendingIntent)

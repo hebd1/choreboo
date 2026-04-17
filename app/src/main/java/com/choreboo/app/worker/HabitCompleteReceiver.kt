@@ -106,7 +106,7 @@ class HabitCompleteReceiver : BroadcastReceiver() {
         message: String,
     ) {
         val notificationBuilder = NotificationCompat.Builder(context, ChorebooApplication.REMINDER_CHANNEL_ID)
-            .setContentTitle(habitTitle)
+            .setContentTitle("\"$habitTitle\"")
             .setContentText(message)
             .setSmallIcon(R.drawable.ic_notification)
             .setAutoCancel(true)
