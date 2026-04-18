@@ -64,17 +64,18 @@ Defined in `dataconnect/schema/schema.gql`:
 - **Cloud timeouts**: Every `withTimeoutOrNull(CLOUD_TIMEOUT_MS)` (5 000 ms) wraps all Data Connect `.execute()` calls across all repositories. On timeout the call returns `null` and the caller handles it gracefully (logs warning, no user-facing error for write-through).
 - **Stat decay**: Calculated on PetScreen open via `chorebooRepository.applyStatDecay()` based on `lastInteractionAt`.
 - **XP/Level-up**: `ChorebooRepository.addXp()` returns `XpResult(levelsGained, newLevel, evolved, newStage)` so callers can trigger celebration UI.
-- **Habit completion**: `HabitRepository.completeHabit()` returns `CompletionResult(xpEarned, newStreak, alreadyComplete)` with targetCount enforcement.
+- **Habit completion**: `HabitRepository.completeHabit()` returns `CompletionResult(xpEarned, newStreak, alreadyComplete)` with targetCount enforcement. For household habits, a cloud pre-check (`GetLogsForHabitAndDate`) runs **blocking** with `withTimeoutOrNull(CLOUD_TIMEOUT_MS)` (5 000 ms) before inserting a local log, to prevent duplicate completions across household members.
 - **Streaks**: `HabitRepository.getStreaksForToday()` returns `Flow<Map<Long, Int>>` for StreakBadge display.
+- **Habit list query**: `HabitDao.getHabitsForUser(uid, date)` returns a **three-way** union: (1) personal habits owned by the user with no assignee, (2) household habits assigned to the user, and (3) household habits owned by the user with no assignee. Habits owned by the user but assigned to someone else are excluded — the assignee sees them, not the owner.
 - **Cloud-to-local sync**: `HabitRepository.syncHabitsFromCloud()`, `HabitRepository.syncHabitLogsFromCloud()`, `ChorebooRepository.syncFromCloud()`, `BackgroundRepository.syncFromCloud()`. Called from `SyncManager.syncAll()`.
 
 ## Room Database (v16, 7 entities)
 
 | Table | Columns | Indexes |
 |-------|---------|---------|
-| **habits** | id, title, description, iconName, customDays, difficulty, baseXp, reminderEnabled, reminderTime, createdAt, isArchived, isHouseholdHabit, ownerUid, householdId, assignedToUid, assignedToName, remoteId | `remoteId` |
-| **habit_logs** | id, habitId (FK→habits CASCADE), completedAt, date (ISO string), xpEarned, streakAtCompletion, completedByUid, remoteId | `remoteId`, `date`, UNIQUE(`habitId`, `date`) |
-| **choreboos** | id, name, stage, level, xp, hunger, happiness, energy, petType, lastInteractionAt, createdAt, sleepUntil, ownerUid, remoteId, backgroundId | `remoteId` |
+| **habits** | id, title, description, iconName, customDays, difficulty, baseXp, reminderEnabled, reminderTime, createdAt, isArchived, isHouseholdHabit, ownerUid, householdId, assignedToUid, assignedToName, remoteId, pendingSync | `remoteId`, `pendingSync` |
+| **habit_logs** | id, habitId (FK→habits CASCADE), completedAt, date (ISO string), xpEarned, streakAtCompletion, completedByUid, remoteId, pendingSync | `remoteId`, `date`, `pendingSync`, UNIQUE(`habitId`, `date`) |
+| **choreboos** | id, name, stage, level, xp, hunger, happiness, energy, petType, lastInteractionAt, createdAt, sleepUntil, ownerUid, remoteId, backgroundId, pendingSync | `remoteId`, `pendingSync` |
 | **household_members** | uid (String PK = Firebase Auth UID), displayName, photoUrl, email, chorebooId, chorebooName, chorebooStage, chorebooLevel, chorebooXp, chorebooHunger, chorebooHappiness, chorebooEnergy, chorebooPetType, chorebooBackgroundId, lastSyncedAt | — |
 | **households** | id (String PK = Data Connect UUID), name, inviteCode, createdByUid, createdByName | — |
 | **household_habit_statuses** | habitId (String PK = Data Connect UUID), title, iconName, ownerName, ownerUid, baseXp, assignedToUid, assignedToName, completedByName, completedByUid, cachedDate | — |
@@ -137,7 +138,7 @@ Deploy the backend (Data Connect schema/connectors + Storage rules) to the `chor
 | Gradle version check | `powershell.exe -File build.ps1 --version` |
 | SDK regen | `npx firebase-tools@latest dataconnect:sdk:generate` |
 
-> **Note**: 265 unit tests across domain models, repositories, and ViewModels. See the [Testing](#testing) section for details. No lint configuration, detekt, or ktlint is set up.
+> **Note**: 455 unit tests across domain models, repositories, and ViewModels. See the [Testing](#testing) section for details. No lint configuration, detekt, or ktlint is set up.
 
 ## Code Style
 
@@ -196,6 +197,7 @@ Deploy the backend (Data Connect schema/connectors + Storage rules) to the `chor
 - **`customDays`**: Comma-separated string in entity (`"MON,TUE,WED"`), `List<String>` in domain model.
 - **Navigation**: `Screen` sealed class in `navigation/ChorebooNavGraph.kt`. Start destination is dynamic: Auth → Onboarding → Pet. 5 bottom tabs (`pet`, `stats`, `household`, `calendar`, `settings`); bottom bar hidden on `auth`, `onboarding`, `add_edit_habit`. `MainViewModel.isAppReady` gates the splash screen before the first destination renders.
 - **Destructive actions** (delete habit) require `AlertDialog` confirmation.
+- **Reminder lifecycle**: `HabitRepository.archiveHabit()` calls `HabitReminderScheduler.cancelReminder()` to cancel any pending alarm. `unarchiveHabit()` calls `HabitReminderScheduler.scheduleReminder()` if `reminderEnabled` is true on the habit, restoring the alarm chain.
 - **Level-up celebrations** shown via `AlertDialog` when XP causes level/stage change.
 - **Cloud sync**: `remoteId` field on all 3 Room entities links local rows to Data Connect UUIDs. Write-through on every mutation; cloud-to-local on auth + app foreground (via `SyncManager`).
 - **Network security**: `network_security_config.xml` disables cleartext HTTP in release builds. `backup_rules.xml` and `data_extraction_rules.xml` exclude the Room DB, DataStore prefs, and shared prefs from Android Auto Backup.
@@ -248,7 +250,7 @@ com.choreboo.app/
 │   ├── habits/                      # AddEditHabitScreen, AddEditHabitViewModel, components/ (HabitCard, StreakBadge)
 │   ├── pet/                         # PetScreen (habit list + feed bottom sheet + background picker), PetViewModel (absorbed HabitList functionality), components/ (StatBar, BackgroundPickerSheet)
 │   ├── stats/                       # StatsScreen, StatsViewModel
-│   ├── household/                   # HouseholdScreen (tap pet card → member habits dialog), HouseholdViewModel (enriches pet photos), components/ (HouseholdPetCard, HouseholdHabitCard)
+│   ├── household/                   # HouseholdScreen (tap pet card → member habits dialog showing habits assigned to that member OR owned by them and unassigned), HouseholdViewModel (enriches pet photos), components/ (HouseholdPetCard, HouseholdHabitCard)
 │   ├── calendar/                    # CalendarScreen, CalendarViewModel
 │   ├── onboarding/                  # OnboardingScreen, OnboardingViewModel
 │   ├── settings/                    # SettingsScreen, SettingsViewModel (+ dev Reset Account flow)
@@ -256,10 +258,10 @@ com.choreboo.app/
 │   └── shop/                        # (placeholder — not yet implemented)
 └── worker/                          # AlarmManager-based reminders (see below)
     ├── HabitReminderScheduler.kt    # Schedules per-habit alarms via AlarmManager
-    ├── HabitReminderReceiver.kt     # BroadcastReceiver that shows reminder notification
-    ├── HabitCompleteReceiver.kt     # BroadcastReceiver for "Complete" action on notification
-    ├── ReminderRescheduleWorker.kt  # WorkManager job that reschedules alarms after reboot/update
-    └── BootReceiver.kt              # BOOT_COMPLETED receiver that triggers ReminderRescheduleWorker
+    ├── HabitReminderReceiver.kt     # BroadcastReceiver: reschedules next alarm FIRST (to maintain chain even on early return), then checks isScheduledForToday() — skips notification if habit not scheduled today, otherwise shows reminder notification
+    ├── HabitCompleteReceiver.kt     # BroadcastReceiver for "Complete" action on notification: injects HabitDao, checks isScheduledForToday() before marking complete, reschedules next alarm after completion (A5)
+    ├── ReminderRescheduleWorker.kt  # WorkManager job that reschedules alarms after reboot/update: filters out archived habits and owner-assigned-away habits (owner gets no alarm when habit is assigned to someone else); also reschedules pet mood alarms via PetMoodScheduler
+    └── BootReceiver.kt              # BOOT_COMPLETED + MY_PACKAGE_REPLACED receiver that triggers ReminderRescheduleWorker
 ```
 
 ## Dev Reset Account
@@ -523,7 +525,7 @@ All critical bugs C1–C5 found during the 2026-04-05 audit have been fixed. See
 ### Medium Priority Issues (all resolved)
 
 - **M1**: `writeScope` in `ChorebooRepository` and `HabitRepository` changed to `private var`. Added `cancelPendingWrites()` that cancels via `coroutineContext[Job]?.cancel()` and creates a fresh scope. Called by `SettingsViewModel.signOut()` and `ResetRepository.resetAll()`.
-- **M2**: `SyncManager` now retries each sync step with exponential backoff. Added `RETRY_DELAYS_MS = listOf(1_000L, 2_000L)` constant and `retryWithBackoff {}` helper. All 4 independent sync steps wrapped in `retryWithBackoff`.
+- **M2**: `SyncManager` now retries each sync step with exponential backoff. Added `RETRY_DELAYS_MS = listOf(1_000L, 2_000L)` constant and `retryWithBackoff {}` helper. All 4 independent sync steps wrapped in `retryWithBackoff`. `HabitRepository` also has its own `retryWithBackoff` helper with `listOf(1_000L, 3_000L)` delays for write-through mutations (upsert, complete).
 - **M3**: `ResetRepository.resetAll()` now calls `chorebooRepository.cancelPendingWrites()` and `habitRepository.cancelPendingWrites()` at the top before cloud cleanup.
 - **M8**: Dead `householdNotificationsEnabled` preference removed entirely — from `UserPreferences.kt`, `SettingsViewModel.kt`, `SettingsScreen.kt`, and `SettingsViewModelTest.kt`.
 

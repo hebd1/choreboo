@@ -551,7 +551,7 @@ fun SettingsScreen(
                     )
                     OutlinedTextField(
                         value = inviteCode,
-                        onValueChange = { if (it.length <= 6) inviteCode = it.uppercase() },
+                        onValueChange = { if (it.length <= 8) inviteCode = it.uppercase() },
                         placeholder = { Text(stringResource(R.string.settings_invite_code_placeholder)) },
                         singleLine = true,
                         shape = RoundedCornerShape(12.dp),
