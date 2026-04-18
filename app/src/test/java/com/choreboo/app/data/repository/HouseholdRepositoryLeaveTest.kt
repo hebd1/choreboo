@@ -3,6 +3,7 @@ package com.choreboo.app.data.repository
 import com.choreboo.app.data.local.dao.HouseholdDao
 import com.choreboo.app.data.local.dao.HouseholdHabitStatusDao
 import com.choreboo.app.data.local.dao.HouseholdMemberDao
+import com.google.firebase.auth.FirebaseAuth
 import io.mockk.coEvery
 import io.mockk.coVerify
 import io.mockk.every
@@ -30,6 +31,7 @@ class HouseholdRepositoryLeaveTest {
     private lateinit var householdHabitStatusDao: HouseholdHabitStatusDao
     private lateinit var userRepository: UserRepository
     private lateinit var habitRepository: HabitRepository
+    private lateinit var firebaseAuth: FirebaseAuth
     private lateinit var repo: HouseholdRepository
 
     private val testUid = "test-uid-household"
@@ -41,6 +43,7 @@ class HouseholdRepositoryLeaveTest {
         householdHabitStatusDao = mockk(relaxed = true)
         userRepository = mockk(relaxed = true)
         habitRepository = mockk(relaxed = true)
+        firebaseAuth = mockk(relaxed = true)
 
         every { userRepository.getCurrentUid() } returns testUid
 
@@ -50,6 +53,7 @@ class HouseholdRepositoryLeaveTest {
             householdHabitStatusDao = householdHabitStatusDao,
             userRepository = userRepository,
             habitRepository = habitRepository,
+            firebaseAuth = firebaseAuth,
         )
     }
 

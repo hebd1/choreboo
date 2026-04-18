@@ -91,16 +91,15 @@ object HabitReminderScheduler {
         alarmManager.cancel(pendingIntent)
     }
 
-    private fun calculateNextTriggerTime(
+    internal fun calculateNextTriggerTime(
         reminderTime: LocalTime,
         scheduledDays: List<String>,
+        now: ZonedDateTime = ZonedDateTime.now(),
     ): ZonedDateTime? {
         if (scheduledDays.isEmpty()) return null
 
-        // Capture a single consistent "now" so sub-functions don't diverge across midnight.
-        val now = ZonedDateTime.now()
         val today = now.toLocalDate()
-        
+
         // Check if any scheduled day is a weekly pattern (MON-SUN)
         val weeklyDays = scheduledDays.filter { it.length == 3 && it.all { c -> c.isLetter() } }
         // Check if any scheduled day is a monthly pattern (D1-D31)

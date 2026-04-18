@@ -12,6 +12,7 @@ import com.choreboo.app.data.datastore.UserPreferences
 import com.choreboo.app.data.local.dao.HabitDao
 import com.choreboo.app.data.repository.ChorebooRepository
 import com.choreboo.app.data.repository.HabitRepository
+import com.choreboo.app.domain.model.Habit
 import com.choreboo.app.ui.util.displayNameRes
 import dagger.hilt.android.AndroidEntryPoint
 import kotlinx.coroutines.CoroutineScope
@@ -191,21 +192,5 @@ class HabitCompleteReceiver : BroadcastReceiver() {
  * An empty list is treated as "always scheduled" (daily).
  */
 private fun List<String>.isScheduledForToday(): Boolean {
-    if (isEmpty()) return true
-    val today = java.time.LocalDate.now()
-    val weeklyDays = filter { it.length == 3 && it.all { c -> c.isLetter() } }
-    if (weeklyDays.isNotEmpty()) {
-        val todayShort = today.dayOfWeek.name.take(3).uppercase()
-        return weeklyDays.any { it.uppercase() == todayShort }
-    }
-    val monthlyDays = filter { it.startsWith("D", ignoreCase = true) }
-    if (monthlyDays.isNotEmpty()) {
-        val todayDom = today.dayOfMonth
-        val lastDom = today.lengthOfMonth()
-        return monthlyDays.any { dayStr ->
-            val day = dayStr.substring(1).toIntOrNull() ?: return@any false
-            (day >= lastDom && todayDom == lastDom) || day == todayDom
-        }
-    }
-    return true
+    return Habit(title = "", customDays = this).isScheduledForToday(java.time.LocalDate.now())
 }

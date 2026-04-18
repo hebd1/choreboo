@@ -55,9 +55,9 @@ interface HouseholdMemberDao {
             chorebooXp, chorebooHunger, chorebooHappiness, chorebooEnergy,
             chorebooPetType, chorebooBackgroundId, lastSyncedAt)
            VALUES (:uid, :displayName, :photoUrl, NULL,
-                   :chorebooId, :chorebooName, :chorebooStage, :chorebooLevel,
-                   :chorebooXp, :chorebooHunger, :chorebooHappiness, :chorebooEnergy,
-                   :chorebooPetType, :chorebooBackgroundId, :lastSyncedAt)""",
+                    :chorebooId, :chorebooName, :chorebooStage, :chorebooLevel,
+                    :chorebooXp, :chorebooHunger, :chorebooHappiness, :chorebooEnergy,
+                    :chorebooPetType, :chorebooBackgroundId, :lastSyncedAt)""",
     )
     suspend fun insertIgnorePet(
         uid: String,

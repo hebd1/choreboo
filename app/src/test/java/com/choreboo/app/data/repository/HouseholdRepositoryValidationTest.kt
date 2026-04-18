@@ -3,6 +3,7 @@ package com.choreboo.app.data.repository
 import com.choreboo.app.data.local.dao.HouseholdMemberDao
 import com.choreboo.app.data.local.dao.HouseholdDao
 import com.choreboo.app.data.local.dao.HouseholdHabitStatusDao
+import com.google.firebase.auth.FirebaseAuth
 import io.mockk.mockk
 import kotlinx.coroutines.test.runTest
 import org.junit.Before
@@ -26,6 +27,7 @@ class HouseholdRepositoryValidationTest {
             householdHabitStatusDao = mockk(relaxed = true),
             userRepository = mockk(relaxed = true),
             habitRepository = mockk(relaxed = true),
+            firebaseAuth = mockk(relaxed = true),
         )
     }
 

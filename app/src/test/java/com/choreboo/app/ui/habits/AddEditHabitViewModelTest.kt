@@ -144,6 +144,22 @@ class AddEditHabitViewModelTest {
         assertEquals("user-123", state.assignedToUid)
     }
 
+    @Test
+    fun `editing monthly habit loads monthly frequency mode`() = runTest {
+        val existingHabit = Habit(
+            id = 43,
+            title = "Pay rent",
+            customDays = listOf("D1", "D15"),
+        )
+        every { habitRepository.getHabitById(43L) } returns flowOf(existingHabit)
+
+        val vm = createViewModel(habitId = 43L)
+        advanceUntilIdle()
+
+        assertEquals(FrequencyMode.MONTHLY, vm.formState.value.frequencyMode)
+        assertEquals(listOf("D1", "D15"), vm.formState.value.customDays)
+    }
+
     // -----------------------------------------------------------------------
     // Form state updates
     // -----------------------------------------------------------------------

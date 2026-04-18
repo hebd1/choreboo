@@ -229,7 +229,7 @@
     <string name="add_habit_difficulty_medium">Medium</string>
     <string name="add_habit_difficulty_hard">Hard</string>
     <string name="add_habit_xp_label">XP</string>
-    <string name="add_habit_daily_reminder">Daily Reminder</string>
+    <string name="add_habit_daily_reminder">Notification time</string>
     <string name="add_habit_reminder_enabled">Enabled</string>
     <string name="add_habit_reminder_not_set">Not set</string>
     <string name="add_habit_notification_permission_title">Notification Permission</string>
@@ -341,6 +341,7 @@
     <string name="household_title_fallback">Household</string>
     <string name="household_chores_section">Household Chores</string>
     <string name="household_close_button">Close</string>
+    <string name="household_level_badge">Lv %1$d</string>
     <!-- Parameterized: "[Alice]'s Chores" -->
     <string name="household_member_chores">%1$s\'s Chores</string>
     <!-- Parameterized: "Profile photo of [Alice]" -->

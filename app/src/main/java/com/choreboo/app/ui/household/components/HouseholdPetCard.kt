@@ -94,8 +94,8 @@ fun HouseholdPetCard(
                     .padding(start = 12.dp, end = 12.dp, bottom = 12.dp, top = 20.dp),
                 horizontalAlignment = Alignment.CenterHorizontally,
             ) {
-                // ── Animation area + level badge ─────────────────────────
-                Box(contentAlignment = Alignment.BottomEnd) {
+                // ── Animation area ────────────────────────────────────────
+                Box {
                     // Background + animation stacked in a clipped rounded box
                     Box(
                         modifier = Modifier
@@ -126,21 +126,6 @@ fun HouseholdPetCard(
                             mood = pet.mood,
                             animationOffsetMs = animationOffsetMs,
                             modifier = Modifier.size(88.dp),
-                        )
-                    }
-                    // Level badge overlaid on bottom-end of the animation area
-                    Box(
-                        contentAlignment = Alignment.Center,
-                        modifier = Modifier
-                            .clip(RoundedCornerShape(6.dp))
-                            .background(MaterialTheme.colorScheme.primary)
-                            .padding(horizontal = 4.dp, vertical = 1.dp),
-                    ) {
-                        Text(
-                            text = stringResource(R.string.stats_level_label, pet.level),
-                            style = MaterialTheme.typography.labelSmall,
-                            color = MaterialTheme.colorScheme.onPrimary,
-                            fontWeight = FontWeight.Bold,
                         )
                     }
                 }
@@ -205,6 +190,23 @@ fun HouseholdPetCard(
                     .padding(8.dp)
                     .size(28.dp)
                     .border(1.5.dp, MaterialTheme.colorScheme.surface, CircleShape),
+            )
+        }
+
+        Box(
+            contentAlignment = Alignment.Center,
+            modifier = Modifier
+                .align(Alignment.TopEnd)
+                .padding(8.dp)
+                .clip(RoundedCornerShape(8.dp))
+                .background(MaterialTheme.colorScheme.primary)
+                .padding(horizontal = 8.dp, vertical = 3.dp),
+        ) {
+            Text(
+                text = stringResource(R.string.household_level_badge, pet.level),
+                style = MaterialTheme.typography.labelSmall,
+                color = MaterialTheme.colorScheme.onPrimary,
+                fontWeight = FontWeight.Bold,
             )
         }
     }

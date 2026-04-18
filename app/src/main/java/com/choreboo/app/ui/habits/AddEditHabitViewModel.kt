@@ -111,6 +111,14 @@ class AddEditHabitViewModel @Inject constructor(
                 val habit = habitRepository.getHabitById(habitId).firstOrNull()
                 if (habit != null) {
                     existingHabit = habit
+                    val frequencyMode = if (
+                        habit.customDays.any { it.startsWith("D", ignoreCase = true) } &&
+                        habit.customDays.none { it.length == 3 && it.all(Char::isLetter) }
+                    ) {
+                        FrequencyMode.MONTHLY
+                    } else {
+                        FrequencyMode.WEEKLY
+                    }
                     // Determine whether the current user is the owner or merely an assignee.
                     val currentUid = authRepository.currentFirebaseUser?.uid
                     _isOwner.value = habit.ownerUid == null || habit.ownerUid == currentUid
@@ -123,6 +131,7 @@ class AddEditHabitViewModel @Inject constructor(
                         baseXp = habit.baseXp,
                         reminderEnabled = habit.reminderEnabled,
                         reminderTime = habit.reminderTime ?: LocalTime.of(9, 0),
+                        frequencyMode = frequencyMode,
                         isEditing = true,
                         isHouseholdHabit = habit.isHouseholdHabit,
                         assignedToUid = habit.assignedToUid,

@@ -101,7 +101,7 @@ val MIGRATION_19_20 = object : Migration(19, 20) {
         HouseholdHabitStatusEntity::class,
         PurchasedBackgroundEntity::class,
     ],
-    version = 20, // v20: completedByUid index added to habit_logs (D4)
+    version = 22, // v22: remove temporary household totalPoints cache
     exportSchema = true,
 )
 @TypeConverters(Converters::class)
@@ -126,7 +126,7 @@ abstract class ChorebooDatabase : RoomDatabase() {
                     "choreboo_database"
                 )
                     .addMigrations(MIGRATION_17_18, MIGRATION_18_19, MIGRATION_19_20)
-                    .fallbackToDestructiveMigrationOnDowngrade()
+                    .fallbackToDestructiveMigration(dropAllTables = true)
                     .build()
                 INSTANCE = instance
                 instance

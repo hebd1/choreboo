@@ -395,7 +395,6 @@ fun PetScreen(
                                 .fillMaxWidth()
                                 .height(220.dp)
                                 .clip(RoundedCornerShape(16.dp)),
-                            contentAlignment = Alignment.Center,
                         ) {
                             // Background layer — fills entire clipped box
                             PetBackgroundImage(
@@ -416,14 +415,17 @@ fun PetScreen(
                                 onStartSleepComplete = { showStartSleepAnimation = false },
                                 onThumbsUpComplete = { showThumbsUp = false },
                                 onTap = { isInteracting = true },
-                                modifier = Modifier.size(160.dp),
-                            )
-
-                            // Mood pill at bottom — tappable to show stat overlay
-                            Box(
                                 modifier = Modifier
                                     .align(Alignment.BottomCenter)
-                                    .padding(bottom = 10.dp)
+                                    .padding(bottom = 12.dp)
+                                    .size(160.dp),
+                            )
+
+                             // Mood pill at bottom — tappable to show stat overlay
+                             Box(
+                                 modifier = Modifier
+                                    .align(Alignment.BottomStart)
+                                    .padding(start = 12.dp, bottom = 10.dp)
                                     .clip(RoundedCornerShape(50.dp))
                                     .background(MaterialTheme.colorScheme.surfaceContainerHighest.copy(alpha = 0.8f))
                                     .clickable { showDetailedStats = !showDetailedStats }
