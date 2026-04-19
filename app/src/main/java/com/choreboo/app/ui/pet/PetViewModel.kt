@@ -333,7 +333,7 @@ class PetViewModel @Inject constructor(
             try {
                 val result = habitRepository.completeHabit(habitId)
                 if (result.alreadyComplete) {
-                    _events.emit(PetEvent.AlreadyComplete)
+                    _events.emit(PetEvent.AlreadyComplete(habitId))
                     return@launch
                 }
                 val xpResult = chorebooRepository.addXp(result.xpEarned)
@@ -343,6 +343,7 @@ class PetViewModel @Inject constructor(
 
                 _events.emit(
                     PetEvent.HabitCompleted(
+                        habitId = habitId,
                         xpEarned = result.xpEarned,
                         streak = result.newStreak,
                         leveledUp = xpResult.levelsGained > 0,
@@ -352,7 +353,7 @@ class PetViewModel @Inject constructor(
                     ),
                 )
             } catch (e: Exception) {
-                _events.emit(PetEvent.CompletionError)
+                _events.emit(PetEvent.CompletionError(habitId))
             }
         }
     }
@@ -430,6 +431,7 @@ sealed class PetEvent {
     data object Sleeping : PetEvent()
     data object AlreadySleeping : PetEvent()
     data class HabitCompleted(
+        val habitId: Long,
         val xpEarned: Int,
         val streak: Int,
         val leveledUp: Boolean = false,
@@ -437,8 +439,8 @@ sealed class PetEvent {
         val evolved: Boolean = false,
         val newStage: ChorebooStage? = null,
     ) : PetEvent()
-    data object AlreadyComplete : PetEvent()
-    data object CompletionError : PetEvent()
+    data class AlreadyComplete(val habitId: Long) : PetEvent()
+    data class CompletionError(val habitId: Long) : PetEvent()
     data object FeedError : PetEvent()
     data object SleepError : PetEvent()
     data object DeleteError : PetEvent()

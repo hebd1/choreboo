@@ -4,9 +4,13 @@ import android.content.Context
 import com.choreboo.app.data.repository.BillingRepository
 import com.choreboo.app.data.repository.ChorebooRepository
 import com.choreboo.app.data.repository.SyncManager
+import com.choreboo.app.domain.model.ChorebooStage
+import com.choreboo.app.domain.model.ChorebooStats
+import com.choreboo.app.domain.model.PetType
 import io.mockk.coEvery
 import io.mockk.coVerify
 import io.mockk.mockk
+import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.test.UnconfinedTestDispatcher
 import kotlinx.coroutines.test.TestScope
 import kotlinx.coroutines.test.advanceUntilIdle
@@ -22,12 +26,14 @@ import org.junit.Test
  * so coroutines execute eagerly and tests can use [advanceUntilIdle] instead of
  * fragile [Thread.sleep] calls.
  */
+@OptIn(ExperimentalCoroutinesApi::class)
 class AppLifecycleObserverTest {
 
     private lateinit var context: Context
     private lateinit var syncManager: SyncManager
     private lateinit var billingRepository: BillingRepository
     private lateinit var chorebooRepository: ChorebooRepository
+    private lateinit var petMoodAlarmHandler: PetMoodAlarmHandler
     private lateinit var observer: AppLifecycleObserver
     private val owner = mockk<androidx.lifecycle.LifecycleOwner>(relaxed = true)
 
@@ -37,6 +43,7 @@ class AppLifecycleObserverTest {
         syncManager = mockk(relaxed = true)
         billingRepository = mockk(relaxed = true)
         chorebooRepository = mockk(relaxed = true)
+        petMoodAlarmHandler = mockk(relaxed = true)
     }
 
     private fun createObserver(testScope: TestScope): AppLifecycleObserver =
@@ -46,6 +53,7 @@ class AppLifecycleObserverTest {
             billingRepository = billingRepository,
             chorebooRepository = chorebooRepository,
             scope = testScope,
+            petMoodAlarmHandler = petMoodAlarmHandler,
         )
 
     // ── Cold start ───────────────────────────────────────────────────────
@@ -97,5 +105,40 @@ class AppLifecycleObserverTest {
 
         // If we reach here without the test thread crashing, the exception was caught
         coVerify(exactly = 1) { syncManager.syncAll(any()) }
+    }
+
+    @Test
+    fun `onStop skips predictive alarm when no choreboo exists`() = runTest {
+        observer = createObserver(this)
+        coEvery { chorebooRepository.getChorebooSync() } returns null
+
+        observer.onStop(owner)
+        advanceUntilIdle()
+
+        coVerify(exactly = 0) { petMoodAlarmHandler.schedule(any(), any()) }
+    }
+
+    @Test
+    fun `onStop schedules predictive alarm when choreboo exists`() = runTest {
+        observer = createObserver(this)
+        coEvery { chorebooRepository.getChorebooSync() } returns ChorebooStats(
+            id = 1,
+            name = "Boo",
+            stage = ChorebooStage.BABY,
+            level = 2,
+            xp = 10,
+            hunger = 70,
+            happiness = 80,
+            energy = 60,
+            petType = PetType.FOX,
+            lastInteractionAt = 0L,
+            createdAt = 0L,
+            sleepUntil = 1234L,
+        )
+
+        observer.onStop(owner)
+        advanceUntilIdle()
+
+        coVerify(exactly = 1) { petMoodAlarmHandler.schedule(any(), any()) }
     }
 }

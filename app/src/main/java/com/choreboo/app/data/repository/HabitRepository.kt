@@ -57,8 +57,21 @@ class HabitRepository @Inject constructor(
     private val firebaseAuth: FirebaseAuth,
     @ApplicationContext private val context: android.content.Context,
 ) {
+    internal constructor(
+        habitDao: HabitDao,
+        habitLogDao: HabitLogDao,
+        userPreferences: UserPreferences,
+        userRepository: UserRepository,
+        firebaseAuth: FirebaseAuth,
+        context: android.content.Context,
+        reminderScheduler: HabitReminderHandler,
+    ) : this(habitDao, habitLogDao, userPreferences, userRepository, firebaseAuth, context) {
+        this.reminderScheduler = reminderScheduler
+    }
+
     private val connector by lazy { ChorebooConnector.instance }
     private val dateFormatter = DateTimeFormatter.ISO_LOCAL_DATE
+    private var reminderScheduler: HabitReminderHandler = AlarmManagerHabitReminderHandler
 
     /** Fire-and-forget scope for silent write-through calls. */
     @Volatile
@@ -248,7 +261,7 @@ class HabitRepository @Inject constructor(
         habitDao.archiveHabit(id)
 
         // A1: Cancel any pending reminder alarm so archived habits never fire notifications.
-        HabitReminderScheduler.cancelReminder(context, id)
+        reminderScheduler.cancel(context, id)
         Timber.d("Cancelled reminder for archived habit id=$id")
 
         // Write-through: archive in Data Connect with retry
@@ -282,7 +295,7 @@ class HabitRepository @Inject constructor(
                     .split(",")
                     .map { it.trim() }
                     .filter { it.isNotEmpty() }
-                HabitReminderScheduler.scheduleReminder(context, id, entity.title, parsedTime, customDays)
+                reminderScheduler.schedule(context, id, entity.title, parsedTime, customDays)
                 Timber.d("Re-scheduled reminder for unarchived habit id=$id")
             } catch (e: Exception) {
                 Timber.w(e, "unarchiveHabit: failed to re-schedule reminder for habit id=$id")
@@ -568,7 +581,7 @@ class HabitRepository @Inject constructor(
         try {
             val allHabits = habitDao.getAllHabitsSync()
             for (habit in allHabits) {
-                HabitReminderScheduler.cancelReminder(context, habit.id)
+                reminderScheduler.cancel(context, habit.id)
             }
             Timber.d("Cancelled ${allHabits.size} pending reminder alarms")
         } catch (e: Exception) {
@@ -656,25 +669,16 @@ class HabitRepository @Inject constructor(
                 if (existing?.pendingSync == true) {
                     Timber.d("syncHabitsFromCloud: skipping pendingSync habit remoteId=$remoteId")
                     val upsertedId = existing.id
-                    if (cloudHabit.reminderEnabled && cloudHabit.reminderTime != null && !cloudHabit.isArchived) {
-                        try {
-                            val parsedTime = try {
-                                LocalTime.parse(cloudHabit.reminderTime)
-                            } catch (e: Exception) {
-                                Timber.w(e, "Failed to parse reminder time (pendingSync path): ${cloudHabit.reminderTime}")
-                                LocalTime.of(9, 0)
-                            }
-                            HabitReminderScheduler.scheduleReminder(
-                                context,
-                                upsertedId,
-                                cloudHabit.title,
-                                parsedTime,
-                                cloudHabit.customDays.split(",").map { it.trim() }.filter { it.isNotEmpty() },
-                            )
-                        } catch (e: Exception) {
-                            Timber.w(e, "Failed to schedule reminder for pendingSync habit ${cloudHabit.title}")
-                        }
-                    }
+                    syncReminderFromCloud(
+                        localHabitId = upsertedId,
+                        title = cloudHabit.title,
+                        reminderEnabled = cloudHabit.reminderEnabled,
+                        reminderTime = cloudHabit.reminderTime,
+                        isArchived = cloudHabit.isArchived,
+                        customDays = cloudHabit.customDays,
+                        shouldOwnReminder = true,
+                        logTag = "pendingSync habit ${cloudHabit.title}",
+                    )
                     continue
                 }
 
@@ -704,25 +708,16 @@ class HabitRepository @Inject constructor(
 
                 // Schedule reminder immediately after syncing if enabled (fixes B17: new devices signing in for first time).
                 // On new devices, synced personal habits have reminderEnabled=true but no AlarmManager alarms were registered.
-                if (cloudHabit.reminderEnabled && cloudHabit.reminderTime != null && !cloudHabit.isArchived) {
-                    try {
-                        val parsedTime = try {
-                            LocalTime.parse(cloudHabit.reminderTime)
-                        } catch (e: Exception) {
-                            Timber.w(e, "Failed to parse reminder time (personal habits path): ${cloudHabit.reminderTime}")
-                            LocalTime.of(9, 0)
-                        }
-                        HabitReminderScheduler.scheduleReminder(
-                            context,
-                            habitLocalId,
-                            cloudHabit.title,
-                            parsedTime,
-                            cloudHabit.customDays.split(",").map { it.trim() }.filter { it.isNotEmpty() },
-                        )
-                    } catch (e: Exception) {
-                        Timber.w(e, "Failed to schedule reminder for synced habit ${cloudHabit.title}")
-                    }
-                }
+                syncReminderFromCloud(
+                    localHabitId = habitLocalId,
+                    title = cloudHabit.title,
+                    reminderEnabled = cloudHabit.reminderEnabled,
+                    reminderTime = cloudHabit.reminderTime,
+                    isArchived = cloudHabit.isArchived,
+                    customDays = cloudHabit.customDays,
+                    shouldOwnReminder = true,
+                    logTag = "synced habit ${cloudHabit.title}",
+                )
             }
 
             // G13: Deletion reconciliation for personal habits.
@@ -733,6 +728,7 @@ class HabitRepository @Inject constructor(
                 .filter { it.ownerUid == uid && it.remoteId !in cloudRemoteIds && !it.pendingSync }
                 .map { it.id }
             if (orphanIds.isNotEmpty()) {
+                orphanIds.forEach { reminderScheduler.cancel(context, it) }
                 orphanIds.chunked(500).forEach { chunk -> habitDao.deleteByIds(chunk) }
                 Timber.d("Deleted ${orphanIds.size} orphaned personal habits not present in cloud")
             }
@@ -756,6 +752,7 @@ class HabitRepository @Inject constructor(
             val householdData = hhResult.data.user?.household
             if (householdData == null) {
                 // User has no household — delete any stale other-member habits from Room
+                habitDao.getOtherMembersHouseholdHabits(uid).forEach { reminderScheduler.cancel(context, it.id) }
                 habitDao.deleteNonOwnedHouseholdHabits(uid)
                 return
             }
@@ -799,25 +796,16 @@ class HabitRepository @Inject constructor(
 
                 // Schedule reminder for household habits assigned to current user (fixes B17: assignments on new devices).
                 // User A assigns a habit to User B → User B signs in on a new device → reminder should fire for User B.
-                if (isAssignedToCurrentUser && reminderEnabled && reminderTime != null && !cloudHabit.isArchived) {
-                    try {
-                        val parsedTime = try {
-                            LocalTime.parse(reminderTime)
-                        } catch (e: Exception) {
-                            Timber.w(e, "Failed to parse reminder time (household habits path): $reminderTime")
-                            LocalTime.of(9, 0)
-                        }
-                        HabitReminderScheduler.scheduleReminder(
-                            context,
-                            hhHabitLocalId,
-                            cloudHabit.title,
-                            parsedTime,
-                            cloudHabit.customDays.split(",").map { it.trim() }.filter { it.isNotEmpty() },
-                        )
-                    } catch (e: Exception) {
-                        Timber.w(e, "Failed to schedule reminder for assigned household habit ${cloudHabit.title}")
-                    }
-                }
+                syncReminderFromCloud(
+                    localHabitId = hhHabitLocalId,
+                    title = cloudHabit.title,
+                    reminderEnabled = reminderEnabled,
+                    reminderTime = reminderTime,
+                    isArchived = cloudHabit.isArchived,
+                    customDays = cloudHabit.customDays,
+                    shouldOwnReminder = isAssignedToCurrentUser,
+                    logTag = "assigned household habit ${cloudHabit.title}",
+                )
             }
 
             // Reconciliation: delete local other-member habits no longer in cloud
@@ -826,6 +814,7 @@ class HabitRepository @Inject constructor(
                 .filter { it.remoteId !in cloudHouseholdRemoteIds }
                 .map { it.id }
             if (staleIds.isNotEmpty()) {
+                staleIds.forEach { reminderScheduler.cancel(context, it) }
                 staleIds.chunked(500).forEach { chunk -> habitDao.deleteByIds(chunk) }
                 Timber.d("Deleted ${staleIds.size} stale other-member household habits")
             }
@@ -975,6 +964,68 @@ class HabitRepository @Inject constructor(
             Timber.e(e, "Failed to sync habit logs from cloud")
             throw e
         }
+    }
+
+    internal fun syncReminderFromCloud(
+        localHabitId: Long,
+        title: String,
+        reminderEnabled: Boolean,
+        reminderTime: String?,
+        isArchived: Boolean,
+        customDays: String,
+        shouldOwnReminder: Boolean,
+        logTag: String,
+    ) {
+        if (!shouldOwnReminder || !reminderEnabled || reminderTime == null || isArchived) {
+            reminderScheduler.cancel(context, localHabitId)
+            return
+        }
+
+        try {
+            val parsedTime = try {
+                LocalTime.parse(reminderTime)
+            } catch (e: Exception) {
+                Timber.w(e, "Failed to parse reminder time for $logTag: $reminderTime")
+                LocalTime.of(9, 0)
+            }
+            reminderScheduler.schedule(
+                context,
+                localHabitId,
+                title,
+                parsedTime,
+                customDays.split(",").map { it.trim() }.filter { it.isNotEmpty() },
+            )
+        } catch (e: Exception) {
+            Timber.w(e, "Failed to sync reminder for $logTag")
+        }
+    }
+}
+
+internal interface HabitReminderHandler {
+    fun schedule(
+        context: android.content.Context,
+        habitId: Long,
+        habitTitle: String,
+        reminderTime: LocalTime,
+        scheduledDays: List<String>,
+    )
+
+    fun cancel(context: android.content.Context, habitId: Long)
+}
+
+private object AlarmManagerHabitReminderHandler : HabitReminderHandler {
+    override fun schedule(
+        context: android.content.Context,
+        habitId: Long,
+        habitTitle: String,
+        reminderTime: LocalTime,
+        scheduledDays: List<String>,
+    ) {
+        HabitReminderScheduler.scheduleReminder(context, habitId, habitTitle, reminderTime, scheduledDays)
+    }
+
+    override fun cancel(context: android.content.Context, habitId: Long) {
+        HabitReminderScheduler.cancelReminder(context, habitId)
     }
 }
 

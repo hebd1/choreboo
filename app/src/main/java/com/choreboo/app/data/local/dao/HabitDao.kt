@@ -17,7 +17,7 @@ interface HabitDao {
      * Get habits visible to a specific user:
      * - Personal habits they own (not household habits)
      * - Household habits explicitly assigned to them
-     * - Unassigned household habits (visible to all household members)
+     * - Household habits they own and left unassigned
      *
      * Note: household habits owned by this user but assigned to a *different* member are
      * intentionally excluded — the owner assigned the work away and should not see it in
@@ -32,7 +32,7 @@ interface HabitDao {
         AND (
             (isHouseholdHabit = 0 AND ownerUid = :uid)
             OR (isHouseholdHabit = 1 AND assignedToUid = :uid)
-            OR (isHouseholdHabit = 1 AND assignedToUid IS NULL)
+            OR (isHouseholdHabit = 1 AND ownerUid = :uid AND assignedToUid IS NULL)
         )
         ORDER BY createdAt DESC
         """,

@@ -59,6 +59,7 @@ import com.choreboo.app.ui.theme.HeatmapLow
 import com.choreboo.app.ui.theme.XpPurple
 import com.choreboo.app.ui.components.ChorebooTopAppBar
 import com.choreboo.app.ui.habits.components.getEmojiForIconName
+import com.choreboo.app.ui.theme.softGlassSurface
 import java.time.DayOfWeek
 import java.time.LocalDate
 import java.time.format.TextStyle
@@ -115,6 +116,7 @@ fun CalendarScreen(
                 )
             }
         },
+        containerColor = Color.Transparent,
     ) { padding ->
         PullToRefreshBox(
             isRefreshing = isRefreshing,
@@ -144,9 +146,17 @@ fun CalendarScreen(
                 Card(
                     modifier = Modifier.fillMaxWidth(),
                     shape = RoundedCornerShape(16.dp),
-                    colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceContainerLowest),
+                    colors = CardDefaults.cardColors(containerColor = Color.Transparent),
                 ) {
-                    Column(modifier = Modifier.padding(20.dp)) {
+                    Column(
+                        modifier = Modifier
+                            .softGlassSurface(
+                                shape = RoundedCornerShape(16.dp),
+                                containerColor = MaterialTheme.colorScheme.surfaceContainerLow.copy(alpha = 0.84f),
+                                borderColor = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.22f),
+                            )
+                            .padding(20.dp),
+                    ) {
                         // Month navigation
                         Row(
                             modifier = Modifier.fillMaxWidth(),
@@ -156,8 +166,11 @@ fun CalendarScreen(
                             IconButton(
                                 onClick = { viewModel.previousMonth() },
                                 modifier = Modifier
-                                    .clip(CircleShape)
-                                    .background(MaterialTheme.colorScheme.surfaceContainerHighest),
+                                    .softGlassSurface(
+                                        shape = CircleShape,
+                                        containerColor = MaterialTheme.colorScheme.surfaceContainerHighest.copy(alpha = 0.78f),
+                                        borderColor = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.18f),
+                                    ),
                             ) {
                                 Icon(Icons.AutoMirrored.Filled.KeyboardArrowLeft, contentDescription = stringResource(R.string.calendar_prev_month_cd))
                             }
@@ -166,6 +179,7 @@ fun CalendarScreen(
                                     text = "${selectedMonth.month.getDisplayName(TextStyle.FULL, Locale.getDefault())} ${selectedMonth.year}",
                                     style = MaterialTheme.typography.headlineSmall,
                                     fontWeight = FontWeight.ExtraBold,
+                                    color = MaterialTheme.colorScheme.onSurface,
                                 )
                                 Text(
                                     text = stringResource(R.string.calendar_days_complete, totalDaysWithAny, daysInMonth),
@@ -177,8 +191,11 @@ fun CalendarScreen(
                             IconButton(
                                 onClick = { viewModel.nextMonth() },
                                 modifier = Modifier
-                                    .clip(CircleShape)
-                                    .background(MaterialTheme.colorScheme.surfaceContainerHighest),
+                                    .softGlassSurface(
+                                        shape = CircleShape,
+                                        containerColor = MaterialTheme.colorScheme.surfaceContainerHighest.copy(alpha = 0.78f),
+                                        borderColor = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.18f),
+                                    ),
                             ) {
                                 Icon(Icons.AutoMirrored.Filled.KeyboardArrowRight, contentDescription = stringResource(R.string.calendar_next_month_cd))
                             }
@@ -327,6 +344,7 @@ fun CalendarScreen(
                             },
                             style = MaterialTheme.typography.titleMedium,
                             fontWeight = FontWeight.Bold,
+                            color = MaterialTheme.colorScheme.onSurface,
                         )
                         if (totalXp > 0) {
                             Text(
@@ -344,8 +362,11 @@ fun CalendarScreen(
                         Box(
                             modifier = Modifier
                                 .fillMaxWidth()
-                                .clip(RoundedCornerShape(16.dp))
-                                .background(MaterialTheme.colorScheme.surfaceContainerLowest)
+                                .softGlassSurface(
+                                    shape = RoundedCornerShape(16.dp),
+                                    containerColor = MaterialTheme.colorScheme.surfaceContainerLow.copy(alpha = 0.82f),
+                                    borderColor = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.22f),
+                                )
                                 .padding(32.dp),
                             contentAlignment = Alignment.Center,
                         ) {
@@ -360,30 +381,47 @@ fun CalendarScreen(
                     items(selectedDateLogs, key = { it.id }) { log ->
                         Card(
                             modifier = Modifier.fillMaxWidth(),
-                            shape = RoundedCornerShape(12.dp),
+                            shape = RoundedCornerShape(16.dp),
                             colors = CardDefaults.cardColors(
-                                containerColor = MaterialTheme.colorScheme.surfaceContainerLowest,
+                                containerColor = Color.Transparent,
                             ),
-                            elevation = CardDefaults.cardElevation(defaultElevation = 1.dp),
+                            elevation = CardDefaults.cardElevation(defaultElevation = 0.dp),
                         ) {
                             Row(
                                 modifier = Modifier
                                     .fillMaxWidth()
+                                    .softGlassSurface(
+                                        shape = RoundedCornerShape(16.dp),
+                                        containerColor = MaterialTheme.colorScheme.surfaceContainerLow.copy(alpha = 0.82f),
+                                        borderColor = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.22f),
+                                    )
                                     .padding(16.dp),
                                 horizontalArrangement = Arrangement.SpaceBetween,
                                 verticalAlignment = Alignment.CenterVertically,
                             ) {
                                 Row(
                                     verticalAlignment = Alignment.CenterVertically,
-                                    horizontalArrangement = Arrangement.spacedBy(12.dp),
+                                    horizontalArrangement = Arrangement.spacedBy(14.dp),
                                     modifier = Modifier.weight(1f),
                                 ) {
-                                    Text(getEmojiForIconName(log.habitIcon), fontSize = 28.sp)
+                                    Box(
+                                        modifier = Modifier
+                                            .size(48.dp)
+                                            .clip(CircleShape)
+                                            .background(MaterialTheme.colorScheme.surfaceContainerHighest),
+                                        contentAlignment = Alignment.Center,
+                                    ) {
+                                        Text(
+                                            text = getEmojiForIconName(log.habitIcon),
+                                            fontSize = 24.sp,
+                                        )
+                                    }
                                     Column {
                                         Text(
                                             text = log.habitTitle,
-                                            style = MaterialTheme.typography.titleSmall,
-                                            fontWeight = FontWeight.Bold,
+                                            style = MaterialTheme.typography.titleMedium,
+                                            fontWeight = FontWeight.SemiBold,
+                                            color = MaterialTheme.colorScheme.onSurface,
                                         )
                                         if (log.streakAtCompletion > 1) {
                                             Text(
@@ -395,19 +433,18 @@ fun CalendarScreen(
                                         }
                                     }
                                 }
-                                // XP badge in tertiaryContainer/20
                                 Box(
                                     modifier = Modifier
-                                         .clip(CircleShape)
-                                         .background(XpPurple.copy(alpha = 0.15f))
-                                         .padding(horizontal = 10.dp, vertical = 4.dp),
-                                 ) {
-                                     Text(
-                                         text = stringResource(R.string.calendar_xp_earned, log.xpEarned),
-                                         style = MaterialTheme.typography.labelMedium,
-                                         fontWeight = FontWeight.Bold,
-                                         color = XpPurple,
-                                     )
+                                        .clip(RoundedCornerShape(50.dp))
+                                        .background(MaterialTheme.colorScheme.tertiaryContainer.copy(alpha = 0.5f))
+                                        .padding(horizontal = 10.dp, vertical = 5.dp),
+                                ) {
+                                    Text(
+                                        text = stringResource(R.string.calendar_xp_earned, log.xpEarned),
+                                        style = MaterialTheme.typography.labelMedium,
+                                        fontWeight = FontWeight.Bold,
+                                        color = MaterialTheme.colorScheme.onTertiaryContainer,
+                                    )
                                 }
                             }
                         }

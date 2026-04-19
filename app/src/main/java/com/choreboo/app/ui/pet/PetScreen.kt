@@ -9,6 +9,9 @@ import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
 import androidx.compose.animation.scaleIn
 import androidx.compose.animation.scaleOut
+import androidx.compose.animation.shrinkVertically
+import androidx.compose.animation.expandVertically
+import androidx.compose.animation.slideInVertically
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.interaction.MutableInteractionSource
@@ -59,6 +62,7 @@ import androidx.compose.runtime.getValue
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
@@ -123,10 +127,12 @@ import com.choreboo.app.ui.theme.PetMoodHungryStart
 import com.choreboo.app.ui.theme.PetMoodSadStart
 import com.choreboo.app.ui.theme.PetMoodTiredStart
 import com.choreboo.app.ui.theme.XpPurple
+import com.choreboo.app.ui.theme.softGlassSurface
 import com.choreboo.app.ui.util.displayName
 import com.choreboo.app.ui.util.labelRes
 import com.choreboo.app.ui.util.hasLocalizedLabel
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.delay
 import java.time.LocalDate
 import java.time.format.DateTimeFormatter
 import java.time.format.TextStyle
@@ -134,8 +140,9 @@ import java.util.Locale
 
 private enum class AnimationPhase { MOOD, IDLE, EATING, INTERACTING, THUMBS_UP, START_SLEEPING, SLEEPING }
 
-private val PET_SCENE_OFFSET_X = 12.dp
-private val PET_SCENE_OFFSET_Y = 34.dp
+private val PET_SCENE_OFFSET_X = 0.dp
+private val PET_SCENE_OFFSET_Y = 24.dp
+private const val HABIT_COMPLETE_HOLD_MS = 240L
 
 private fun formatNextScheduledDay(nextDate: LocalDate, today: LocalDate): String {
     val locale = Locale.getDefault()
@@ -182,6 +189,7 @@ fun PetScreen(
     val isPremium by viewModel.isPremium.collectAsStateWithLifecycle()
 
     val context = LocalContext.current
+    val scope = rememberCoroutineScope()
 
     // Local UI state
     val snackbarHostState = remember { SnackbarHostState() }
@@ -193,6 +201,8 @@ fun PetScreen(
     var showThumbsUp by remember { mutableStateOf(false) }
     var showBackgroundPicker by rememberSaveable { mutableStateOf(false) }
     var resubscribeNudgeDismissed by rememberSaveable { mutableStateOf(false) }
+    var pendingCompletionIds by remember { mutableStateOf(setOf<Long>()) }
+    var exitingCompletionIds by remember { mutableStateOf(setOf<Long>()) }
 
     // True when user has a premium pet but no active subscription
     val showResubscribeNudge = !isPremium && petType.isPremium && !resubscribeNudgeDismissed
@@ -240,18 +250,24 @@ fun PetScreen(
                     )
                 }
                 is PetEvent.HabitCompleted -> {
+                    pendingCompletionIds = pendingCompletionIds - event.habitId
+                    exitingCompletionIds = exitingCompletionIds - event.habitId
                     showThumbsUp = true
                     if (event.leveledUp || event.evolved) {
                         showLevelUpDialog = event
                     }
                 }
                 is PetEvent.AlreadyComplete -> {
+                    pendingCompletionIds = pendingCompletionIds - event.habitId
+                    exitingCompletionIds = exitingCompletionIds - event.habitId
                     snackbarHostState.showStitchSnackbar(
                         message = alreadyCompletedMsg,
                         type = SnackbarType.Info,
                     )
                 }
                 is PetEvent.CompletionError -> {
+                    pendingCompletionIds = pendingCompletionIds - event.habitId
+                    exitingCompletionIds = exitingCompletionIds - event.habitId
                     snackbarHostState.showStitchSnackbar(
                         message = completionErrorMsg,
                         type = SnackbarType.Error,
@@ -369,6 +385,7 @@ fun PetScreen(
                 Icon(Icons.Default.Add, contentDescription = stringResource(R.string.pet_add_habit_cd))
             }
         },
+        containerColor = Color.Transparent,
         snackbarHost = { SnackbarHost(snackbarHostState) { data -> StitchSnackbar(data) } },
     ) { padding ->
         if (choreboo == null) {
@@ -419,7 +436,11 @@ fun PetScreen(
                             modifier = Modifier
                                 .fillMaxWidth()
                                 .height(220.dp)
-                                .clip(RoundedCornerShape(16.dp)),
+                                .softGlassSurface(
+                                    shape = RoundedCornerShape(20.dp),
+                                    containerColor = MaterialTheme.colorScheme.surfaceContainerLow.copy(alpha = 0.58f),
+                                    borderColor = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.24f),
+                                ),
                         ) {
                             // Background layer — fills entire clipped box
                             PetBackgroundImage(
@@ -449,12 +470,15 @@ fun PetScreen(
                              // Mood pill at bottom — tappable to show stat overlay
                              Box(
                                  modifier = Modifier
-                                    .align(Alignment.BottomStart)
-                                    .padding(start = 12.dp, bottom = 10.dp)
-                                    .clip(RoundedCornerShape(50.dp))
-                                    .background(MaterialTheme.colorScheme.surfaceContainerHighest.copy(alpha = 0.8f))
-                                    .clickable { showDetailedStats = !showDetailedStats }
-                                    .padding(horizontal = 14.dp, vertical = 6.dp),
+                                     .align(Alignment.TopStart)
+                                     .padding(start = 12.dp, top = 10.dp)
+                                     .softGlassSurface(
+                                         shape = RoundedCornerShape(50.dp),
+                                         containerColor = MaterialTheme.colorScheme.surfaceContainerHighest.copy(alpha = 0.76f),
+                                         borderColor = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.22f),
+                                     )
+                                     .clickable { showDetailedStats = !showDetailedStats }
+                                     .padding(horizontal = 14.dp, vertical = 6.dp),
                             ) {
                                 Row(
                                     verticalAlignment = Alignment.CenterVertically,
@@ -482,8 +506,11 @@ fun PetScreen(
                                 .align(Alignment.TopEnd)
                                 .offset(x = 6.dp, y = (-12).dp)
                                 .rotate(3f)
-                                .clip(RoundedCornerShape(10.dp))
-                                .background(MaterialTheme.colorScheme.secondaryContainer)
+                                .softGlassSurface(
+                                    shape = RoundedCornerShape(10.dp),
+                                    containerColor = MaterialTheme.colorScheme.secondaryContainer.copy(alpha = 0.92f),
+                                    borderColor = MaterialTheme.colorScheme.onSecondaryContainer.copy(alpha = 0.12f),
+                                )
                                 .padding(horizontal = 12.dp, vertical = 8.dp),
                         ) {
                             Row(
@@ -506,8 +533,11 @@ fun PetScreen(
                                 .align(Alignment.BottomEnd)
                                 .offset(x = 4.dp, y = 4.dp)
                                 .size(48.dp)
-                                .clip(CircleShape)
-                                .background(MaterialTheme.colorScheme.surfaceContainerHigh.copy(alpha = 0.92f))
+                                .softGlassSurface(
+                                    shape = CircleShape,
+                                    containerColor = MaterialTheme.colorScheme.surfaceContainerHigh.copy(alpha = 0.8f),
+                                    borderColor = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.22f),
+                                )
                                 .clickable { showBackgroundPicker = true },
                             contentAlignment = Alignment.Center,
                         ) {
@@ -637,12 +667,17 @@ fun PetScreen(
                     }
                                 } else if (habits.isEmpty()) {
                     item {
-                        Box(
-                            modifier = Modifier
-                                .fillMaxWidth()
-                                .padding(vertical = 48.dp),
-                            contentAlignment = Alignment.Center,
-                        ) {
+                    Box(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .softGlassSurface(
+                                shape = RoundedCornerShape(20.dp),
+                                containerColor = MaterialTheme.colorScheme.surfaceContainerLow.copy(alpha = 0.7f),
+                                borderColor = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.22f),
+                            )
+                            .padding(vertical = 48.dp),
+                        contentAlignment = Alignment.Center,
+                    ) {
                             Column(horizontalAlignment = Alignment.CenterHorizontally) {
                                 Text(text = "\uD83D\uDCCB", style = MaterialTheme.typography.displayLarge)
                                 Spacer(modifier = Modifier.height(16.dp))
@@ -685,26 +720,46 @@ fun PetScreen(
 
                     items(habits, key = { it.id }) { habit ->
                         val isScheduledToday = habit.isScheduledForToday(todayLocalDate)
-                        HabitCard(
-                            habit = habit,
-                            completedToday = todayCompletions[habit.id] ?: 0,
-                            currentStreak = streaks[habit.id] ?: 0,
-                            isScheduledToday = isScheduledToday,
-                            nextScheduledLabel = remember(habit.customDays, todayLocalDate, isScheduledToday) {
-                                if (isScheduledToday) {
-                                    null
-                                } else {
-                                    habit.nextScheduledDate(todayLocalDate)?.let { nextDate ->
-                                        nextScheduledFmt.format(
-                                            formatNextScheduledDay(nextDate, todayLocalDate),
-                                        )
+                        val isAnimatingComplete = habit.id in pendingCompletionIds
+                        AnimatedVisibility(
+                            visible = habit.id !in exitingCompletionIds,
+                            enter = expandVertically(animationSpec = tween(220, easing = FastOutSlowInEasing)) +
+                                fadeIn(animationSpec = tween(220)) +
+                                slideInVertically(initialOffsetY = { it / 2 }, animationSpec = tween(220, easing = FastOutSlowInEasing)),
+                            exit = shrinkVertically(animationSpec = tween(180, easing = FastOutSlowInEasing)) +
+                                fadeOut(animationSpec = tween(160)),
+                        ) {
+                            HabitCard(
+                                habit = habit,
+                                completedToday = todayCompletions[habit.id] ?: 0,
+                                currentStreak = streaks[habit.id] ?: 0,
+                                isScheduledToday = isScheduledToday,
+                                isAnimatingComplete = isAnimatingComplete,
+                                nextScheduledLabel = remember(habit.customDays, todayLocalDate, isScheduledToday) {
+                                    if (isScheduledToday) {
+                                        null
+                                    } else {
+                                        habit.nextScheduledDate(todayLocalDate)?.let { nextDate ->
+                                            nextScheduledFmt.format(
+                                                formatNextScheduledDay(nextDate, todayLocalDate),
+                                            )
+                                        }
                                     }
-                                }
-                            },
-                            onComplete = { viewModel.completeHabit(habit.id) },
-                            onClick = { onEditHabit(habit.id) },
-                            householdCompleterName = householdCompleterNames[habit.id],
-                        )
+                                },
+                                onComplete = {
+                                    if (habit.id !in pendingCompletionIds && habit.id !in exitingCompletionIds) {
+                                        pendingCompletionIds = pendingCompletionIds + habit.id
+                                        scope.launch {
+                                            delay(HABIT_COMPLETE_HOLD_MS)
+                                            exitingCompletionIds = exitingCompletionIds + habit.id
+                                            viewModel.completeHabit(habit.id)
+                                        }
+                                    }
+                                },
+                                onClick = { onEditHabit(habit.id) },
+                                householdCompleterName = householdCompleterNames[habit.id],
+                            )
+                        }
                     }
                 }
 
@@ -750,7 +805,7 @@ fun PetScreen(
                                 ) { /* consume tap — prevent scrim dismissal */ },
                             shape = RoundedCornerShape(24.dp),
                             colors = CardDefaults.cardColors(
-                                containerColor = MaterialTheme.colorScheme.surface,
+                                containerColor = MaterialTheme.colorScheme.surface.copy(alpha = 0.96f),
                             ),
                             elevation = CardDefaults.cardElevation(defaultElevation = 8.dp),
                         ) {
@@ -988,12 +1043,16 @@ private fun ActionButton(
     Box(
         modifier = modifier
             .height(64.dp)
-            .clip(RoundedCornerShape(50.dp))
-            .background(
-                when {
-                    !enabled -> MaterialTheme.colorScheme.surfaceContainerHighest
-                    isPrimary -> MaterialTheme.colorScheme.primary
-                    else -> MaterialTheme.colorScheme.surfaceContainerHigh
+            .softGlassSurface(
+                shape = RoundedCornerShape(50.dp),
+                containerColor = when {
+                    !enabled -> MaterialTheme.colorScheme.surfaceContainerHighest.copy(alpha = 0.82f)
+                    isPrimary -> MaterialTheme.colorScheme.primary.copy(alpha = 0.94f)
+                    else -> MaterialTheme.colorScheme.surfaceContainerHigh.copy(alpha = 0.82f)
+                },
+                borderColor = when {
+                    isPrimary -> MaterialTheme.colorScheme.onPrimary.copy(alpha = 0.08f)
+                    else -> MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.22f)
                 },
             )
             .clickable(enabled = enabled) {
@@ -1042,8 +1101,11 @@ private fun StatBentoCard(
     Box(
         modifier = modifier
             .height(110.dp)
-            .clip(RoundedCornerShape(16.dp))
-            .background(MaterialTheme.colorScheme.surfaceContainerLowest)
+            .softGlassSurface(
+                shape = RoundedCornerShape(16.dp),
+                containerColor = MaterialTheme.colorScheme.surfaceContainerLow.copy(alpha = 0.82f),
+                borderColor = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.22f),
+            )
             .semantics(mergeDescendants = true) { contentDescription = contentDescriptionText },
     ) {
         Column(
@@ -1118,8 +1180,11 @@ private fun EnergyBentoCard(
          modifier = modifier
              .fillMaxWidth()
              .height(100.dp)
-             .clip(RoundedCornerShape(16.dp))
-             .background(MaterialTheme.colorScheme.surfaceContainerLowest)
+             .softGlassSurface(
+                 shape = RoundedCornerShape(16.dp),
+                 containerColor = MaterialTheme.colorScheme.surfaceContainerLow.copy(alpha = 0.82f),
+                 borderColor = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.22f),
+             )
              .semantics(mergeDescendants = true) { contentDescription = contentDescriptionText },
      ) {
         Column(
@@ -1321,65 +1386,69 @@ private fun PetAnimation(
             AnimationPhase.SLEEPING -> FOX_ANIM_LOOP_SLEEPING to Int.MAX_VALUE
         }
 
-        Crossfade(
-            targetState = phase,
-            animationSpec = tween(durationMillis = 100),
-            label = "petAnimationCrossfade",
-        ) { animPhase ->
-            val (currentAsset, currentIterations) = when (animPhase) {
-                AnimationPhase.MOOD -> foxMoodAssetPath(mood) to 1
-                AnimationPhase.IDLE -> FOX_ANIM_IDLE to FOX_IDLE_ITERATIONS
-                AnimationPhase.EATING -> FOX_ANIM_EATING to 1
-                AnimationPhase.INTERACTING -> FOX_ANIM_INTERACT to 1
-                AnimationPhase.THUMBS_UP -> FOX_ANIM_THUMBS_UP to 1
-                AnimationPhase.START_SLEEPING -> FOX_ANIM_START_SLEEP to 1
-                AnimationPhase.SLEEPING -> FOX_ANIM_LOOP_SLEEPING to Int.MAX_VALUE
-            }
+        Box(modifier = modifier, contentAlignment = Alignment.Center) {
+            Crossfade(
+                targetState = phase,
+                animationSpec = tween(durationMillis = 100),
+                label = "petAnimationCrossfade",
+            ) { animPhase ->
+                val (currentAsset, currentIterations) = when (animPhase) {
+                    AnimationPhase.MOOD -> foxMoodAssetPath(mood) to 1
+                    AnimationPhase.IDLE -> FOX_ANIM_IDLE to FOX_IDLE_ITERATIONS
+                    AnimationPhase.EATING -> FOX_ANIM_EATING to 1
+                    AnimationPhase.INTERACTING -> FOX_ANIM_INTERACT to 1
+                    AnimationPhase.THUMBS_UP -> FOX_ANIM_THUMBS_UP to 1
+                    AnimationPhase.START_SLEEPING -> FOX_ANIM_START_SLEEP to 1
+                    AnimationPhase.SLEEPING -> FOX_ANIM_LOOP_SLEEPING to Int.MAX_VALUE
+                }
 
-            WebmAnimationView(
-                assetPath = currentAsset,
-                iterations = currentIterations,
-                onComplete = {
-                    when (animPhase) {
-                        AnimationPhase.MOOD -> {
-                            if (phase == AnimationPhase.MOOD) phase = AnimationPhase.IDLE
-                        }
-                        AnimationPhase.IDLE -> {
-                            if (phase == AnimationPhase.IDLE) phase = AnimationPhase.MOOD
-                        }
-                        AnimationPhase.EATING -> {
-                            if (phase == AnimationPhase.EATING) {
-                                onEatingComplete()
-                                phase = AnimationPhase.MOOD
+                WebmAnimationView(
+                    assetPath = currentAsset,
+                    iterations = currentIterations,
+                    onComplete = {
+                        when (animPhase) {
+                            AnimationPhase.MOOD -> {
+                                if (phase == AnimationPhase.MOOD) phase = AnimationPhase.IDLE
+                            }
+                            AnimationPhase.IDLE -> {
+                                if (phase == AnimationPhase.IDLE) phase = AnimationPhase.MOOD
+                            }
+                            AnimationPhase.EATING -> {
+                                if (phase == AnimationPhase.EATING) {
+                                    onEatingComplete()
+                                    phase = AnimationPhase.MOOD
+                                }
+                            }
+                            AnimationPhase.INTERACTING -> {
+                                if (phase == AnimationPhase.INTERACTING) {
+                                    onInteractComplete()
+                                    phase = AnimationPhase.MOOD
+                                }
+                            }
+                            AnimationPhase.THUMBS_UP -> {
+                                if (phase == AnimationPhase.THUMBS_UP) {
+                                    onThumbsUpComplete()
+                                    phase = AnimationPhase.MOOD
+                                }
+                            }
+                            AnimationPhase.START_SLEEPING -> {
+                                if (phase == AnimationPhase.START_SLEEPING) {
+                                    onStartSleepComplete()
+                                    phase = AnimationPhase.SLEEPING
+                                }
+                            }
+                            AnimationPhase.SLEEPING -> {
+                                if (phase == AnimationPhase.SLEEPING) {
+                                    phase = if (isSleeping) AnimationPhase.SLEEPING else AnimationPhase.MOOD
+                                }
                             }
                         }
-                        AnimationPhase.INTERACTING -> {
-                            if (phase == AnimationPhase.INTERACTING) {
-                                onInteractComplete()
-                                phase = AnimationPhase.MOOD
-                            }
-                        }
-                        AnimationPhase.THUMBS_UP -> {
-                            if (phase == AnimationPhase.THUMBS_UP) {
-                                onThumbsUpComplete()
-                                phase = AnimationPhase.MOOD
-                            }
-                        }
-                        AnimationPhase.START_SLEEPING -> {
-                            if (phase == AnimationPhase.START_SLEEPING) {
-                                onStartSleepComplete()
-                                phase = AnimationPhase.SLEEPING
-                            }
-                        }
-                        AnimationPhase.SLEEPING -> {
-                            if (phase == AnimationPhase.SLEEPING) {
-                                phase = if (isSleeping) AnimationPhase.SLEEPING else AnimationPhase.MOOD
-                            }
-                        }
-                    }
-                },
-                modifier = modifier.clickable { onTap() },
-            )
+                    },
+                    modifier = Modifier
+                        .fillMaxSize()
+                        .clickable { onTap() },
+                )
+            }
         }
     } else if (petType == PetType.PANDA) {
         var phase by remember { mutableStateOf(AnimationPhase.MOOD) }
@@ -1410,65 +1479,69 @@ private fun PetAnimation(
             }
         }
 
-        Crossfade(
-            targetState = phase,
-            animationSpec = tween(durationMillis = 100),
-            label = "pandaAnimationCrossfade",
-        ) { animPhase ->
-            val (currentAsset, currentIterations) = when (animPhase) {
-                AnimationPhase.MOOD -> pandaMoodAssetPath(mood) to 1
-                AnimationPhase.IDLE -> PANDA_ANIM_IDLE to PANDA_IDLE_ITERATIONS
-                AnimationPhase.EATING -> PANDA_ANIM_EATING to 1
-                AnimationPhase.INTERACTING -> PANDA_ANIM_INTERACT to 1
-                AnimationPhase.THUMBS_UP -> PANDA_ANIM_THUMBS_UP to 1
-                AnimationPhase.START_SLEEPING -> PANDA_ANIM_START_SLEEP to 1
-                AnimationPhase.SLEEPING -> PANDA_ANIM_LOOP_SLEEPING to Int.MAX_VALUE
-            }
+        Box(modifier = modifier, contentAlignment = Alignment.Center) {
+            Crossfade(
+                targetState = phase,
+                animationSpec = tween(durationMillis = 100),
+                label = "pandaAnimationCrossfade",
+            ) { animPhase ->
+                val (currentAsset, currentIterations) = when (animPhase) {
+                    AnimationPhase.MOOD -> pandaMoodAssetPath(mood) to 1
+                    AnimationPhase.IDLE -> PANDA_ANIM_IDLE to PANDA_IDLE_ITERATIONS
+                    AnimationPhase.EATING -> PANDA_ANIM_EATING to 1
+                    AnimationPhase.INTERACTING -> PANDA_ANIM_INTERACT to 1
+                    AnimationPhase.THUMBS_UP -> PANDA_ANIM_THUMBS_UP to 1
+                    AnimationPhase.START_SLEEPING -> PANDA_ANIM_START_SLEEP to 1
+                    AnimationPhase.SLEEPING -> PANDA_ANIM_LOOP_SLEEPING to Int.MAX_VALUE
+                }
 
-            WebmAnimationView(
-                assetPath = currentAsset,
-                iterations = currentIterations,
-                onComplete = {
-                    when (animPhase) {
-                        AnimationPhase.MOOD -> {
-                            if (phase == AnimationPhase.MOOD) phase = AnimationPhase.IDLE
-                        }
-                        AnimationPhase.IDLE -> {
-                            if (phase == AnimationPhase.IDLE) phase = AnimationPhase.MOOD
-                        }
-                        AnimationPhase.EATING -> {
-                            if (phase == AnimationPhase.EATING) {
-                                onEatingComplete()
-                                phase = AnimationPhase.MOOD
+                WebmAnimationView(
+                    assetPath = currentAsset,
+                    iterations = currentIterations,
+                    onComplete = {
+                        when (animPhase) {
+                            AnimationPhase.MOOD -> {
+                                if (phase == AnimationPhase.MOOD) phase = AnimationPhase.IDLE
+                            }
+                            AnimationPhase.IDLE -> {
+                                if (phase == AnimationPhase.IDLE) phase = AnimationPhase.MOOD
+                            }
+                            AnimationPhase.EATING -> {
+                                if (phase == AnimationPhase.EATING) {
+                                    onEatingComplete()
+                                    phase = AnimationPhase.MOOD
+                                }
+                            }
+                            AnimationPhase.INTERACTING -> {
+                                if (phase == AnimationPhase.INTERACTING) {
+                                    onInteractComplete()
+                                    phase = AnimationPhase.MOOD
+                                }
+                            }
+                            AnimationPhase.THUMBS_UP -> {
+                                if (phase == AnimationPhase.THUMBS_UP) {
+                                    onThumbsUpComplete()
+                                    phase = AnimationPhase.MOOD
+                                }
+                            }
+                            AnimationPhase.START_SLEEPING -> {
+                                if (phase == AnimationPhase.START_SLEEPING) {
+                                    onStartSleepComplete()
+                                    phase = AnimationPhase.SLEEPING
+                                }
+                            }
+                            AnimationPhase.SLEEPING -> {
+                                if (phase == AnimationPhase.SLEEPING) {
+                                    phase = if (isSleeping) AnimationPhase.SLEEPING else AnimationPhase.MOOD
+                                }
                             }
                         }
-                        AnimationPhase.INTERACTING -> {
-                            if (phase == AnimationPhase.INTERACTING) {
-                                onInteractComplete()
-                                phase = AnimationPhase.MOOD
-                            }
-                        }
-                        AnimationPhase.THUMBS_UP -> {
-                            if (phase == AnimationPhase.THUMBS_UP) {
-                                onThumbsUpComplete()
-                                phase = AnimationPhase.MOOD
-                            }
-                        }
-                        AnimationPhase.START_SLEEPING -> {
-                            if (phase == AnimationPhase.START_SLEEPING) {
-                                onStartSleepComplete()
-                                phase = AnimationPhase.SLEEPING
-                            }
-                        }
-                        AnimationPhase.SLEEPING -> {
-                            if (phase == AnimationPhase.SLEEPING) {
-                                phase = if (isSleeping) AnimationPhase.SLEEPING else AnimationPhase.MOOD
-                            }
-                        }
-                    }
-                },
-                modifier = modifier.clickable { onTap() },
-            )
+                    },
+                    modifier = Modifier
+                        .fillMaxSize()
+                        .clickable { onTap() },
+                )
+            }
         }
     } else {
         val sizeMultiplier = 64.sp

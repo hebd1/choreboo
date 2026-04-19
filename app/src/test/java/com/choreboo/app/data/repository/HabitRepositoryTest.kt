@@ -37,6 +37,7 @@ class HabitRepositoryTest {
     private lateinit var userPreferences: UserPreferences
     private lateinit var userRepository: UserRepository
     private lateinit var firebaseAuth: FirebaseAuth
+    private lateinit var reminderScheduler: HabitReminderHandler
     private lateinit var repo: HabitRepository
 
     private val testUid = "test-uid-123"
@@ -65,6 +66,7 @@ class HabitRepositoryTest {
         userPreferences = mockk(relaxed = true)
         userRepository = mockk(relaxed = true)
         firebaseAuth = mockk()
+        reminderScheduler = mockk(relaxed = true)
 
         val user = mockk<FirebaseUser>()
         every { firebaseAuth.currentUser } returns user
@@ -75,7 +77,15 @@ class HabitRepositoryTest {
         every { userPreferences.totalLifetimeXp } returns flowOf(0)
 
         val context = mockk<Context>(relaxed = true)
-        repo = HabitRepository(habitDao, habitLogDao, userPreferences, userRepository, firebaseAuth, context)
+        repo = HabitRepository(
+            habitDao,
+            habitLogDao,
+            userPreferences,
+            userRepository,
+            firebaseAuth,
+            context,
+            reminderScheduler,
+        )
     }
 
     // ── upsertHabit validation ──────────────────────────────────────────

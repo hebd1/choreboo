@@ -14,10 +14,8 @@ import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.foundation.layout.consumeWindowInsets
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.height
-import androidx.compose.foundation.layout.navigationBars
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.statusBars
-import androidx.compose.foundation.layout.union
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Scaffold
@@ -38,6 +36,7 @@ import com.choreboo.app.domain.model.ChorebooMood
 import com.choreboo.app.navigation.Screen
 import com.choreboo.app.navigation.ChorebooNavGraph
 import com.choreboo.app.ui.components.BottomNavBar
+import com.choreboo.app.ui.theme.ChorebooGlassBackground
 import com.choreboo.app.ui.theme.ChorebooHabitTrackerFriendTheme
 import dagger.hilt.android.AndroidEntryPoint
 
@@ -86,37 +85,37 @@ class MainActivity : ComponentActivity() {
  */
 @Composable
 private fun BrandedSplashScreen() {
-    Box(
-        modifier = Modifier
-            .fillMaxSize()
-            .background(MaterialTheme.colorScheme.surface),
-        contentAlignment = Alignment.Center,
-    ) {
-        Column(
-            horizontalAlignment = Alignment.CenterHorizontally,
-            verticalArrangement = Arrangement.Center,
+    ChorebooGlassBackground {
+        Box(
+            modifier = Modifier.fillMaxSize(),
+            contentAlignment = Alignment.Center,
         ) {
-            Text(
-                text = "\uD83E\uDD5A",
-                fontSize = 64.sp,
-            )
-            Spacer(modifier = Modifier.height(16.dp))
-            Text(
-                text = stringResource(R.string.splash_brand_name),
-                style = MaterialTheme.typography.headlineLarge,
-                fontWeight = FontWeight.Bold,
-                color = MaterialTheme.colorScheme.primary,
-            )
-            Spacer(modifier = Modifier.height(24.dp))
-            CircularProgressIndicator(
-                color = MaterialTheme.colorScheme.primary,
-            )
-            Spacer(modifier = Modifier.height(12.dp))
-            Text(
-                text = stringResource(R.string.splash_loading),
-                style = MaterialTheme.typography.bodyMedium,
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
-            )
+            Column(
+                horizontalAlignment = Alignment.CenterHorizontally,
+                verticalArrangement = Arrangement.Center,
+            ) {
+                Text(
+                    text = "\uD83E\uDD5A",
+                    fontSize = 64.sp,
+                )
+                Spacer(modifier = Modifier.height(16.dp))
+                Text(
+                    text = stringResource(R.string.splash_brand_name),
+                    style = MaterialTheme.typography.headlineLarge,
+                    fontWeight = FontWeight.Bold,
+                    color = MaterialTheme.colorScheme.primary,
+                )
+                Spacer(modifier = Modifier.height(24.dp))
+                CircularProgressIndicator(
+                    color = MaterialTheme.colorScheme.primary,
+                )
+                Spacer(modifier = Modifier.height(12.dp))
+                Text(
+                    text = stringResource(R.string.splash_loading),
+                    style = MaterialTheme.typography.bodyMedium,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                )
+            }
         }
     }
 }
@@ -140,24 +139,27 @@ fun ChorebooApp(
     )
     val showBottomBar = currentRoute in bottomNavRoutes
 
-    Scaffold(
-        modifier = Modifier.fillMaxSize(),
-        contentWindowInsets = WindowInsets.statusBars.union(WindowInsets.navigationBars),
-        bottomBar = {
-            if (showBottomBar) {
-                BottomNavBar(
-                    navController = navController,
-                    petMood = petMood,
-                )
-            }
-        },
-    ) { innerPadding ->
-        ChorebooNavGraph(
-            navController = navController,
-            startDestination = startDestination,
-            modifier = Modifier
-                .padding(innerPadding)
-                .consumeWindowInsets(innerPadding),
-        )
+    ChorebooGlassBackground {
+        Scaffold(
+            modifier = Modifier.fillMaxSize(),
+            containerColor = androidx.compose.ui.graphics.Color.Transparent,
+            contentWindowInsets = WindowInsets.statusBars,
+            bottomBar = {
+                if (showBottomBar) {
+                    BottomNavBar(
+                        navController = navController,
+                        petMood = petMood,
+                    )
+                }
+            },
+        ) { innerPadding ->
+            ChorebooNavGraph(
+                navController = navController,
+                startDestination = startDestination,
+                modifier = Modifier
+                    .padding(innerPadding)
+                    .consumeWindowInsets(innerPadding),
+            )
+        }
     }
 }

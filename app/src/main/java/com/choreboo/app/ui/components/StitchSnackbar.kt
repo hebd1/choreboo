@@ -2,6 +2,7 @@ package com.choreboo.app.ui.components
 
 import androidx.annotation.StringRes
 import androidx.compose.foundation.background
+import androidx.compose.foundation.border
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
@@ -25,6 +26,7 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.choreboo.app.R
+import com.choreboo.app.ui.theme.softGlassSurface
 
 private data class SnackbarStyle(
     val header: String,
@@ -73,16 +75,20 @@ fun StitchSnackbar(data: SnackbarData) {
         modifier = Modifier
             .padding(start = 16.dp, end = 16.dp, bottom = 8.dp)
             .fillMaxWidth()
-            .clip(RoundedCornerShape(50.dp))
-            .background(style.background)
-            .padding(horizontal = 8.dp, vertical = 8.dp),
+            .softGlassSurface(
+                shape = RoundedCornerShape(28.dp),
+                containerColor = style.background.copy(alpha = 0.92f),
+                borderColor = style.contentColor.copy(alpha = 0.12f),
+            )
+            .padding(horizontal = 10.dp, vertical = 10.dp),
         verticalAlignment = Alignment.CenterVertically,
     ) {
         Box(
             modifier = Modifier
                 .size(40.dp)
                 .clip(CircleShape)
-                .background(style.contentColor.copy(alpha = 0.15f)),
+                .background(style.contentColor.copy(alpha = 0.15f))
+                .border(1.dp, style.contentColor.copy(alpha = 0.08f), CircleShape),
             contentAlignment = Alignment.Center,
         ) {
             Text(style.emoji, fontSize = 18.sp)

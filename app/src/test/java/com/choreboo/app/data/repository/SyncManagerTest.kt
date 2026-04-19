@@ -3,7 +3,6 @@ package com.choreboo.app.data.repository
 import com.google.firebase.auth.FirebaseAuth
 import com.google.firebase.auth.FirebaseUser
 import com.google.firebase.auth.GetTokenResult
-import com.google.android.gms.tasks.Task
 import com.google.android.gms.tasks.Tasks
 import io.mockk.coEvery
 import io.mockk.coVerify
@@ -29,6 +28,7 @@ class SyncManagerTest {
     private lateinit var backgroundRepository: BackgroundRepository
     private lateinit var householdRepository: HouseholdRepository
     private lateinit var firebaseAuth: FirebaseAuth
+    private lateinit var firebaseUser: FirebaseUser
     private lateinit var syncManager: SyncManager
 
     @Before
@@ -42,10 +42,10 @@ class SyncManagerTest {
 
         // Default: authenticated user with a valid token.
         // getIdToken(any()) covers both force=true (D10 post-sign-in path) and force=false.
-        val user = mockk<FirebaseUser>()
-        every { firebaseAuth.currentUser } returns user
+        firebaseUser = mockk()
+        every { firebaseAuth.currentUser } returns firebaseUser
         val tokenTask = Tasks.forResult(mockk<GetTokenResult>())
-        every { user.getIdToken(any()) } returns tokenTask
+        every { firebaseUser.getIdToken(any()) } returns tokenTask
 
         syncManager = SyncManager(habitRepository, chorebooRepository, userRepository, backgroundRepository, householdRepository, firebaseAuth)
     }
@@ -74,6 +74,15 @@ class SyncManagerTest {
         coVerify { userRepository.syncPointsFromCloud() }
         coVerify { habitRepository.syncHabitLogsFromCloud() }
         coVerify { habitRepository.syncHouseholdHabitLogsForToday() }
+    }
+
+    @Test
+    fun `syncAll prefetches auth token with matching force flag`() = runTest {
+        syncManager.syncAll(force = true)
+        syncManager.syncAll(force = false)
+
+        io.mockk.verify { firebaseUser.getIdToken(true) }
+        io.mockk.verify(atLeast = 1) { firebaseUser.getIdToken(false) }
     }
 
     // ── Cooldown ────────────────────────────────────────────────────────
@@ -168,5 +177,28 @@ class SyncManagerTest {
         val result = syncManager.syncAll(force = true)
 
         assertTrue(result) // Main sync steps succeeded
+    }
+
+    @Test
+    fun `syncAll retries transient failures before succeeding`() = runTest {
+        coEvery { habitRepository.syncHabitsFromCloud() } throws Exception("first") andThenThrows Exception("second") andThen Unit
+
+        val result = syncManager.syncAll(force = true)
+
+        assertTrue(result)
+        coVerify(exactly = 3) { habitRepository.syncHabitsFromCloud() }
+    }
+
+    @Test
+    fun `runExclusive executes block`() = runTest {
+        var invoked = false
+
+        val result = syncManager.runExclusive {
+            invoked = true
+            "done"
+        }
+
+        assertTrue(invoked)
+        org.junit.Assert.assertEquals("done", result)
     }
 }

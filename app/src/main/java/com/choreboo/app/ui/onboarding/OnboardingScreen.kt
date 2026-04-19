@@ -70,6 +70,7 @@ import androidx.compose.ui.text.input.ImeAction
 import androidx.hilt.navigation.compose.hiltViewModel
 import com.choreboo.app.R
 import com.choreboo.app.domain.model.PetType
+import com.choreboo.app.ui.theme.softGlassSurface
 import com.choreboo.app.ui.util.displayName
 import com.choreboo.app.ui.util.findActivity
 import com.choreboo.app.ui.util.localizedLabel
@@ -157,7 +158,7 @@ fun OnboardingScreen(
     Box(
         modifier = Modifier
             .fillMaxSize()
-            .background(MaterialTheme.colorScheme.surface),
+            .background(Color.Transparent),
     ) {
         Column(
             modifier = Modifier
@@ -428,8 +429,11 @@ private fun HowItHelpsStep(
         Column(
             modifier = Modifier
                 .fillMaxWidth()
-                .clip(RoundedCornerShape(20.dp))
-                .background(MaterialTheme.colorScheme.surfaceContainerLowest)
+                .softGlassSurface(
+                    shape = RoundedCornerShape(20.dp),
+                    containerColor = MaterialTheme.colorScheme.surfaceContainerLow.copy(alpha = 0.84f),
+                    borderColor = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.22f),
+                )
                 .padding(20.dp),
             verticalArrangement = Arrangement.spacedBy(16.dp),
         ) {
@@ -529,15 +533,18 @@ private fun PetSelectionCard(
 ) {
     Box(
         modifier = modifier
-            .clip(RoundedCornerShape(20.dp))
-            .background(
-                if (isSelected) MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.25f)
-                else MaterialTheme.colorScheme.surfaceContainerLowest,
-            )
-            .border(
-                width = if (isSelected) 2.dp else 1.dp,
-                color = if (isSelected) MaterialTheme.colorScheme.primary else Color.Transparent,
+            .softGlassSurface(
                 shape = RoundedCornerShape(20.dp),
+                containerColor = if (isSelected) {
+                    MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.38f)
+                } else {
+                    MaterialTheme.colorScheme.surfaceContainerLow.copy(alpha = 0.82f)
+                },
+                borderColor = if (isSelected) {
+                    MaterialTheme.colorScheme.primary.copy(alpha = 0.18f)
+                } else {
+                    MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.22f)
+                },
             )
             .clickable { onSelect() }
             .padding(16.dp),
@@ -641,8 +648,11 @@ private fun NameStep(
         Box(
             modifier = Modifier
                 .fillMaxWidth()
-                .clip(RoundedCornerShape(20.dp))
-                .background(MaterialTheme.colorScheme.surfaceContainerLowest)
+                .softGlassSurface(
+                    shape = RoundedCornerShape(20.dp),
+                    containerColor = MaterialTheme.colorScheme.surfaceContainerLow.copy(alpha = 0.84f),
+                    borderColor = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.22f),
+                )
                 .padding(20.dp),
         ) {
             Column {
@@ -855,8 +865,11 @@ private fun PaywallStep(
         Column(
             modifier = Modifier
                 .fillMaxWidth()
-                .clip(RoundedCornerShape(20.dp))
-                .background(MaterialTheme.colorScheme.surfaceContainerLowest)
+                .softGlassSurface(
+                    shape = RoundedCornerShape(20.dp),
+                    containerColor = MaterialTheme.colorScheme.surfaceContainerLow.copy(alpha = 0.84f),
+                    borderColor = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.22f),
+                )
                 .padding(20.dp),
             verticalArrangement = Arrangement.spacedBy(14.dp),
         ) {
@@ -967,15 +980,18 @@ private fun SurveyCard(
     Row(
         modifier = Modifier
             .fillMaxWidth()
-            .clip(RoundedCornerShape(16.dp))
-            .background(
-                if (isSelected) MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.3f)
-                else MaterialTheme.colorScheme.surfaceContainerLowest,
-            )
-            .border(
-                width = if (isSelected) 2.dp else 1.dp,
-                color = if (isSelected) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.outlineVariant,
+            .softGlassSurface(
                 shape = RoundedCornerShape(16.dp),
+                containerColor = if (isSelected) {
+                    MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.38f)
+                } else {
+                    MaterialTheme.colorScheme.surfaceContainerLow.copy(alpha = 0.82f)
+                },
+                borderColor = if (isSelected) {
+                    MaterialTheme.colorScheme.primary.copy(alpha = 0.18f)
+                } else {
+                    MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.22f)
+                },
             )
             .clickable { onClick() }
             .padding(16.dp),
@@ -1011,10 +1027,18 @@ private fun PrimaryButton(
         modifier = Modifier
             .fillMaxWidth()
             .height(60.dp)
-            .clip(RoundedCornerShape(16.dp))
-            .background(
-                if (enabled) MaterialTheme.colorScheme.primary
-                else MaterialTheme.colorScheme.surfaceContainerHighest,
+            .softGlassSurface(
+                shape = RoundedCornerShape(16.dp),
+                containerColor = if (enabled) {
+                    MaterialTheme.colorScheme.primary.copy(alpha = 0.94f)
+                } else {
+                    MaterialTheme.colorScheme.surfaceContainerHighest.copy(alpha = 0.82f)
+                },
+                borderColor = if (enabled) {
+                    MaterialTheme.colorScheme.onPrimary.copy(alpha = 0.08f)
+                } else {
+                    MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.18f)
+                },
             )
             .clickable(enabled = enabled) { onClick() },
         contentAlignment = Alignment.Center,

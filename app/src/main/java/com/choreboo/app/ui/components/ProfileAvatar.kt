@@ -1,6 +1,7 @@
 package com.choreboo.app.ui.components
 
 import androidx.compose.foundation.background
+import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.size
@@ -23,6 +24,7 @@ import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import coil3.compose.AsyncImage
 import com.choreboo.app.R
+import com.choreboo.app.ui.theme.softGlassSurface
 
 @Composable
 fun ProfileAvatar(
@@ -34,8 +36,12 @@ fun ProfileAvatar(
     Box(
         modifier = Modifier
             .size(size)
-            .clip(CircleShape)
-            .background(MaterialTheme.colorScheme.primaryContainer)
+            .softGlassSurface(
+                shape = CircleShape,
+                containerColor = MaterialTheme.colorScheme.surfaceContainerHighest.copy(alpha = 0.72f),
+                borderColor = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.24f),
+            )
+            .background(MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.18f))
             .then(
                 if (onClick != null) {
                     Modifier.clickable { onClick() }
@@ -69,10 +75,11 @@ private fun ProfileImage(url: String, size: Dp) {
              model = url,
              contentDescription = stringResource(R.string.profile_photo_cd),
              modifier = Modifier
-                 .size(size)
-                 .clip(CircleShape),
-             contentScale = ContentScale.Crop,
-             onError = { loadFailed = true },
+                  .size(size)
+                  .border(1.dp, MaterialTheme.colorScheme.surface.copy(alpha = 0.65f), CircleShape)
+                  .clip(CircleShape),
+              contentScale = ContentScale.Crop,
+              onError = { loadFailed = true },
          )
     }
 }

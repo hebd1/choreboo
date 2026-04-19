@@ -3,6 +3,8 @@ package com.choreboo.app.ui.components
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.ui.geometry.Offset
+import androidx.compose.ui.graphics.Brush
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
@@ -70,7 +72,16 @@ fun PetBackgroundImage(
         Box(
             modifier = modifier
                 .fillMaxSize()
-                .background(moodColor),
+                .background(
+                    Brush.linearGradient(
+                        colors = listOf(
+                            moodColor.copy(alpha = 0.92f),
+                            MaterialTheme.colorScheme.surface.copy(alpha = 0.55f),
+                        ),
+                        start = Offset.Zero,
+                        end = Offset.Infinite,
+                    ),
+                ),
         )
     }
 }

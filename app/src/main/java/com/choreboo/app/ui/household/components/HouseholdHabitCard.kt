@@ -26,6 +26,7 @@ import androidx.compose.ui.unit.sp
 import com.choreboo.app.R
 import com.choreboo.app.domain.model.HouseholdHabitStatus
 import com.choreboo.app.ui.habits.components.getEmojiForIconName
+import com.choreboo.app.ui.theme.softGlassSurface
 import androidx.compose.ui.res.stringResource
 
 /**
@@ -48,15 +49,25 @@ fun HouseholdHabitCard(
         modifier = modifier.fillMaxWidth(),
         shape = RoundedCornerShape(16.dp),
         colors = CardDefaults.cardColors(
-            containerColor = if (isCompleted)
-                MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.4f)
-            else
-                MaterialTheme.colorScheme.surfaceContainerLowest,
+            containerColor = androidx.compose.ui.graphics.Color.Transparent,
         ),
     ) {
         Row(
             modifier = Modifier
                 .fillMaxWidth()
+                .softGlassSurface(
+                    shape = RoundedCornerShape(16.dp),
+                    containerColor = if (isCompleted) {
+                        MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.5f)
+                    } else {
+                        MaterialTheme.colorScheme.surfaceContainerLow.copy(alpha = 0.82f)
+                    },
+                    borderColor = if (isCompleted) {
+                        MaterialTheme.colorScheme.primary.copy(alpha = 0.12f)
+                    } else {
+                        MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.22f)
+                    },
+                )
                 .padding(horizontal = 16.dp, vertical = 12.dp),
             verticalAlignment = Alignment.CenterVertically,
         ) {
@@ -86,6 +97,7 @@ fun HouseholdHabitCard(
                     text = habit.title,
                     style = MaterialTheme.typography.bodyLarge,
                     fontWeight = FontWeight.SemiBold,
+                    color = MaterialTheme.colorScheme.onSurface,
                     maxLines = 1,
                     overflow = TextOverflow.Ellipsis,
                 )

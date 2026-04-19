@@ -5,7 +5,6 @@ import com.choreboo.app.data.datastore.UserPreferences
 import com.choreboo.app.data.local.dao.HabitDao
 import com.choreboo.app.data.local.dao.HabitLogDao
 import com.choreboo.app.data.local.entity.HabitEntity
-import com.choreboo.app.data.local.entity.HabitLogEntity
 import com.google.firebase.auth.FirebaseAuth
 import com.google.firebase.auth.FirebaseUser
 import io.mockk.coEvery
@@ -13,6 +12,7 @@ import io.mockk.coVerify
 import io.mockk.every
 import io.mockk.mockk
 import io.mockk.slot
+import java.time.LocalTime
 import kotlinx.coroutines.test.runTest
 import org.junit.Assert.assertEquals
 import org.junit.Before
@@ -35,6 +35,7 @@ class HabitRepositorySyncTest {
     private lateinit var userPreferences: UserPreferences
     private lateinit var userRepository: UserRepository
     private lateinit var firebaseAuth: FirebaseAuth
+    private lateinit var reminderScheduler: HabitReminderHandler
     private lateinit var repo: HabitRepository
 
     private val testUid = "test-uid-123"
@@ -67,13 +68,22 @@ class HabitRepositorySyncTest {
         userPreferences = mockk(relaxed = true)
         userRepository = mockk(relaxed = true)
         firebaseAuth = mockk()
+        reminderScheduler = mockk(relaxed = true)
 
         val user = mockk<FirebaseUser>()
         every { firebaseAuth.currentUser } returns user
         every { user.uid } returns testUid
 
         val context = mockk<Context>(relaxed = true)
-        repo = HabitRepository(habitDao, habitLogDao, userPreferences, userRepository, firebaseAuth, context)
+        repo = HabitRepository(
+            habitDao,
+            habitLogDao,
+            userPreferences,
+            userRepository,
+            firebaseAuth,
+            context,
+            reminderScheduler,
+        )
     }
 
     // ── convertHouseholdHabitsToPersonal ─────────────────────────────────
@@ -209,5 +219,110 @@ class HabitRepositorySyncTest {
         repo.cancelAllReminders()
 
         coVerify(exactly = 1) { habitDao.getAllHabitsSync() }
+    }
+
+    @Test
+    fun `archiveHabit cancels reminder`() = runTest {
+        coEvery { habitDao.getHabitByIdSync(1L) } returns habitEntity(id = 1L)
+
+        repo.archiveHabit(1L)
+
+        coVerify { reminderScheduler.cancel(any(), 1L) }
+    }
+
+    @Test
+    fun `unarchiveHabit reschedules enabled reminder`() = runTest {
+        coEvery { habitDao.getHabitByIdSync(1L) } returns habitEntity(
+            id = 1L,
+            title = "Read",
+        ).copy(
+            reminderEnabled = true,
+            reminderTime = "08:30",
+            customDays = "MON,WED,FRI",
+        )
+
+        repo.unarchiveHabit(1L)
+
+        coVerify {
+            reminderScheduler.schedule(
+                any(),
+                1L,
+                "Read",
+                LocalTime.of(8, 30),
+                listOf("MON", "WED", "FRI"),
+            )
+        }
+    }
+
+    @Test
+    fun `syncReminderFromCloud schedules owned enabled reminder`() {
+        repo.syncReminderFromCloud(
+            localHabitId = 7L,
+            title = "Exercise",
+            reminderEnabled = true,
+            reminderTime = "09:15",
+            isArchived = false,
+            customDays = "MON,TUE",
+            shouldOwnReminder = true,
+            logTag = "test",
+        )
+
+        coVerify {
+            reminderScheduler.schedule(
+                any(),
+                7L,
+                "Exercise",
+                LocalTime.of(9, 15),
+                listOf("MON", "TUE"),
+            )
+        }
+    }
+
+    @Test
+    fun `syncReminderFromCloud cancels when reminder disabled`() {
+        repo.syncReminderFromCloud(
+            localHabitId = 8L,
+            title = "Exercise",
+            reminderEnabled = false,
+            reminderTime = "09:15",
+            isArchived = false,
+            customDays = "MON,TUE",
+            shouldOwnReminder = true,
+            logTag = "test",
+        )
+
+        coVerify { reminderScheduler.cancel(any(), 8L) }
+    }
+
+    @Test
+    fun `syncReminderFromCloud cancels when archived`() {
+        repo.syncReminderFromCloud(
+            localHabitId = 9L,
+            title = "Exercise",
+            reminderEnabled = true,
+            reminderTime = "09:15",
+            isArchived = true,
+            customDays = "MON,TUE",
+            shouldOwnReminder = true,
+            logTag = "test",
+        )
+
+        coVerify { reminderScheduler.cancel(any(), 9L) }
+    }
+
+    @Test
+    fun `syncReminderFromCloud cancels when habit is not owned by current reminder device`() {
+        repo.syncReminderFromCloud(
+            localHabitId = 10L,
+            title = "Exercise",
+            reminderEnabled = true,
+            reminderTime = "09:15",
+            isArchived = false,
+            customDays = "MON,TUE",
+            shouldOwnReminder = false,
+            logTag = "test",
+        )
+
+        coVerify { reminderScheduler.cancel(any(), 10L) }
     }
 }

@@ -1,5 +1,9 @@
 package com.choreboo.app.ui.habits.components
 
+import androidx.compose.animation.Crossfade
+import androidx.compose.animation.animateColorAsState
+import androidx.compose.animation.core.animateFloatAsState
+import androidx.compose.animation.core.spring
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
@@ -43,6 +47,7 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.scale
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.shadow
 import androidx.compose.ui.graphics.graphicsLayer
@@ -53,6 +58,7 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.choreboo.app.R
 import com.choreboo.app.domain.model.Habit
+import com.choreboo.app.ui.theme.softGlassSurface
 import java.time.LocalDateTime
 
 @Composable
@@ -62,6 +68,8 @@ fun HabitCard(
     currentStreak: Int = 0,
     isScheduledToday: Boolean = true,
     nextScheduledLabel: String? = null,
+    modifier: Modifier = Modifier,
+    isAnimatingComplete: Boolean = false,
     onComplete: () -> Unit,
     onClick: () -> Unit = {},
     /**
@@ -72,25 +80,49 @@ fun HabitCard(
     now: LocalDateTime = LocalDateTime.now(),
 ) {
     val isComplete = completedToday >= 1
+    val isVisuallyComplete = isComplete || isAnimatingComplete
     val emoji = getEmojiForIconName(habit.iconName)
+    val cardContainerColor = animateColorAsState(
+        targetValue = if (isVisuallyComplete) {
+            MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.42f)
+        } else {
+            MaterialTheme.colorScheme.surfaceContainerLow.copy(alpha = 0.82f)
+        },
+        label = "habitCardContainerColor",
+    )
+    val cardBorderColor = animateColorAsState(
+        targetValue = if (isVisuallyComplete) {
+            MaterialTheme.colorScheme.primary.copy(alpha = 0.14f)
+        } else {
+            MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.24f)
+        },
+        label = "habitCardBorderColor",
+    )
+    val completionScale = animateFloatAsState(
+        targetValue = if (isAnimatingComplete && !isComplete) 1.12f else 1f,
+        animationSpec = spring(dampingRatio = 0.55f, stiffness = 500f),
+        label = "habitCompletionScale",
+    )
 
     Card(
-        modifier = Modifier
+        modifier = modifier
             .fillMaxWidth()
             .graphicsLayer { alpha = if (isScheduledToday) 1f else 0.5f }
             .clickable { onClick() },
         shape = RoundedCornerShape(16.dp),
         colors = CardDefaults.cardColors(
-            containerColor = if (isComplete)
-                MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.18f)
-            else
-                MaterialTheme.colorScheme.surfaceContainerLowest,
+            containerColor = androidx.compose.ui.graphics.Color.Transparent,
         ),
         elevation = CardDefaults.cardElevation(defaultElevation = 0.dp),
     ) {
         Column(
             modifier = Modifier
                 .fillMaxWidth()
+                .softGlassSurface(
+                    shape = RoundedCornerShape(16.dp),
+                    containerColor = cardContainerColor.value,
+                    borderColor = cardBorderColor.value,
+                )
                 .padding(16.dp),
         ) {
             Row(
@@ -103,7 +135,7 @@ fun HabitCard(
                         .size(56.dp)
                         .clip(CircleShape)
                         .background(
-                            if (isComplete) MaterialTheme.colorScheme.primary
+                            if (isVisuallyComplete) MaterialTheme.colorScheme.primary
                             else if (!isScheduledToday) MaterialTheme.colorScheme.surfaceContainerHighest
                             else MaterialTheme.colorScheme.surfaceContainerHighest,
                         ),
@@ -136,11 +168,11 @@ fun HabitCard(
                             text = habit.title,
                             style = MaterialTheme.typography.titleMedium,
                             fontWeight = FontWeight.Bold,
-                            color = if (isComplete)
+                            color = if (isVisuallyComplete)
                                 MaterialTheme.colorScheme.onSurface.copy(alpha = 0.5f)
                             else
                                 MaterialTheme.colorScheme.onSurface,
-                            textDecoration = if (isComplete) TextDecoration.LineThrough else TextDecoration.None,
+                            textDecoration = if (isVisuallyComplete) TextDecoration.LineThrough else TextDecoration.None,
                         )
                         // XP badge — tertiaryContainer pill
                         Box(
@@ -159,7 +191,7 @@ fun HabitCard(
                         }
                     }
                     Spacer(modifier = Modifier.height(4.dp))
-                    if (isComplete) {
+                    if (isVisuallyComplete) {
                         Text(
                             text = if (householdCompleterName != null)
                                 stringResource(R.string.habit_card_completed_by, householdCompleterName)
@@ -273,7 +305,7 @@ fun HabitCard(
                         Box(
                             modifier = Modifier
                                 .then(
-                                    if (isComplete) Modifier.shadow(
+                                    if (isVisuallyComplete) Modifier.shadow(
                                         elevation = 6.dp,
                                         shape = CircleShape,
                                         ambientColor = MaterialTheme.colorScheme.primary.copy(alpha = 0.4f),
@@ -281,28 +313,40 @@ fun HabitCard(
                                     ) else Modifier
                                 )
                                 .size(40.dp)
+                                .scale(completionScale.value)
                                 .clip(CircleShape)
                                 .background(
                                     when {
-                                        !isScheduledToday -> MaterialTheme.colorScheme.surfaceContainerHighest
-                                        isComplete -> MaterialTheme.colorScheme.primary
-                                        else -> MaterialTheme.colorScheme.surface
+                                        !isScheduledToday -> MaterialTheme.colorScheme.surfaceContainerHighest.copy(alpha = 0.8f)
+                                        isVisuallyComplete -> MaterialTheme.colorScheme.primary
+                                        else -> MaterialTheme.colorScheme.surface.copy(alpha = 0.82f)
                                     },
                                 )
                                 .then(
-                                    if (!isComplete && isScheduledToday)
+                                    if (!isVisuallyComplete && isScheduledToday)
                                         Modifier.background(MaterialTheme.colorScheme.surface)
                                     else Modifier
                                 ),
                             contentAlignment = Alignment.Center,
                         ) {
-                            if (isComplete) {
-                                Icon(
-                                    imageVector = Icons.Default.Check,
-                                    contentDescription = stringResource(R.string.habit_card_completed),
-                                    tint = MaterialTheme.colorScheme.onPrimary,
-                                    modifier = Modifier.size(22.dp),
-                                )
+                            if (isVisuallyComplete) {
+                                Crossfade(targetState = isAnimatingComplete && !isComplete, label = "habitCheckCrossfade") { animating ->
+                                    if (animating) {
+                                        Box(
+                                            modifier = Modifier
+                                                .size(22.dp)
+                                                .clip(CircleShape)
+                                                .background(MaterialTheme.colorScheme.onPrimary.copy(alpha = 0.22f)),
+                                        )
+                                    } else {
+                                        Icon(
+                                            imageVector = Icons.Default.Check,
+                                            contentDescription = stringResource(R.string.habit_card_completed),
+                                            tint = MaterialTheme.colorScheme.onPrimary,
+                                            modifier = Modifier.size(22.dp),
+                                        )
+                                    }
+                                }
                             } else if (!isScheduledToday) {
                                 Icon(
                                     imageVector = Icons.Default.Lock,

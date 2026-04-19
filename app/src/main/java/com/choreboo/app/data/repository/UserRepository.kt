@@ -1,6 +1,7 @@
 package com.choreboo.app.data.repository
 
 import androidx.core.net.toUri
+import com.choreboo.app.dataconnect.GetCurrentUserQuery
 import com.choreboo.app.data.datastore.UserPreferences
 import com.choreboo.app.dataconnect.ChorebooConnector
 import com.choreboo.app.dataconnect.execute
@@ -25,7 +26,21 @@ class UserRepository @Inject constructor(
     private val userPreferences: UserPreferences,
     private val firebaseStorage: FirebaseStorage,
 ) {
-    private val connector by lazy { ChorebooConnector.instance }
+    internal constructor(
+        firebaseAuth: FirebaseAuth,
+        userPreferences: UserPreferences,
+        firebaseStorage: FirebaseStorage,
+        cloudDataSource: UserCloudDataSource,
+    ) : this(firebaseAuth, userPreferences, firebaseStorage) {
+        this.overrideCloudDataSource = cloudDataSource
+    }
+
+    private var overrideCloudDataSource: UserCloudDataSource? = null
+    private val defaultCloudDataSource: UserCloudDataSource by lazy {
+        ConnectorUserCloudDataSource(ChorebooConnector.instance)
+    }
+    private val cloudDataSource: UserCloudDataSource
+        get() = overrideCloudDataSource ?: defaultCloudDataSource
 
     /**
      * Returns the current user's UID, or null if not authenticated.
@@ -57,12 +72,11 @@ class UserRepository @Inject constructor(
             // the interceptor may not yet have the fresh token in its cache.
             firebaseAuth.currentUser?.getIdToken(false)?.await()
             val timedOut = withTimeoutOrNull(CLOUD_TIMEOUT_MS) {
-                connector.upsertUser.execute(
+                cloudDataSource.upsertUser(
                     displayName = user.displayName,
-                ) {
-                    email = user.email
-                    photoUrl = user.photoUrl
-                }
+                    email = user.email,
+                    photoUrl = user.photoUrl,
+                )
             }
             if (timedOut == null) {
                 Timber.w("syncCurrentUserToCloud: timed out")
@@ -100,14 +114,14 @@ class UserRepository @Inject constructor(
      * Fetch current user's profile including household info from Data Connect.
      */
     suspend fun fetchCurrentUserFromCloud(): AppUser? {
-        val uid = getCurrentUid() ?: return null
+        getCurrentUid() ?: return null
         return try {
-            val result = withTimeoutOrNull(CLOUD_TIMEOUT_MS) { connector.getCurrentUser.execute() }
-            if (result == null) {
+            val cloudData = withTimeoutOrNull(CLOUD_TIMEOUT_MS) { cloudDataSource.getCurrentUser() }
+            if (cloudData == null) {
                 Timber.w("fetchCurrentUserFromCloud timed out")
                 return getCurrentAppUser()
             }
-            val cloudUser = result.data.user
+            val cloudUser = cloudData.user
             if (cloudUser != null) {
                 AppUser(
                     uid = cloudUser.id,
@@ -143,7 +157,7 @@ class UserRepository @Inject constructor(
         if (getCurrentUid() == null) return
         try {
             val timedOut = withTimeoutOrNull(CLOUD_TIMEOUT_MS) {
-                connector.updateUserPoints.execute(
+                cloudDataSource.updateUserPoints(
                     totalPoints = totalPoints,
                     totalLifetimeXp = totalLifetimeXp,
                 )
@@ -159,20 +173,19 @@ class UserRepository @Inject constructor(
     }
 
     /**
-     * Cloud-to-local sync for point totals. Uses max-wins strategy so neither device loses
-     * progress. Called during the post-auth/resume sync flow.
-     * - totalLifetimeXp never decreases, so max is always correct.
-     * - totalPoints can decrease from feeding, but max prevents losing progress across devices.
+     * Cloud-to-local sync for point totals. Spendable points are cloud-authoritative so cross-device
+     * purchases and feeding cannot be undone by stale local state. Lifetime XP never decreases, so
+     * it still uses max-wins to preserve monotonic progress.
      */
     suspend fun syncPointsFromCloud() {
         if (getCurrentUid() == null) return
         try {
-            val result = withTimeoutOrNull(CLOUD_TIMEOUT_MS) { connector.getCurrentUser.execute() }
-            if (result == null) {
+            val cloudData = withTimeoutOrNull(CLOUD_TIMEOUT_MS) { cloudDataSource.getCurrentUser() }
+            if (cloudData == null) {
                 Timber.w("syncPointsFromCloud timed out")
                 return
             }
-            val cloudUser = result.data.user ?: return
+            val cloudUser = cloudData.user ?: return
 
             val cloudPoints = cloudUser.totalPoints
             val cloudLifetimeXp = cloudUser.totalLifetimeXp
@@ -180,7 +193,7 @@ class UserRepository @Inject constructor(
             val localPoints = userPreferences.totalPoints.first()
             val localLifetimeXp = userPreferences.totalLifetimeXp.first()
 
-            val mergedPoints = maxOf(localPoints, cloudPoints)
+            val mergedPoints = cloudPoints
             val mergedLifetimeXp = maxOf(localLifetimeXp, cloudLifetimeXp)
 
             userPreferences.setPointsAndLifetimeXp(mergedPoints, mergedLifetimeXp)
@@ -295,5 +308,32 @@ class UserRepository @Inject constructor(
             Timber.e(e, "Failed to delete profile photo")
             throw e
         }
+    }
+}
+
+internal interface UserCloudDataSource {
+    suspend fun upsertUser(displayName: String, email: String?, photoUrl: String?)
+    suspend fun getCurrentUser(): GetCurrentUserQuery.Data
+    suspend fun updateUserPoints(totalPoints: Int, totalLifetimeXp: Int)
+}
+
+private class ConnectorUserCloudDataSource(
+    private val connector: ChorebooConnector,
+) : UserCloudDataSource {
+    override suspend fun upsertUser(displayName: String, email: String?, photoUrl: String?) {
+        connector.upsertUser.execute(displayName = displayName) {
+            this.email = email
+            this.photoUrl = photoUrl
+        }
+    }
+
+    override suspend fun getCurrentUser(): GetCurrentUserQuery.Data =
+        connector.getCurrentUser.execute().data
+
+    override suspend fun updateUserPoints(totalPoints: Int, totalLifetimeXp: Int) {
+        connector.updateUserPoints.execute(
+            totalPoints = totalPoints,
+            totalLifetimeXp = totalLifetimeXp,
+        )
     }
 }

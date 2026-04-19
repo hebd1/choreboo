@@ -45,6 +45,7 @@ import com.choreboo.app.domain.model.BackgroundItem
 import com.choreboo.app.domain.model.BackgroundTier
 import com.choreboo.app.ui.components.StarPointsChip
 import com.choreboo.app.ui.theme.GoldGlow
+import com.choreboo.app.ui.theme.softGlassSurface
 import androidx.compose.ui.res.stringResource
 import com.choreboo.app.ui.util.labelRes
 
@@ -76,7 +77,7 @@ fun BackgroundPickerSheet(
     ModalBottomSheet(
         onDismissRequest = onDismiss,
         sheetState = sheetState,
-        containerColor = MaterialTheme.colorScheme.surface,
+        containerColor = MaterialTheme.colorScheme.surface.copy(alpha = 0.92f),
     ) {
         Column(modifier = Modifier.fillMaxWidth()) {
             // Header
@@ -155,8 +156,11 @@ private fun BackgroundCell(
     Box(
         modifier = Modifier
             .height(120.dp)
-            .clip(RoundedCornerShape(12.dp))
-            .border(borderWidth, borderColor, RoundedCornerShape(12.dp))
+            .softGlassSurface(
+                shape = RoundedCornerShape(12.dp),
+                containerColor = MaterialTheme.colorScheme.surfaceContainerLow.copy(alpha = 0.76f),
+                borderColor = borderColor.copy(alpha = 0.9f),
+            )
             .clickable(enabled = !isPremiumLocked) {
                 if (isUnlocked) onSelect() else if (canAfford) onPurchase()
             },

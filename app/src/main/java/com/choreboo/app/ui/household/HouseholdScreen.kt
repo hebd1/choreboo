@@ -62,6 +62,7 @@ import com.choreboo.app.ui.components.StitchSnackbar
 import com.choreboo.app.ui.habits.components.getEmojiForIconName
 import com.choreboo.app.ui.household.components.HouseholdHabitCard
 import com.choreboo.app.ui.household.components.HouseholdPetCard
+import com.choreboo.app.ui.theme.softGlassSurface
 import androidx.compose.ui.res.stringResource
 import kotlinx.coroutines.launch
 
@@ -119,12 +120,23 @@ fun HouseholdScreen(
                     .padding(top = 16.dp, bottom = 96.dp),
             ) {
                 // Header
-                Text(
-                    text = household?.name ?: stringResource(R.string.household_title_fallback),
-                    style = MaterialTheme.typography.headlineMedium,
-                    fontWeight = FontWeight.ExtraBold,
-                    color = MaterialTheme.colorScheme.primary,
-                )
+                Box(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .softGlassSurface(
+                            shape = RoundedCornerShape(24.dp),
+                            containerColor = MaterialTheme.colorScheme.surfaceContainerLow.copy(alpha = 0.8f),
+                            borderColor = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.22f),
+                        )
+                        .padding(horizontal = 18.dp, vertical = 16.dp),
+                ) {
+                    Text(
+                        text = household?.name ?: stringResource(R.string.household_title_fallback),
+                        style = MaterialTheme.typography.headlineMedium,
+                        fontWeight = FontWeight.ExtraBold,
+                        color = MaterialTheme.colorScheme.primary,
+                    )
+                }
 
                 Spacer(modifier = Modifier.height(16.dp))
 
@@ -240,6 +252,7 @@ private fun MemberHabitsDialog(
                 text = stringResource(R.string.household_chores_title, pet.ownerName),
                 style = MaterialTheme.typography.titleMedium,
                 fontWeight = FontWeight.Bold,
+                color = MaterialTheme.colorScheme.onSurface,
             )
         },
         text = {
@@ -313,6 +326,7 @@ private fun MemberHabitRow(
                 text = habit.title,
                 style = MaterialTheme.typography.bodyMedium,
                 fontWeight = FontWeight.SemiBold,
+                color = MaterialTheme.colorScheme.onSurface,
                 maxLines = 1,
                 overflow = TextOverflow.Ellipsis,
             )
@@ -408,12 +422,17 @@ private fun EmptyHouseholdState(
             modifier = Modifier.fillMaxWidth(),
             shape = RoundedCornerShape(16.dp),
             colors = CardDefaults.cardColors(
-                containerColor = MaterialTheme.colorScheme.surfaceContainerLowest,
+                containerColor = androidx.compose.ui.graphics.Color.Transparent,
             ),
         ) {
             Column(
                 modifier = Modifier
                     .fillMaxWidth()
+                    .softGlassSurface(
+                        shape = RoundedCornerShape(16.dp),
+                        containerColor = MaterialTheme.colorScheme.surfaceContainerLow.copy(alpha = 0.84f),
+                        borderColor = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.22f),
+                    )
                     .padding(24.dp),
                 horizontalAlignment = Alignment.CenterHorizontally,
             ) {

@@ -312,6 +312,7 @@ class PetViewModelTest {
             vm.completeHabit(1L)
             val event = awaitItem()
             assertTrue(event is PetEvent.AlreadyComplete)
+            assertEquals(1L, (event as PetEvent.AlreadyComplete).habitId)
         }
 
         // addXp should NOT be called
@@ -340,6 +341,7 @@ class PetViewModelTest {
             val event = awaitItem()
             assertTrue(event is PetEvent.HabitCompleted)
             val completed = event as PetEvent.HabitCompleted
+            assertEquals(1L, completed.habitId)
             assertEquals(25, completed.xpEarned)
             assertEquals(3, completed.streak)
             assertFalse(completed.leveledUp)
@@ -367,6 +369,7 @@ class PetViewModelTest {
         vm.events.test {
             vm.completeHabit(1L)
             val event = awaitItem() as PetEvent.HabitCompleted
+            assertEquals(1L, event.habitId)
             assertTrue(event.leveledUp)
             assertEquals(6, event.newLevel)
             assertFalse(event.evolved)
@@ -393,9 +396,25 @@ class PetViewModelTest {
         vm.events.test {
             vm.completeHabit(1L)
             val event = awaitItem() as PetEvent.HabitCompleted
+            assertEquals(1L, event.habitId)
             assertTrue(event.leveledUp)
             assertTrue(event.evolved)
             assertEquals(ChorebooStage.CHILD, event.newStage)
+        }
+    }
+
+    @Test
+    fun `completeHabit emits CompletionError with habitId when repository throws`() = runTest {
+        coEvery { habitRepository.completeHabit(7L) } throws IllegalStateException("boom")
+
+        val vm = createViewModel()
+        advanceUntilIdle()
+
+        vm.events.test {
+            vm.completeHabit(7L)
+            val event = awaitItem()
+            assertTrue(event is PetEvent.CompletionError)
+            assertEquals(7L, (event as PetEvent.CompletionError).habitId)
         }
     }
 

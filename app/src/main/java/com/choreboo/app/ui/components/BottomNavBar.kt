@@ -45,6 +45,9 @@ import androidx.annotation.StringRes
 import com.choreboo.app.R
 import com.choreboo.app.domain.model.ChorebooMood
 import com.choreboo.app.navigation.Screen
+import com.choreboo.app.ui.theme.glassPanelBorderColor
+import com.choreboo.app.ui.theme.glassPanelColor
+import com.choreboo.app.ui.theme.softGlassSurface
 
 data class BottomNavItem(
     @StringRes val labelRes: Int,
@@ -83,14 +86,19 @@ fun BottomNavBar(
     Box(
         modifier = modifier
             .fillMaxWidth()
-            .clip(RoundedCornerShape(topStart = 24.dp, topEnd = 24.dp))
-            .background(MaterialTheme.colorScheme.surfaceContainerHighest),
+            .padding(horizontal = 12.dp, vertical = 8.dp),
+        contentAlignment = Alignment.Center,
     ) {
         Row(
             modifier = Modifier
                 .fillMaxWidth()
                 .navigationBarsPadding()
-                .padding(horizontal = 8.dp, vertical = 8.dp),
+                .softGlassSurface(
+                    shape = RoundedCornerShape(32.dp),
+                    containerColor = glassPanelColor(),
+                    borderColor = glassPanelBorderColor(),
+                )
+                .padding(horizontal = 18.dp, vertical = 12.dp),
             horizontalArrangement = Arrangement.SpaceAround,
             verticalAlignment = Alignment.CenterVertically,
         ) {
@@ -142,7 +150,7 @@ private fun NavBarTab(
             )
             .then(
                 if (selected)
-                    Modifier.background(MaterialTheme.colorScheme.primaryContainer, CircleShape)
+                    Modifier.background(MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.96f), CircleShape)
                 else
                     Modifier
             ),

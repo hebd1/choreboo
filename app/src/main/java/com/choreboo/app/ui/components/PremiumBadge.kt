@@ -19,6 +19,7 @@ import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import com.choreboo.app.R
+import com.choreboo.app.ui.theme.softGlassSurface
 
 /**
  * Small chip indicating the user has an active Choreboo Premium subscription.
@@ -33,8 +34,11 @@ fun PremiumBadge(
 
     Row(
         modifier = modifier
-            .clip(RoundedCornerShape(50.dp))
-            .background(MaterialTheme.colorScheme.tertiaryContainer)
+            .softGlassSurface(
+                shape = RoundedCornerShape(50.dp),
+                containerColor = MaterialTheme.colorScheme.tertiaryContainer.copy(alpha = 0.88f),
+                borderColor = MaterialTheme.colorScheme.onTertiaryContainer.copy(alpha = 0.12f),
+            )
             .padding(horizontal = 10.dp, vertical = 4.dp),
         verticalAlignment = Alignment.CenterVertically,
         horizontalArrangement = Arrangement.spacedBy(4.dp),

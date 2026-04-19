@@ -2,8 +2,8 @@ package com.choreboo.app.ui.household.components
 
 import androidx.compose.animation.Crossfade
 import androidx.compose.animation.core.tween
+import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
-import androidx.compose.foundation.border
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -35,6 +35,8 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.graphics.Brush
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
@@ -65,11 +67,12 @@ import com.choreboo.app.ui.theme.PetMoodHappyStart
 import com.choreboo.app.ui.theme.PetMoodHungryStart
 import com.choreboo.app.ui.theme.PetMoodSadStart
 import com.choreboo.app.ui.theme.PetMoodTiredStart
+import com.choreboo.app.ui.theme.softGlassSurface
 
 private enum class HouseholdAnimPhase { MOOD, IDLE }
 
-private val HOUSEHOLD_PET_SCENE_OFFSET_X = 5.dp
-private val HOUSEHOLD_PET_SCENE_OFFSET_Y = 8.dp
+private val HOUSEHOLD_PET_SCENE_OFFSET_X = 0.dp
+private val HOUSEHOLD_PET_SCENE_OFFSET_Y = 16.dp
 
 /**
  * Compact card designed for a 2-column grid.
@@ -89,133 +92,178 @@ fun HouseholdPetCard(
         Card(
             onClick = { onClick?.invoke() },
             modifier = Modifier.fillMaxWidth(),
-            shape = RoundedCornerShape(16.dp),
+            shape = RoundedCornerShape(20.dp),
             colors = CardDefaults.cardColors(
-                containerColor = MaterialTheme.colorScheme.surfaceContainerLowest,
+                containerColor = androidx.compose.ui.graphics.Color.Transparent,
             ),
+            border = BorderStroke(
+                width = 1.dp,
+                color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.16f),
+            ),
+            elevation = CardDefaults.cardElevation(defaultElevation = 0.dp),
         ) {
             Column(
                 modifier = Modifier
                     .fillMaxWidth()
-                    // Extra top padding so column content clears the avatar overlay.
-                    .padding(start = 12.dp, end = 12.dp, bottom = 12.dp, top = 20.dp),
+                    .softGlassSurface(
+                        shape = RoundedCornerShape(20.dp),
+                        containerColor = MaterialTheme.colorScheme.surfaceContainerLow.copy(alpha = 0.74f),
+                        borderColor = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.18f),
+                    )
+                    .padding(12.dp),
                 horizontalAlignment = Alignment.CenterHorizontally,
             ) {
-                // ── Animation area ────────────────────────────────────────
-                Box {
-                    // Background + animation stacked in a clipped rounded box
+                Box(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .height(112.dp)
+                        .clip(RoundedCornerShape(18.dp)),
+                ) {
+                    val isDark = isSystemInDarkTheme()
+                    val moodBg = when (pet.mood) {
+                        ChorebooMood.HAPPY, ChorebooMood.CONTENT ->
+                            if (isDark) PetMoodDarkHappyStart else PetMoodHappyStart
+                        ChorebooMood.HUNGRY ->
+                            if (isDark) PetMoodDarkHungryStart else PetMoodHungryStart
+                        ChorebooMood.TIRED ->
+                            if (isDark) PetMoodDarkTiredStart else PetMoodTiredStart
+                        ChorebooMood.SAD ->
+                            if (isDark) PetMoodDarkSadStart else PetMoodSadStart
+                        else ->
+                            if (isDark) PetMoodDarkContentStart else PetMoodContentStart
+                    }
+                    PetBackgroundImage(
+                        backgroundId = pet.backgroundId,
+                        mood = pet.mood,
+                        moodColor = moodBg,
+                    )
                     Box(
                         modifier = Modifier
-                            .size(88.dp)
-                            .clip(RoundedCornerShape(12.dp)),
+                            .fillMaxSize()
+                            .background(
+                                Brush.verticalGradient(
+                                    colors = listOf(
+                                        MaterialTheme.colorScheme.surface.copy(alpha = 0.08f),
+                                        Color.Transparent,
+                                        MaterialTheme.colorScheme.surface.copy(alpha = 0.22f),
+                                    ),
+                                ),
+                            ),
+                    )
+                    HouseholdPetAnimation(
+                        petType = pet.petType,
+                        mood = pet.mood,
+                        animationOffsetMs = animationOffsetMs,
+                        modifier = Modifier
+                            .align(Alignment.BottomCenter)
+                            .offset(x = HOUSEHOLD_PET_SCENE_OFFSET_X, y = HOUSEHOLD_PET_SCENE_OFFSET_Y)
+                            .size(94.dp),
+                    )
+
+                    OwnerAvatarBadge(
+                        ownerName = pet.ownerName,
+                        ownerPhotoUrl = pet.ownerPhotoUrl,
+                        modifier = Modifier
+                            .align(Alignment.TopStart)
+                            .padding(10.dp),
+                    )
+
+                    Box(
                         contentAlignment = Alignment.Center,
+                        modifier = Modifier
+                            .align(Alignment.TopEnd)
+                            .padding(10.dp)
+                            .softGlassSurface(
+                                shape = RoundedCornerShape(10.dp),
+                                containerColor = MaterialTheme.colorScheme.primary.copy(alpha = 0.88f),
+                                borderColor = MaterialTheme.colorScheme.onPrimary.copy(alpha = 0.08f),
+                            )
+                            .padding(horizontal = 9.dp, vertical = 4.dp),
                     ) {
-                        val isDark = isSystemInDarkTheme()
-                        val moodBg = when (pet.mood) {
-                            ChorebooMood.HAPPY, ChorebooMood.CONTENT ->
-                                if (isDark) PetMoodDarkHappyStart else PetMoodHappyStart
-                            ChorebooMood.HUNGRY ->
-                                if (isDark) PetMoodDarkHungryStart else PetMoodHungryStart
-                            ChorebooMood.TIRED ->
-                                if (isDark) PetMoodDarkTiredStart else PetMoodTiredStart
-                            ChorebooMood.SAD ->
-                                if (isDark) PetMoodDarkSadStart else PetMoodSadStart
-                            else ->
-                                if (isDark) PetMoodDarkContentStart else PetMoodContentStart
-                        }
-                        PetBackgroundImage(
-                            backgroundId = pet.backgroundId,
-                            mood = pet.mood,
-                            moodColor = moodBg,
-                        )
-                        HouseholdPetAnimation(
-                            petType = pet.petType,
-                            mood = pet.mood,
-                            animationOffsetMs = animationOffsetMs,
-                            modifier = Modifier
-                                .offset(x = HOUSEHOLD_PET_SCENE_OFFSET_X, y = HOUSEHOLD_PET_SCENE_OFFSET_Y)
-                                .size(88.dp),
+                        Text(
+                            text = stringResource(R.string.household_level_badge, pet.level),
+                            style = MaterialTheme.typography.labelSmall,
+                            color = MaterialTheme.colorScheme.onPrimary,
+                            fontWeight = FontWeight.Bold,
                         )
                     }
                 }
 
-                Spacer(modifier = Modifier.height(8.dp))
+                Spacer(modifier = Modifier.height(12.dp))
 
-                // ── Pet name ─────────────────────────────────────────────
                 Text(
                     text = pet.name,
-                    style = MaterialTheme.typography.titleSmall,
+                    style = MaterialTheme.typography.titleMedium,
                     fontWeight = FontWeight.Bold,
+                    color = MaterialTheme.colorScheme.onSurface,
                     maxLines = 1,
                     overflow = TextOverflow.Ellipsis,
                 )
 
-                Spacer(modifier = Modifier.height(4.dp))
+                Spacer(modifier = Modifier.height(6.dp))
 
-                // ── Owner name ─────────────────────────────────────────────
-                Text(
-                    text = pet.ownerName,
-                    style = MaterialTheme.typography.bodySmall,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                    maxLines = 1,
-                    overflow = TextOverflow.Ellipsis,
-                )
+                Box(
+                    modifier = Modifier
+                        .clip(RoundedCornerShape(50.dp))
+                        .background(MaterialTheme.colorScheme.surfaceContainerHighest.copy(alpha = 0.6f))
+                        .padding(horizontal = 10.dp, vertical = 4.dp),
+                ) {
+                    Text(
+                        text = pet.ownerName,
+                        style = MaterialTheme.typography.labelMedium,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        maxLines = 1,
+                        overflow = TextOverflow.Ellipsis,
+                    )
+                }
 
-                Spacer(modifier = Modifier.height(10.dp))
+                Spacer(modifier = Modifier.height(12.dp))
 
-                // ── Mini stat bars ────────────────────────────────────────
                 MiniStatBar(emoji = "\uD83C\uDF56", value = pet.hunger)
-                Spacer(modifier = Modifier.height(4.dp))
+                Spacer(modifier = Modifier.height(6.dp))
                 MiniStatBar(emoji = "\uD83D\uDE0A", value = pet.happiness)
-                Spacer(modifier = Modifier.height(4.dp))
+                Spacer(modifier = Modifier.height(6.dp))
                 MiniStatBar(emoji = "\u26A1", value = pet.energy)
             }
         }
+    }
+}
 
-        // ── Owner avatar badge – upper-left corner overlay ───────────────
-        var avatarPhotoFailed by remember(pet.ownerPhotoUrl) { mutableStateOf(false) }
+@Composable
+private fun OwnerAvatarBadge(
+    ownerName: String,
+    ownerPhotoUrl: String?,
+    modifier: Modifier = Modifier,
+) {
+    var avatarPhotoFailed by remember(ownerPhotoUrl) { mutableStateOf(false) }
 
-        if (!pet.ownerPhotoUrl.isNullOrBlank() && !avatarPhotoFailed) {
+    Box(
+        modifier = modifier
+            .size(34.dp)
+            .softGlassSurface(
+                shape = CircleShape,
+                containerColor = MaterialTheme.colorScheme.surface.copy(alpha = 0.72f),
+                borderColor = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.18f),
+            )
+            .padding(3.dp),
+        contentAlignment = Alignment.Center,
+    ) {
+        if (!ownerPhotoUrl.isNullOrBlank() && !avatarPhotoFailed) {
             AsyncImage(
-                model = pet.ownerPhotoUrl,
-                contentDescription = stringResource(R.string.household_profile_photo_cd, pet.ownerName),
+                model = ownerPhotoUrl,
+                contentDescription = stringResource(R.string.household_profile_photo_cd, ownerName),
                 contentScale = ContentScale.Crop,
                 modifier = Modifier
-                    .align(Alignment.TopStart)
-                    .padding(8.dp)
-                    .size(28.dp)
-                    .border(1.5.dp, MaterialTheme.colorScheme.surface, CircleShape)
+                    .fillMaxSize()
                     .clip(CircleShape),
                 onError = { avatarPhotoFailed = true },
             )
         } else {
-            // Fallback: green AccountCircle icon with border
             Icon(
                 imageVector = Icons.Default.AccountCircle,
-                contentDescription = stringResource(R.string.household_profile_photo_cd, pet.ownerName),
+                contentDescription = stringResource(R.string.household_profile_photo_cd, ownerName),
                 tint = MaterialTheme.colorScheme.primary,
-                modifier = Modifier
-                    .align(Alignment.TopStart)
-                    .padding(8.dp)
-                    .size(28.dp)
-                    .border(1.5.dp, MaterialTheme.colorScheme.surface, CircleShape),
-            )
-        }
-
-        Box(
-            contentAlignment = Alignment.Center,
-            modifier = Modifier
-                .align(Alignment.TopEnd)
-                .padding(8.dp)
-                .clip(RoundedCornerShape(8.dp))
-                .background(MaterialTheme.colorScheme.primary)
-                .padding(horizontal = 8.dp, vertical = 3.dp),
-        ) {
-            Text(
-                text = stringResource(R.string.household_level_badge, pet.level),
-                style = MaterialTheme.typography.labelSmall,
-                color = MaterialTheme.colorScheme.onPrimary,
-                fontWeight = FontWeight.Bold,
+                modifier = Modifier.fillMaxSize(),
             )
         }
     }
@@ -227,8 +275,8 @@ fun HouseholdPetCard(
  * FOX: WebM mood-idle alternating loop — plays the mood-appropriate animation
  * once (happy/hungry/sad), then the idle animation 3 times, then repeats.
  *
- * All other pet types (AXOLOTL, CAPYBARA, PANDA): emoji placeholder until
- * their WebM assets are added under assets/animations/<type>/.
+ * All other pet types (AXOLOTL, CAPYBARA): emoji placeholder until their
+ * animated assets are added under assets/animations/<type>/.
  */
 @Composable
 private fun HouseholdPetAnimation(
@@ -254,31 +302,41 @@ private fun HouseholdPetAnimation(
             HouseholdAnimPhase.IDLE -> FOX_ANIM_IDLE to FOX_IDLE_ITERATIONS
         }
 
-        Crossfade(
-            targetState = phase,
-            animationSpec = tween(durationMillis = 100),
-            label = "householdPetAnimCrossfade",
-        ) { animPhase ->
-            val (currentAsset, currentIterations) = when (animPhase) {
-                HouseholdAnimPhase.MOOD -> foxMoodAssetPath(mood) to 1
-                HouseholdAnimPhase.IDLE -> FOX_ANIM_IDLE to FOX_IDLE_ITERATIONS
-            }
+        Box(modifier = modifier, contentAlignment = Alignment.Center) {
+            Crossfade(
+                targetState = phase,
+                animationSpec = tween(durationMillis = 100),
+                label = "householdPetAnimCrossfade",
+            ) { animPhase ->
+                val (currentAsset, currentIterations) = when (animPhase) {
+                    HouseholdAnimPhase.MOOD -> foxMoodAssetPath(mood) to 1
+                    HouseholdAnimPhase.IDLE -> FOX_ANIM_IDLE to FOX_IDLE_ITERATIONS
+                }
 
-            if (started) {
-                WebmAnimationView(
-                    assetPath = currentAsset,
-                    iterations = currentIterations,
-                    onComplete = {
-                        phase = when (phase) {
-                            HouseholdAnimPhase.MOOD -> HouseholdAnimPhase.IDLE
-                            HouseholdAnimPhase.IDLE -> HouseholdAnimPhase.MOOD
-                        }
-                    },
-                    modifier = modifier,
-                )
-            } else {
-                // Show a blank box while waiting for the animation to start
-                Box(modifier = modifier)
+                if (started) {
+                    WebmAnimationView(
+                        assetPath = currentAsset,
+                        iterations = currentIterations,
+                        onComplete = {
+                            when (animPhase) {
+                                HouseholdAnimPhase.MOOD -> {
+                                    if (phase == HouseholdAnimPhase.MOOD) {
+                                        phase = HouseholdAnimPhase.IDLE
+                                    }
+                                }
+                                HouseholdAnimPhase.IDLE -> {
+                                    if (phase == HouseholdAnimPhase.IDLE) {
+                                        phase = HouseholdAnimPhase.MOOD
+                                    }
+                                }
+                            }
+                        },
+                        modifier = Modifier.fillMaxSize(),
+                    )
+                } else {
+                    // Show a blank box while waiting for the animation to start
+                    Box(modifier = Modifier.fillMaxSize())
+                }
             }
         }
     } else if (petType == PetType.PANDA) {
@@ -292,30 +350,40 @@ private fun HouseholdPetAnimation(
             }
         }
 
-        Crossfade(
-            targetState = phase,
-            animationSpec = tween(durationMillis = 100),
-            label = "householdPandaAnimCrossfade",
-        ) { animPhase ->
-            val (currentAsset, currentIterations) = when (animPhase) {
-                HouseholdAnimPhase.MOOD -> pandaMoodAssetPath(mood) to 1
-                HouseholdAnimPhase.IDLE -> PANDA_ANIM_IDLE to PANDA_IDLE_ITERATIONS
-            }
+        Box(modifier = modifier, contentAlignment = Alignment.Center) {
+            Crossfade(
+                targetState = phase,
+                animationSpec = tween(durationMillis = 100),
+                label = "householdPandaAnimCrossfade",
+            ) { animPhase ->
+                val (currentAsset, currentIterations) = when (animPhase) {
+                    HouseholdAnimPhase.MOOD -> pandaMoodAssetPath(mood) to 1
+                    HouseholdAnimPhase.IDLE -> PANDA_ANIM_IDLE to PANDA_IDLE_ITERATIONS
+                }
 
-            if (started) {
-                WebmAnimationView(
-                    assetPath = currentAsset,
-                    iterations = currentIterations,
-                    onComplete = {
-                        phase = when (phase) {
-                            HouseholdAnimPhase.MOOD -> HouseholdAnimPhase.IDLE
-                            HouseholdAnimPhase.IDLE -> HouseholdAnimPhase.MOOD
-                        }
-                    },
-                    modifier = modifier,
-                )
-            } else {
-                Box(modifier = modifier)
+                if (started) {
+                    WebmAnimationView(
+                        assetPath = currentAsset,
+                        iterations = currentIterations,
+                        onComplete = {
+                            when (animPhase) {
+                                HouseholdAnimPhase.MOOD -> {
+                                    if (phase == HouseholdAnimPhase.MOOD) {
+                                        phase = HouseholdAnimPhase.IDLE
+                                    }
+                                }
+                                HouseholdAnimPhase.IDLE -> {
+                                    if (phase == HouseholdAnimPhase.IDLE) {
+                                        phase = HouseholdAnimPhase.MOOD
+                                    }
+                                }
+                            }
+                        },
+                        modifier = Modifier.fillMaxSize(),
+                    )
+                } else {
+                    Box(modifier = Modifier.fillMaxSize())
+                }
             }
         }
     } else {
@@ -349,14 +417,14 @@ private fun MiniStatBar(
             progress = { value / 100f },
             modifier = Modifier
                 .weight(1f)
-                .height(5.dp)
-                .clip(RoundedCornerShape(3.dp)),
+                .height(6.dp)
+                .clip(RoundedCornerShape(4.dp)),
             color = when {
                 value < 20 -> MaterialTheme.colorScheme.error
                 value < 50 -> MaterialTheme.colorScheme.tertiary
                 else -> MaterialTheme.colorScheme.primary
             },
-            trackColor = MaterialTheme.colorScheme.surfaceContainerHighest,
+            trackColor = MaterialTheme.colorScheme.surfaceContainerHighest.copy(alpha = 0.72f),
         )
     }
 }

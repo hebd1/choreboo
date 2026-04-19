@@ -56,6 +56,7 @@ import com.choreboo.app.R
 import com.choreboo.app.domain.model.Badge
 import com.choreboo.app.domain.model.ChorebooMood
 import com.choreboo.app.ui.components.ChorebooTopAppBar
+import com.choreboo.app.ui.theme.softGlassSurface
 import com.choreboo.app.ui.theme.XpPurple
 import com.choreboo.app.ui.util.displayNameRes
 import com.choreboo.app.ui.util.descriptionRes
@@ -112,6 +113,7 @@ fun StatsScreen(
                 )
             }
         },
+        containerColor = androidx.compose.ui.graphics.Color.Transparent,
     ) { padding ->
         PullToRefreshBox(
             isRefreshing = isRefreshing,
@@ -225,8 +227,11 @@ private fun WeeklyStreakCard(
     Box(
         modifier = Modifier
             .fillMaxWidth()
-            .clip(RoundedCornerShape(20.dp))
-            .background(MaterialTheme.colorScheme.surfaceContainerLowest),
+            .softGlassSurface(
+                shape = RoundedCornerShape(20.dp),
+                containerColor = MaterialTheme.colorScheme.surfaceContainerLow.copy(alpha = 0.84f),
+                borderColor = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.22f),
+            ),
     ) {
         // Fire watermark — faint, overlapping top-right
         Box(
@@ -334,8 +339,11 @@ private fun StreakXpBentoGrid(
         Box(
             modifier = Modifier
                 .weight(1f)
-                .clip(RoundedCornerShape(16.dp))
-                .background(MaterialTheme.colorScheme.surfaceContainerLowest)
+                .softGlassSurface(
+                    shape = RoundedCornerShape(16.dp),
+                    containerColor = MaterialTheme.colorScheme.surfaceContainerLow.copy(alpha = 0.84f),
+                    borderColor = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.22f),
+                )
                 .clickable { onBadgesTapped() },
         ) {
             Column(
@@ -423,8 +431,11 @@ private fun StreakXpBentoGrid(
                 modifier = Modifier
                     .weight(1f)
                     .fillMaxWidth()
-                    .clip(RoundedCornerShape(16.dp))
-                    .background(XpPurple.copy(alpha = 0.12f)),
+                    .softGlassSurface(
+                        shape = RoundedCornerShape(16.dp),
+                        containerColor = XpPurple.copy(alpha = 0.18f),
+                        borderColor = XpPurple.copy(alpha = 0.14f),
+                    ),
                 contentAlignment = Alignment.Center,
             ) {
                 Column(horizontalAlignment = Alignment.CenterHorizontally) {
@@ -447,8 +458,11 @@ private fun StreakXpBentoGrid(
                 modifier = Modifier
                     .weight(1f)
                     .fillMaxWidth()
-                    .clip(RoundedCornerShape(16.dp))
-                    .background(MaterialTheme.colorScheme.secondaryContainer.copy(alpha = 0.20f)),
+                    .softGlassSurface(
+                        shape = RoundedCornerShape(16.dp),
+                        containerColor = MaterialTheme.colorScheme.secondaryContainer.copy(alpha = 0.28f),
+                        borderColor = MaterialTheme.colorScheme.secondary.copy(alpha = 0.12f),
+                    ),
                 contentAlignment = Alignment.Center,
             ) {
                 Column(horizontalAlignment = Alignment.CenterHorizontally) {
@@ -499,8 +513,11 @@ private fun PetStatusBentoGrid(
             modifier = Modifier
                 .weight(1f)
                 .aspectRatio(1f)
-                .clip(RoundedCornerShape(20.dp))
-                .background(MaterialTheme.colorScheme.tertiaryContainer.copy(alpha = 0.30f)),
+                .softGlassSurface(
+                    shape = RoundedCornerShape(20.dp),
+                    containerColor = MaterialTheme.colorScheme.tertiaryContainer.copy(alpha = 0.34f),
+                    borderColor = MaterialTheme.colorScheme.tertiary.copy(alpha = 0.12f),
+                ),
         ) {
             Column(
                 modifier = Modifier
@@ -534,8 +551,11 @@ private fun PetStatusBentoGrid(
             modifier = Modifier
                 .weight(1f)
                 .aspectRatio(1f)
-                .clip(RoundedCornerShape(20.dp))
-                .background(MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.35f)),
+                .softGlassSurface(
+                    shape = RoundedCornerShape(20.dp),
+                    containerColor = MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.38f),
+                    borderColor = MaterialTheme.colorScheme.primary.copy(alpha = 0.12f),
+                ),
         ) {
             Column(
                 modifier = Modifier
@@ -576,8 +596,11 @@ private fun MonthlyMasteryCard(completionRate: Int) {
         modifier = Modifier
             .fillMaxWidth()
             .height(140.dp)
-            .clip(RoundedCornerShape(16.dp))
-            .background(MaterialTheme.colorScheme.primary)
+            .softGlassSurface(
+                shape = RoundedCornerShape(16.dp),
+                containerColor = MaterialTheme.colorScheme.primary.copy(alpha = 0.92f),
+                borderColor = MaterialTheme.colorScheme.onPrimary.copy(alpha = 0.08f),
+            )
             .padding(20.dp),
     ) {
         Column(
@@ -629,7 +652,7 @@ private fun BadgeBottomSheet(
         onDismissRequest = onDismiss,
         sheetState = sheetState,
         shape = RoundedCornerShape(topStart = 24.dp, topEnd = 24.dp),
-        containerColor = MaterialTheme.colorScheme.surface,
+        containerColor = MaterialTheme.colorScheme.surface.copy(alpha = 0.94f),
     ) {
         Column(
             modifier = Modifier

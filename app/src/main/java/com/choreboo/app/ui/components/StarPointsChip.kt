@@ -19,6 +19,10 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
+import com.choreboo.app.ui.theme.GlassCircleShape
+import com.choreboo.app.ui.theme.glassBadgeBorderColor
+import com.choreboo.app.ui.theme.glassBadgeColor
+import com.choreboo.app.ui.theme.softGlassSurface
 
 /**
  * Pill-shaped chip showing the user's star-point balance with a star icon.
@@ -44,14 +48,17 @@ fun StarPointsChip(
     Row(
         verticalAlignment = Alignment.CenterVertically,
         modifier = modifier
-            .clip(RoundedCornerShape(50.dp))
-            .background(MaterialTheme.colorScheme.surfaceContainerHigh.copy(alpha = backgroundAlpha))
+            .softGlassSurface(
+                shape = RoundedCornerShape(50.dp),
+                containerColor = glassBadgeColor().copy(alpha = backgroundAlpha),
+                borderColor = glassBadgeBorderColor(),
+            )
             .padding(horizontal = 12.dp, vertical = 6.dp),
     ) {
         Icon(
             imageVector = Icons.Default.Stars,
             contentDescription = contentDescription,
-            tint = MaterialTheme.colorScheme.secondaryContainer,
+            tint = MaterialTheme.colorScheme.secondary,
             modifier = Modifier.size(iconSize),
         )
         Spacer(modifier = Modifier.width(4.dp))
@@ -59,6 +66,7 @@ fun StarPointsChip(
             text = "$points",
             fontWeight = FontWeight.Bold,
             style = MaterialTheme.typography.labelLarge,
+            color = MaterialTheme.colorScheme.onSurface,
         )
     }
 }

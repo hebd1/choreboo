@@ -614,44 +614,73 @@ print('First sub-chunk in ANMF:', tag)  # should be b'ALPH'
 
 ### Converting Lottie image-sequence JSON → animated WebP
 
-Some Lottie files (e.g. those exported by "Image to Lottie" tools) are image-sequence Lotties: each frame is a full pre-rendered image stored as a `data:image/webp;base64,...` URI in the `assets` array. These can be converted without a Lottie renderer — extract the frames directly and feed them to ffmpeg.
+Some Lottie files (e.g. those exported by "Image to Lottie" tools) are image-sequence Lotties: each frame is a full pre-rendered image stored as a `data:image/webp;base64,...` URI in the `assets` array. These can be converted without a Lottie renderer — extract the selected frames directly and assemble the animation with `webpmux`.
 
-The conversion script is `/tmp/lottie_to_webp.py` (re-create from the template below if `/tmp` is cleared):
+> **Important**: do **not** use ffmpeg alone for the final animation assembly on these transparent frame sequences. The first panda conversion attempt used ffmpeg for the mux step, which produced blended `ANMF` frames and caused ghosting/previous-frame trails in `AnimatedImageDrawable`. Full-frame transparent sequences must be assembled with `NO_BLEND` frames.
+
+The checked-in conversion script is `convert_lottie_to_webp.py`. It expects the libwebp tool bundle under `/tmp/libwebp-tools/`:
+
+```bash
+mkdir -p /tmp/libwebp-tools && cd /tmp/libwebp-tools
+wget https://storage.googleapis.com/downloads.webmproject.org/releases/webp/libwebp-1.2.1-linux-x86-64.tar.gz
+tar xzf libwebp-1.2.1-linux-x86-64.tar.gz
+# webpmux at: /tmp/libwebp-tools/libwebp-1.2.1-linux-x86-64/bin/webpmux
+```
+
+Convert all panda assets:
+
+```bash
+python3 convert_lottie_to_webp.py --all-panda
+```
+
+Convert one file:
+
+```bash
+python3 convert_lottie_to_webp.py input.json output.webp
+```
+
+The core of the script is:
 
 ```python
 #!/usr/bin/env python3
-"""Convert Lottie image-sequence JSON files to animated WebP using ffmpeg."""
-import json, base64, os, subprocess, tempfile
+import base64, json, subprocess, tempfile
+from pathlib import Path
 
-FFMPEG = "/tmp/ffmpeg-static/ffmpeg-7.0.2-amd64-static/ffmpeg"
+WEBPMUX = Path("/tmp/libwebp-tools/libwebp-1.2.1-linux-x86-64/bin/webpmux")
 
-def convert(json_path: str, webp_path: str) -> None:
-    with open(json_path) as f:
-        data = json.load(f)
-    assets = data.get("assets", [])
-    src_fps = data.get("fr", 30)
-    out_fps = max(1, src_fps // 2)   # halve fps (30 -> 15) to cut file size ~50%
+def convert(json_path: Path, webp_path: Path, target_fps: int = 15) -> None:
+    data = json.loads(json_path.read_text())
+    assets = data["assets"]
+    src_fps = int(data.get("fr", 30))
+    step = src_fps / target_fps
+    indices = []
+    n = 0
+    while True:
+        index = int(n * step)
+        if index >= len(assets):
+            break
+        indices.append(index)
+        n += 1
 
     with tempfile.TemporaryDirectory() as tmpdir:
-        for i, asset in enumerate(assets):
-            p = asset.get("p", "")
-            if not p.startswith("data:"):
-                raise ValueError(f"Asset {i} is not an embedded data URL — not an image-sequence Lottie")
-            b64 = p.split(",", 1)[1]
-            with open(os.path.join(tmpdir, f"frame_{i:04d}.webp"), "wb") as out:
-                out.write(base64.b64decode(b64))
+        tmpdir = Path(tmpdir)
+        command = [str(WEBPMUX)]
+        for output_index, asset_index in enumerate(indices):
+            b64 = assets[asset_index]["p"].split(",", 1)[1]
+            frame_path = tmpdir / f"frame_{output_index:04d}.webp"
+            frame_path.write_bytes(base64.b64decode(b64))
+            start_ms = round(output_index * 1000 / target_fps)
+            end_ms = round((output_index + 1) * 1000 / target_fps)
+            duration = max(1, end_ms - start_ms)
+            command.extend(["-frame", str(frame_path), f"+{duration}+0+0+0-b"])
 
-        subprocess.run([
-            FFMPEG, "-y",
-            "-framerate", str(src_fps),
-            "-i", os.path.join(tmpdir, "frame_%04d.webp"),
-            "-vf", f"fps={out_fps},format=yuva420p",
-            "-loop", "0", "-vcodec", "libwebp", "-lossless", "0", "-quality", "70",
-            webp_path,
-        ], check=True)
+        command.extend(["-loop", "0", "-bgcolor", "0,0,0,0", "-o", str(webp_path)])
+        subprocess.run(command, check=True)
 ```
 
 **How to detect an image-sequence Lottie**: open the JSON and check `assets[0]["p"]` — if it starts with `data:image/`, the frames are embedded. If `assets[0]["u"]` is a directory path, the images are external files (different pipeline needed).
+
+**Why `webpmux`**: `webpmux -frame file +duration+0+0+0-b` writes each frame with `NO_BLEND`, which is required for full-canvas transparent frame sequences. The `-b` suffix here means no blending. This prevents old transparent pixels from keeping previous frame content.
 
 ### Current fox animation inventory
 
@@ -669,19 +698,19 @@ def convert(json_path: str, webp_path: str) -> None:
 
 ### Current panda animation inventory
 
-Converted from image-sequence Lottie JSON files (`*_lottie.json`) in `app/src/main/assets/animations/panda/` using the script above. Source: 30 fps, output: 15 fps.
+Converted from image-sequence Lottie JSON files (`*_lottie.json`) in `app/src/main/assets/animations/panda/` using `convert_lottie_to_webp.py` with `webpmux` `NO_BLEND` frames. Source: 30 fps, output: 15 fps.
 
 | File | Source JSON | Size | Frames |
 |------|-------------|------|--------|
-| `panda_happy.webp` | `panda_happy_lottie.json` | 663 KB | 75 |
-| `panda_idle.webp` | `panda_idle_lottie.json` | 1.3 MB | 145 |
-| `panda_sad.webp` | `panda_sad_lottie.json` | 1.2 MB | 150 |
-| `panda_eating.webp` | `panda_eating_lottie.json` | 658 KB | 75 |
-| `panda_hungry.webp` | `panda_hungry_lottie.json` | 1.4 MB | 148 |
-| `panda_interact.webp` | `panda_interact_lottie.json` | 555 KB | 60 |
-| `panda_thumbs_up.webp` | `panda_thumbs_up_lottie.json` | 1.3 MB | 150 |
-| `panda_start_sleep.webp` | `panda_sleep_lottie.json` | 466 KB | 58 |
-| `panda_loop_sleeping.webp` | `panda_loop_sleeping.json` | 264 KB | 33 |
+| `panda_happy.webp` | `panda_happy_lottie.json` | 768 KB | 75 |
+| `panda_idle.webp` | `panda_idle_lottie.json` | 1.6 MB | 145 |
+| `panda_sad.webp` | `panda_sad_lottie.json` | 1.4 MB | 150 |
+| `panda_eating.webp` | `panda_eating_lottie.json` | 768 KB | 75 |
+| `panda_hungry.webp` | `panda_hungry_lottie.json` | 1.6 MB | 148 |
+| `panda_interact.webp` | `panda_interact_lottie.json` | 662 KB | 60 |
+| `panda_thumbs_up.webp` | `panda_thumbs_up_lottie.json` | 1.5 MB | 150 |
+| `panda_start_sleep.webp` | `panda_sleep_lottie.json` | 540 KB | 58 |
+| `panda_loop_sleeping.webp` | `panda_loop_sleeping.json` | 305 KB | 33 |
 
 ### `repeatCount` semantics
 

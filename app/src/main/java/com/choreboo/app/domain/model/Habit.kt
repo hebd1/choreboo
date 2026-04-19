@@ -76,7 +76,7 @@ data class Habit(
      */
     fun timeUntilNextReminderMinutes(now: LocalDateTime = LocalDateTime.now()): Long? {
         if (!reminderEnabled || reminderTime == null) return null
-        val isMonthly = customDays.any { it.startsWith("D") }
+        val isMonthly = customDays.any { it.startsWith("D", ignoreCase = true) }
         val maxDays = if (isMonthly) 31 else 7
         for (daysAhead in 0..maxDays) {
             val candidate = now.toLocalDate().plusDays(daysAhead.toLong())

@@ -91,6 +91,7 @@ import com.choreboo.app.R
 import coil3.compose.AsyncImage
 import com.choreboo.app.domain.model.HouseholdMember
 import com.choreboo.app.ui.components.ProfileAvatar
+import com.choreboo.app.ui.theme.softGlassSurface
 import androidx.compose.ui.layout.ContentScale
 import java.time.LocalTime
 
@@ -169,6 +170,7 @@ fun AddEditHabitScreen(
 
     Scaffold(
         snackbarHost = { SnackbarHost(snackbarHostState) { data -> StitchSnackbar(data) } },
+        containerColor = Color.Transparent,
     ) { padding ->
         Column(
             modifier = Modifier
@@ -216,12 +218,10 @@ fun AddEditHabitScreen(
                     Box(
                         modifier = Modifier
                             .size(80.dp)
-                            .clip(RoundedCornerShape(12.dp))
-                            .background(MaterialTheme.colorScheme.surfaceContainerHigh)
-                            .border(
-                                2.dp,
-                                MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.3f),
-                                RoundedCornerShape(12.dp),
+                            .softGlassSurface(
+                                shape = RoundedCornerShape(12.dp),
+                                containerColor = MaterialTheme.colorScheme.surfaceContainerHigh.copy(alpha = 0.82f),
+                                borderColor = MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.2f),
                             ),
                         contentAlignment = Alignment.Center,
                     ) {
@@ -383,8 +383,11 @@ fun AddEditHabitScreen(
                 Box(
                     modifier = Modifier
                         .fillMaxWidth()
-                        .clip(RoundedCornerShape(16.dp))
-                        .background(MaterialTheme.colorScheme.surfaceContainerLow)
+                        .softGlassSurface(
+                            shape = RoundedCornerShape(16.dp),
+                            containerColor = MaterialTheme.colorScheme.surfaceContainerLow.copy(alpha = 0.84f),
+                            borderColor = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.22f),
+                        )
                         .padding(16.dp),
                 ) {
                     Column {
@@ -489,8 +492,11 @@ fun AddEditHabitScreen(
                     Box(
                         modifier = Modifier
                             .fillMaxWidth()
-                            .clip(RoundedCornerShape(16.dp))
-                            .background(MaterialTheme.colorScheme.surfaceContainerLow)
+                            .softGlassSurface(
+                                shape = RoundedCornerShape(16.dp),
+                                containerColor = MaterialTheme.colorScheme.surfaceContainerLow.copy(alpha = 0.84f),
+                                borderColor = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.22f),
+                            )
                             .border(
                                 width = 0.dp,
                                 color = Color.Transparent,
@@ -567,8 +573,11 @@ fun AddEditHabitScreen(
                     modifier = Modifier
                         .fillMaxWidth()
                         .height(56.dp)
-                        .clip(RoundedCornerShape(16.dp))
-                        .background(MaterialTheme.colorScheme.primary)
+                        .softGlassSurface(
+                            shape = RoundedCornerShape(16.dp),
+                            containerColor = MaterialTheme.colorScheme.primary.copy(alpha = 0.94f),
+                            borderColor = MaterialTheme.colorScheme.onPrimary.copy(alpha = 0.08f),
+                        )
                         .clickable { viewModel.saveHabit() },
                     contentAlignment = Alignment.Center,
                 ) {
@@ -664,7 +673,11 @@ private fun ChorebooTopBar(
     Row(
         modifier = Modifier
             .fillMaxWidth()
-            .background(MaterialTheme.colorScheme.surface)
+            .softGlassSurface(
+                shape = RoundedCornerShape(28.dp),
+                containerColor = MaterialTheme.colorScheme.surfaceContainerLow.copy(alpha = 0.8f),
+                borderColor = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.22f),
+            )
             .padding(horizontal = 16.dp, vertical = 12.dp),
         horizontalArrangement = Arrangement.SpaceBetween,
         verticalAlignment = Alignment.CenterVertically,
@@ -697,8 +710,11 @@ private fun FrequencyCard(
     Box(
         modifier = Modifier
             .fillMaxWidth()
-            .clip(RoundedCornerShape(16.dp))
-            .background(MaterialTheme.colorScheme.surfaceContainerLow)
+            .softGlassSurface(
+                shape = RoundedCornerShape(16.dp),
+                containerColor = MaterialTheme.colorScheme.surfaceContainerLow.copy(alpha = 0.84f),
+                borderColor = MaterialTheme.colorScheme.primary.copy(alpha = 0.18f),
+            )
             .border(
                 4.dp,
                 MaterialTheme.colorScheme.primary.copy(alpha = 0.3f),
@@ -932,8 +948,11 @@ private fun ReminderCard(
     Column(
         modifier = Modifier
             .fillMaxWidth()
-            .clip(RoundedCornerShape(16.dp))
-            .background(MaterialTheme.colorScheme.surfaceContainerLow)
+            .softGlassSurface(
+                shape = RoundedCornerShape(16.dp),
+                containerColor = MaterialTheme.colorScheme.surfaceContainerLow.copy(alpha = 0.84f),
+                borderColor = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.22f),
+            )
             .padding(12.dp),
     ) {
         // Toggle row
@@ -1155,8 +1174,11 @@ private fun AssigneePicker(
     Box(
         modifier = Modifier
             .fillMaxWidth()
-            .clip(RoundedCornerShape(16.dp))
-            .background(MaterialTheme.colorScheme.surfaceContainerLow)
+            .softGlassSurface(
+                shape = RoundedCornerShape(16.dp),
+                containerColor = MaterialTheme.colorScheme.surfaceContainerLow.copy(alpha = 0.84f),
+                borderColor = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.22f),
+            )
             .padding(16.dp),
     ) {
         Column {

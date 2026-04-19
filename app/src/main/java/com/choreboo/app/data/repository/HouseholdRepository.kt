@@ -320,11 +320,10 @@ class HouseholdRepository @Inject constructor(
             val users = result.data.user?.household?.users_on_household
             if (users != null) {
                 val petUsers = users.filter { it.activeChoreboo != null }
-                if (petUsers.isNotEmpty()) {
-                    val now = System.currentTimeMillis()
-                    petUsers.forEach { user ->
+                upsertHouseholdPets(
+                    petUsers = petUsers.map { user ->
                         val pet = user.activeChoreboo!!
-                        householdMemberDao.upsertPetColumns(
+                        HouseholdPetSnapshot(
                             uid = user.id,
                             displayName = user.displayName,
                             photoUrl = user.photoUrl,
@@ -338,12 +337,10 @@ class HouseholdRepository @Inject constructor(
                             chorebooEnergy = pet.energy,
                             chorebooPetType = pet.petType,
                             chorebooBackgroundId = pet.backgroundId,
-                            lastSyncedAt = now,
                         )
-                    }
-                    // Reconcile: remove any cached member no longer in the household
-                    householdMemberDao.deleteMembersNotIn(petUsers.map { it.id })
-                }
+                    },
+                    allMemberUids = users.map { it.id },
+                )
                 // If petUsers is empty, identity rows (name/email/photo) from refreshHouseholdMembers()
                 // are intentionally preserved — no members have created a Choreboo yet.
                 Timber.d("Persisted ${petUsers.size} household pets to Room")
@@ -354,6 +351,41 @@ class HouseholdRepository @Inject constructor(
         } catch (e: Exception) {
             Timber.e(e, "Failed to refresh household pets")
         }
+    }
+
+    internal suspend fun upsertHouseholdPets(
+        petUsers: List<HouseholdPetSnapshot>,
+        allMemberUids: List<String>,
+    ) {
+        if (allMemberUids.isEmpty()) {
+            householdMemberDao.deleteAll()
+            return
+        }
+
+        if (petUsers.isNotEmpty()) {
+            val now = System.currentTimeMillis()
+            petUsers.forEach { user ->
+                householdMemberDao.upsertPetColumns(
+                    uid = user.uid,
+                    displayName = user.displayName,
+                    photoUrl = user.photoUrl,
+                    chorebooId = user.chorebooId,
+                    chorebooName = user.chorebooName,
+                    chorebooStage = user.chorebooStage,
+                    chorebooLevel = user.chorebooLevel,
+                    chorebooXp = user.chorebooXp,
+                    chorebooHunger = user.chorebooHunger,
+                    chorebooHappiness = user.chorebooHappiness,
+                    chorebooEnergy = user.chorebooEnergy,
+                    chorebooPetType = user.chorebooPetType,
+                    chorebooBackgroundId = user.chorebooBackgroundId,
+                    lastSyncedAt = now,
+                )
+            }
+        }
+
+        // Reconcile against all known household members so identity-only rows are preserved.
+        householdMemberDao.deleteMembersNotIn(allMemberUids)
     }
 
     /**
@@ -515,4 +547,20 @@ private fun HouseholdHabitStatusEntity.toDomain(): HouseholdHabitStatus = Househ
     assignedToName = assignedToName,
     completedByName = completedByName,
     completedByUid = completedByUid,
+)
+
+internal data class HouseholdPetSnapshot(
+    val uid: String,
+    val displayName: String,
+    val photoUrl: String?,
+    val chorebooId: String,
+    val chorebooName: String,
+    val chorebooStage: String,
+    val chorebooLevel: Int,
+    val chorebooXp: Int,
+    val chorebooHunger: Int,
+    val chorebooHappiness: Int,
+    val chorebooEnergy: Int,
+    val chorebooPetType: String,
+    val chorebooBackgroundId: String?,
 )

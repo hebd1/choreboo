@@ -6,6 +6,8 @@ import org.junit.Assert.assertNull
 import org.junit.Assert.assertTrue
 import org.junit.Test
 import java.time.LocalDate
+import java.time.LocalDateTime
+import java.time.LocalTime
 
 /**
  * Tests for [Habit.isScheduledForToday].
@@ -209,5 +211,61 @@ class HabitTest {
     @Test
     fun `next scheduled date returns null for invalid schedule`() {
         assertNull(habit(listOf("Dfoo", "HELLO")).nextScheduledDate(testDate))
+    }
+
+    @Test
+    fun `timeUntilNextReminderMinutes returns null when reminder disabled`() {
+        val now = LocalDateTime.of(2026, 1, 15, 8, 0)
+        val reminderHabit = Habit(
+            title = "Test",
+            customDays = listOf("THU"),
+            reminderEnabled = false,
+            reminderTime = LocalTime.of(9, 0),
+        )
+
+        assertNull(reminderHabit.timeUntilNextReminderMinutes(now))
+    }
+
+    @Test
+    fun `timeUntilNextReminderMinutes returns minutes until later today`() {
+        val now = LocalDateTime.of(2026, 1, 15, 8, 0)
+        val reminderHabit = Habit(
+            title = "Test",
+            customDays = listOf("THU"),
+            reminderEnabled = true,
+            reminderTime = LocalTime.of(9, 30),
+        )
+
+        assertEquals(90L, reminderHabit.timeUntilNextReminderMinutes(now))
+    }
+
+    @Test
+    fun `timeUntilNextReminderMinutes skips past reminder today and returns next scheduled day`() {
+        val now = LocalDateTime.of(2026, 1, 15, 10, 0)
+        val reminderHabit = Habit(
+            title = "Test",
+            customDays = listOf("THU", "SAT"),
+            reminderEnabled = true,
+            reminderTime = LocalTime.of(9, 0),
+        )
+
+        assertEquals(47L * 60L, reminderHabit.timeUntilNextReminderMinutes(now))
+    }
+
+    @Test
+    fun `timeUntilNextReminderMinutes normalizes D31 to short month end`() {
+        val now = LocalDateTime.of(2026, 2, 10, 8, 0)
+        val reminderHabit = Habit(
+            title = "Test",
+            customDays = listOf("D31"),
+            reminderEnabled = true,
+            reminderTime = LocalTime.of(18, 45),
+        )
+
+        val expectedMinutes = java.time.Duration.between(
+            now,
+            LocalDateTime.of(2026, 2, 28, 18, 45),
+        ).toMinutes()
+        assertEquals(expectedMinutes, reminderHabit.timeUntilNextReminderMinutes(now))
     }
 }

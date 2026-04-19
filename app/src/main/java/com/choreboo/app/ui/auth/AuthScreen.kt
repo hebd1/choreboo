@@ -78,6 +78,7 @@ import androidx.credentials.CredentialManager
 import androidx.credentials.GetCredentialRequest
 import androidx.credentials.exceptions.GetCredentialException
 import com.choreboo.app.R
+import com.choreboo.app.ui.theme.softGlassSurface
 import com.google.android.libraries.identity.googleid.GetGoogleIdOption
 import com.google.android.libraries.identity.googleid.GoogleIdTokenCredential
 import kotlinx.coroutines.launch
@@ -164,13 +165,13 @@ fun AuthScreen(
 
     Scaffold(
         snackbarHost = { SnackbarHost(snackbarHostState) { data -> StitchSnackbar(data) } },
-        containerColor = MaterialTheme.colorScheme.surface,
+        containerColor = androidx.compose.ui.graphics.Color.Transparent,
     ) { padding ->
         Box(
             modifier = Modifier
                 .fillMaxSize()
                 .padding(padding)
-                .background(MaterialTheme.colorScheme.surface),
+                .background(androidx.compose.ui.graphics.Color.Transparent),
         ) {
             Column(
                 modifier = Modifier
@@ -186,8 +187,11 @@ fun AuthScreen(
                 Box(
                     modifier = Modifier
                         .size(96.dp)
-                        .clip(CircleShape)
-                        .background(MaterialTheme.colorScheme.primaryContainer),
+                        .softGlassSurface(
+                            shape = CircleShape,
+                            containerColor = MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.82f),
+                            borderColor = MaterialTheme.colorScheme.onPrimaryContainer.copy(alpha = 0.12f),
+                        ),
                     contentAlignment = Alignment.Center,
                 ) {
                     Text("🥚", fontSize = 44.sp)
@@ -224,8 +228,11 @@ fun AuthScreen(
                 Box(
                     modifier = Modifier
                         .fillMaxWidth()
-                        .clip(RoundedCornerShape(24.dp))
-                        .background(MaterialTheme.colorScheme.surfaceContainerLowest)
+                        .softGlassSurface(
+                            shape = RoundedCornerShape(24.dp),
+                            containerColor = MaterialTheme.colorScheme.surfaceContainerLow.copy(alpha = 0.84f),
+                            borderColor = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.22f),
+                        )
                         .padding(24.dp),
                 ) {
                     Column {

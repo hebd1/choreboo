@@ -6,6 +6,7 @@ import androidx.lifecycle.LifecycleOwner
 import com.choreboo.app.data.repository.BillingRepository
 import com.choreboo.app.data.repository.ChorebooRepository
 import com.choreboo.app.data.repository.SyncManager
+import com.choreboo.app.domain.model.ChorebooStats
 import com.choreboo.app.worker.PetMoodScheduler
 import dagger.hilt.android.qualifiers.ApplicationContext
 import kotlinx.coroutines.CoroutineExceptionHandler
@@ -48,8 +49,10 @@ class AppLifecycleObserver @Inject constructor(
         billingRepository: BillingRepository,
         chorebooRepository: ChorebooRepository,
         scope: CoroutineScope,
+        petMoodAlarmHandler: PetMoodAlarmHandler = DefaultPetMoodAlarmHandler,
     ) : this(context, syncManager, billingRepository, chorebooRepository) {
         this.scope = scope
+        this.petMoodAlarmHandler = petMoodAlarmHandler
     }
 
     private var scope: CoroutineScope = CoroutineScope(
@@ -59,6 +62,7 @@ class AppLifecycleObserver @Inject constructor(
                 Timber.e(throwable, "AppLifecycleObserver: unhandled coroutine exception")
             },
     )
+    private var petMoodAlarmHandler: PetMoodAlarmHandler = DefaultPetMoodAlarmHandler
 
     /** Tracks whether this is the first onStart (cold start). */
     @Volatile
@@ -94,7 +98,7 @@ class AppLifecycleObserver @Inject constructor(
 
         // Cancel the pet mood predictive alarm when app comes to foreground
         // so decay happens live and the app sees up-to-date stats
-        PetMoodScheduler.cancelPredictiveAlarm(context)
+        petMoodAlarmHandler.cancel(context)
     }
 
     override fun onStop(owner: LifecycleOwner) {
@@ -108,17 +112,32 @@ class AppLifecycleObserver @Inject constructor(
                 }
 
                 // Schedule the predictive alarm based on current stats
-                PetMoodScheduler.schedulePredictiveAlarm(
-                    context,
-                    choreboo.hunger,
-                    choreboo.happiness,
-                    choreboo.energy,
-                    choreboo.sleepUntil,
-                    choreboo.name,
-                )
+                petMoodAlarmHandler.schedule(context, choreboo)
             } catch (e: Exception) {
                 Timber.e(e, "Error scheduling pet mood alarm on background")
             }
         }
+    }
+}
+
+internal interface PetMoodAlarmHandler {
+    fun cancel(context: Context)
+    fun schedule(context: Context, choreboo: ChorebooStats)
+}
+
+private object DefaultPetMoodAlarmHandler : PetMoodAlarmHandler {
+    override fun cancel(context: Context) {
+        PetMoodScheduler.cancelPredictiveAlarm(context)
+    }
+
+    override fun schedule(context: Context, choreboo: ChorebooStats) {
+        PetMoodScheduler.schedulePredictiveAlarm(
+            context,
+            choreboo.hunger,
+            choreboo.happiness,
+            choreboo.energy,
+            choreboo.sleepUntil,
+            choreboo.name,
+        )
     }
 }

@@ -97,6 +97,7 @@ import com.choreboo.app.domain.model.PetType
 import com.choreboo.app.ui.components.ChorebooTopAppBar
 import com.choreboo.app.ui.components.PremiumBadge
 import com.choreboo.app.ui.components.ProfileAvatar
+import com.choreboo.app.ui.theme.softGlassSurface
 import com.choreboo.app.ui.util.displayName
 import com.choreboo.app.ui.util.findActivity
 import com.google.android.libraries.identity.googleid.GetGoogleIdOption
@@ -380,6 +381,7 @@ fun SettingsScreen(
                 Text(
                     stringResource(R.string.settings_sign_out_dialog_body),
                     style = MaterialTheme.typography.bodyMedium,
+                    color = MaterialTheme.colorScheme.onSurface,
                 )
             },
             confirmButton = {
@@ -418,6 +420,7 @@ fun SettingsScreen(
                         stringResource(R.string.settings_reset_dialog_body_header),
                         style = MaterialTheme.typography.bodyMedium,
                         fontWeight = FontWeight.SemiBold,
+                        color = MaterialTheme.colorScheme.onSurface,
                     )
                     Text(
                         stringResource(R.string.settings_reset_dialog_data_list),
@@ -570,6 +573,7 @@ fun SettingsScreen(
                     Text(
                         stringResource(R.string.settings_create_household_body),
                         style = MaterialTheme.typography.bodyMedium,
+                        color = MaterialTheme.colorScheme.onSurface,
                     )
                     OutlinedTextField(
                         value = householdName,
@@ -644,6 +648,7 @@ fun SettingsScreen(
                     Text(
                         stringResource(R.string.settings_join_code_body),
                         style = MaterialTheme.typography.bodyMedium,
+                        color = MaterialTheme.colorScheme.onSurface,
                     )
                     OutlinedTextField(
                         value = inviteCode,
@@ -708,6 +713,7 @@ fun SettingsScreen(
                     Text(
                         stringResource(R.string.settings_invite_code_share),
                         style = MaterialTheme.typography.bodyMedium,
+                        color = MaterialTheme.colorScheme.onSurface,
                     )
                     Box(
                         modifier = Modifier
@@ -776,6 +782,7 @@ fun SettingsScreen(
                                         text = member.displayName,
                                         style = MaterialTheme.typography.labelMedium,
                                         fontWeight = FontWeight.SemiBold,
+                                        color = MaterialTheme.colorScheme.onSurface,
                                     )
                                     if (member.email != null) {
                                         Text(
@@ -820,6 +827,7 @@ fun SettingsScreen(
                 Text(
                     stringResource(R.string.settings_leave_household_body),
                     style = MaterialTheme.typography.bodyMedium,
+                    color = MaterialTheme.colorScheme.onSurface,
                 )
             },
             confirmButton = {
@@ -871,6 +879,7 @@ fun SettingsScreen(
             }
         },
         snackbarHost = { SnackbarHost(snackbarHostState) { StitchSnackbar(it) } },
+        containerColor = Color.Transparent,
     ) { padding ->
         Column(
             modifier = Modifier
@@ -889,14 +898,23 @@ fun SettingsScreen(
             )
             Card(
                 shape = RoundedCornerShape(16.dp),
-                colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceContainerLowest),
+                colors = CardDefaults.cardColors(containerColor = Color.Transparent),
                 modifier = Modifier.fillMaxWidth(),
             ) {
-                Column(modifier = Modifier.padding(20.dp)) {
+                Column(
+                    modifier = Modifier
+                        .softGlassSurface(
+                            shape = RoundedCornerShape(16.dp),
+                            containerColor = MaterialTheme.colorScheme.surfaceContainerLow.copy(alpha = 0.84f),
+                            borderColor = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.22f),
+                        )
+                        .padding(20.dp),
+                ) {
                     Text(
                         stringResource(R.string.settings_appearance_vibe),
                         style = MaterialTheme.typography.titleSmall,
                         fontWeight = FontWeight.SemiBold,
+                        color = MaterialTheme.colorScheme.onSurface,
                     )
                     Spacer(modifier = Modifier.height(12.dp))
 
@@ -947,10 +965,18 @@ fun SettingsScreen(
             )
             Card(
                 shape = RoundedCornerShape(16.dp),
-                colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceContainerLowest),
+                colors = CardDefaults.cardColors(containerColor = Color.Transparent),
                 modifier = Modifier.fillMaxWidth(),
             ) {
-                Column(modifier = Modifier.padding(20.dp)) {
+                Column(
+                    modifier = Modifier
+                        .softGlassSurface(
+                            shape = RoundedCornerShape(16.dp),
+                            containerColor = MaterialTheme.colorScheme.surfaceContainerLow.copy(alpha = 0.84f),
+                            borderColor = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.22f),
+                        )
+                        .padding(20.dp),
+                ) {
                     if (isPremium) {
                         // Premium active state
                         Row(
@@ -968,6 +994,7 @@ fun SettingsScreen(
                                     stringResource(R.string.settings_premium_title),
                                     style = MaterialTheme.typography.titleSmall,
                                     fontWeight = FontWeight.SemiBold,
+                                    color = MaterialTheme.colorScheme.onSurface,
                                 )
                                 Text(
                                     stringResource(R.string.settings_premium_active),
@@ -1001,6 +1028,7 @@ fun SettingsScreen(
                                     stringResource(R.string.settings_upgrade_premium),
                                     style = MaterialTheme.typography.titleSmall,
                                     fontWeight = FontWeight.SemiBold,
+                                    color = MaterialTheme.colorScheme.onSurface,
                                 )
                                 Text(
                                     stringResource(R.string.settings_premium_price),
@@ -1054,16 +1082,25 @@ fun SettingsScreen(
             )
             Card(
                 shape = RoundedCornerShape(16.dp),
-                colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceContainerLowest),
+                colors = CardDefaults.cardColors(containerColor = Color.Transparent),
                 modifier = Modifier.fillMaxWidth(),
             ) {
-                Column(modifier = Modifier.padding(20.dp)) {
+                Column(
+                    modifier = Modifier
+                        .softGlassSurface(
+                            shape = RoundedCornerShape(16.dp),
+                            containerColor = MaterialTheme.colorScheme.surfaceContainerLow.copy(alpha = 0.84f),
+                            borderColor = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.22f),
+                        )
+                        .padding(20.dp),
+                ) {
                     if (currentHousehold != null) {
                         // Household name header
                         Text(
                             text = currentHousehold?.name ?: stringResource(R.string.settings_my_household_fallback),
                             style = MaterialTheme.typography.titleSmall,
                             fontWeight = FontWeight.SemiBold,
+                            color = MaterialTheme.colorScheme.onSurface,
                         )
                         Spacer(modifier = Modifier.height(16.dp))
 
@@ -1088,6 +1125,7 @@ fun SettingsScreen(
                                 stringResource(R.string.settings_invite_code_label),
                                 style = MaterialTheme.typography.labelMedium,
                                 fontWeight = FontWeight.SemiBold,
+                                color = MaterialTheme.colorScheme.onSurface,
                                 modifier = Modifier.weight(1f),
                             )
                         }
@@ -1115,6 +1153,7 @@ fun SettingsScreen(
                                 stringResource(R.string.settings_manage_housemates),
                                 style = MaterialTheme.typography.labelMedium,
                                 fontWeight = FontWeight.SemiBold,
+                                color = MaterialTheme.colorScheme.onSurface,
                                 modifier = Modifier.weight(1f),
                             )
                         }
@@ -1125,6 +1164,7 @@ fun SettingsScreen(
                             text = stringResource(R.string.settings_no_household),
                             style = MaterialTheme.typography.titleSmall,
                             fontWeight = FontWeight.SemiBold,
+                            color = MaterialTheme.colorScheme.onSurface,
                         )
                         Spacer(modifier = Modifier.height(4.dp))
                         Text(
@@ -1164,6 +1204,7 @@ fun SettingsScreen(
                                 stringResource(R.string.settings_create_household),
                                 style = MaterialTheme.typography.labelMedium,
                                 fontWeight = FontWeight.SemiBold,
+                                color = MaterialTheme.colorScheme.onSurface,
                                 modifier = Modifier.weight(1f),
                             )
                         }
@@ -1200,6 +1241,7 @@ fun SettingsScreen(
                                 stringResource(R.string.settings_join_with_code),
                                 style = MaterialTheme.typography.labelMedium,
                                 fontWeight = FontWeight.SemiBold,
+                                color = MaterialTheme.colorScheme.onSurface,
                                 modifier = Modifier.weight(1f),
                             )
                         }
@@ -1214,17 +1256,27 @@ fun SettingsScreen(
             )
             Card(
                 shape = RoundedCornerShape(16.dp),
-                colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceContainerLowest),
+                colors = CardDefaults.cardColors(containerColor = Color.Transparent),
                 modifier = Modifier.fillMaxWidth(),
             ) {
                 Row(
                     modifier = Modifier
                         .fillMaxWidth()
+                        .softGlassSurface(
+                            shape = RoundedCornerShape(16.dp),
+                            containerColor = MaterialTheme.colorScheme.surfaceContainerLow.copy(alpha = 0.84f),
+                            borderColor = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.22f),
+                        )
                         .padding(20.dp),
                     verticalAlignment = Alignment.CenterVertically,
                 ) {
                     Column(modifier = Modifier.weight(1f)) {
-                        Text(stringResource(R.string.settings_sound_effects), style = MaterialTheme.typography.titleSmall, fontWeight = FontWeight.SemiBold)
+                        Text(
+                            stringResource(R.string.settings_sound_effects),
+                            style = MaterialTheme.typography.titleSmall,
+                            fontWeight = FontWeight.SemiBold,
+                            color = MaterialTheme.colorScheme.onSurface,
+                        )
                         Text(
                             stringResource(R.string.settings_sound_effects_body),
                             style = MaterialTheme.typography.bodySmall,
@@ -1241,17 +1293,24 @@ fun SettingsScreen(
             )
             Card(
                 shape = RoundedCornerShape(16.dp),
-                colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceContainerLowest),
+                colors = CardDefaults.cardColors(containerColor = Color.Transparent),
                 modifier = Modifier.fillMaxWidth(),
             ) {
                 Column(
-                    modifier = Modifier.padding(20.dp),
+                    modifier = Modifier
+                        .softGlassSurface(
+                            shape = RoundedCornerShape(16.dp),
+                            containerColor = MaterialTheme.colorScheme.surfaceContainerLow.copy(alpha = 0.84f),
+                            borderColor = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.22f),
+                        )
+                        .padding(20.dp),
                     verticalArrangement = Arrangement.spacedBy(12.dp),
                 ) {
                     Text(
                         text = stringResource(R.string.settings_active_pet_label),
                         style = MaterialTheme.typography.labelSmall,
                         fontWeight = FontWeight.SemiBold,
+                        color = MaterialTheme.colorScheme.onSurface,
                     )
                     Text(
                         text = activeChoreboo?.name ?: stringResource(R.string.settings_pet_tap_to_manage),
@@ -1279,6 +1338,7 @@ fun SettingsScreen(
                                     text = activeChoreboo?.name.orEmpty(),
                                     style = MaterialTheme.typography.labelMedium,
                                     fontWeight = FontWeight.SemiBold,
+                                    color = MaterialTheme.colorScheme.onSurface,
                                 )
                                 Text(
                                     text = stringResource(R.string.settings_pet_level_format, activeChoreboo?.level ?: 1),
@@ -1322,6 +1382,7 @@ fun SettingsScreen(
                                         text = petType.displayName(),
                                         style = MaterialTheme.typography.labelMedium,
                                         fontWeight = FontWeight.SemiBold,
+                                        color = MaterialTheme.colorScheme.onSurface,
                                     )
                                     if (ownedPet?.isActive == true) {
                                         Text(
@@ -1358,10 +1419,18 @@ fun SettingsScreen(
             )
             Card(
                 shape = RoundedCornerShape(16.dp),
-                colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceContainerLowest),
+                colors = CardDefaults.cardColors(containerColor = Color.Transparent),
                 modifier = Modifier.fillMaxWidth(),
             ) {
-                Column(modifier = Modifier.padding(20.dp)) {
+                Column(
+                    modifier = Modifier
+                        .softGlassSurface(
+                            shape = RoundedCornerShape(16.dp),
+                            containerColor = MaterialTheme.colorScheme.surfaceContainerLow.copy(alpha = 0.84f),
+                            borderColor = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.22f),
+                        )
+                        .padding(20.dp),
+                ) {
                     // Profile photo section
                     Row(
                         modifier = Modifier
