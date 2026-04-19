@@ -22,6 +22,7 @@ import androidx.compose.material.icons.filled.AccountCircle
 import androidx.compose.material.icons.filled.Home
 import androidx.compose.material.icons.filled.PersonAdd
 import androidx.compose.material3.AlertDialog
+import androidx.compose.material3.AlertDialogDefaults
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.Card
@@ -29,6 +30,7 @@ import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.Scaffold
 import androidx.compose.material3.SnackbarHost
 import androidx.compose.material3.SnackbarHostState
 import com.choreboo.app.ui.components.SnackbarType
@@ -46,6 +48,7 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
@@ -58,6 +61,7 @@ import coil3.compose.AsyncImage
 import com.choreboo.app.R
 import com.choreboo.app.domain.model.HouseholdHabitStatus
 import com.choreboo.app.domain.model.HouseholdPet
+import com.choreboo.app.ui.components.ChorebooTopAppBar
 import com.choreboo.app.ui.components.StitchSnackbar
 import com.choreboo.app.ui.habits.components.getEmojiForIconName
 import com.choreboo.app.ui.household.components.HouseholdHabitCard
@@ -75,6 +79,9 @@ fun HouseholdScreen(
     val household by viewModel.currentHousehold.collectAsStateWithLifecycle()
     val pets by viewModel.householdPets.collectAsStateWithLifecycle()
     val habits by viewModel.householdHabits.collectAsStateWithLifecycle()
+    val totalPoints by viewModel.totalPoints.collectAsStateWithLifecycle()
+    val profilePhotoUri by viewModel.profilePhotoUri.collectAsStateWithLifecycle()
+    val googlePhotoUrl by viewModel.googlePhotoUrl.collectAsStateWithLifecycle()
     val selectedPet by viewModel.selectedPet.collectAsStateWithLifecycle()
     val isRefreshing by viewModel.isRefreshing.collectAsStateWithLifecycle()
 
@@ -107,38 +114,41 @@ fun HouseholdScreen(
         )
     }
 
-    Box(modifier = Modifier.fillMaxSize()) {
+    Scaffold(
+        topBar = {
+            ChorebooTopAppBar(
+                profilePhotoUri = profilePhotoUri,
+                googlePhotoUrl = googlePhotoUrl,
+                totalPoints = totalPoints,
+                pointsContentDescription = stringResource(R.string.household_points_cd),
+            ) {
+                Text(
+                    text = household?.name ?: stringResource(R.string.household_title_fallback),
+                    style = MaterialTheme.typography.headlineMedium,
+                    fontWeight = FontWeight.ExtraBold,
+                    color = MaterialTheme.colorScheme.primary,
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis,
+                )
+            }
+        },
+        snackbarHost = { SnackbarHost(snackbarHostState) { StitchSnackbar(it) } },
+        containerColor = Color.Transparent,
+    ) { padding ->
         PullToRefreshBox(
             isRefreshing = isRefreshing,
             onRefresh = { viewModel.refreshData() },
-            modifier = Modifier.fillMaxSize(),
+            modifier = Modifier
+                .fillMaxSize()
+                .padding(padding),
         ) {
             Column(
                 modifier = Modifier
                     .fillMaxSize()
                     .padding(horizontal = 16.dp)
-                    .padding(top = 16.dp, bottom = 96.dp),
+                    .padding(bottom = 96.dp),
             ) {
-                // Header
-                Box(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .softGlassSurface(
-                            shape = RoundedCornerShape(24.dp),
-                            containerColor = MaterialTheme.colorScheme.surfaceContainerLow.copy(alpha = 0.8f),
-                            borderColor = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.22f),
-                        )
-                        .padding(horizontal = 18.dp, vertical = 16.dp),
-                ) {
-                    Text(
-                        text = household?.name ?: stringResource(R.string.household_title_fallback),
-                        style = MaterialTheme.typography.headlineMedium,
-                        fontWeight = FontWeight.ExtraBold,
-                        color = MaterialTheme.colorScheme.primary,
-                    )
-                }
-
-                Spacer(modifier = Modifier.height(16.dp))
+                Spacer(modifier = Modifier.height(8.dp))
 
                 if (household == null) {
                     EmptyHouseholdState(onInvite = onNavigateToSettings)
@@ -147,14 +157,12 @@ fun HouseholdScreen(
                         verticalArrangement = Arrangement.spacedBy(0.dp),
                         contentPadding = PaddingValues(bottom = 8.dp),
                     ) {
-                        // ── Pet grid (up to 5) ───────────────────────────────────
                         if (pets.isEmpty()) {
                             item {
                                 QuietHouseholdState()
                                 Spacer(modifier = Modifier.height(16.dp))
                             }
                         } else {
-                            // Cap at 5 pets. Display as a 2-column grid using chunked rows.
                             val displayPets = pets.take(5)
                             val rows = displayPets.chunked(2)
                             items(rows, key = { row -> "pet_row_${row[0].chorebooId}" }) { row ->
@@ -168,13 +176,7 @@ fun HouseholdScreen(
                             }
                         }
 
-                        // ── Household chores section ─────────────────────────────
                         if (habits.isNotEmpty()) {
-                            // Create a map of uid -> photoUrl for quick lookup
-                            val memberPhotoMap = pets.associate { pet ->
-                                pet.ownerUid to pet.ownerPhotoUrl
-                            }
-
                             item(key = "chores_header") {
                                 Spacer(modifier = Modifier.height(4.dp))
                                 Text(
@@ -193,16 +195,9 @@ fun HouseholdScreen(
                         }
                     }
                 }
-            } // end Column
-        } // end PullToRefreshBox
-
-        SnackbarHost(
-            hostState = snackbarHostState,
-            modifier = Modifier
-                .align(Alignment.BottomCenter)
-                .padding(bottom = 8.dp),
-        ) { data -> StitchSnackbar(data) }
-    } // end Box
+            }
+        }
+    }
 }
 
 // ── Member habits dialog ─────────────────────────────────────────────────
@@ -219,6 +214,11 @@ private fun MemberHabitsDialog(
 ) {
     AlertDialog(
         onDismissRequest = onDismiss,
+        containerColor = MaterialTheme.colorScheme.tertiaryContainer,
+        iconContentColor = MaterialTheme.colorScheme.onTertiaryContainer,
+        titleContentColor = MaterialTheme.colorScheme.onTertiaryContainer,
+        textContentColor = MaterialTheme.colorScheme.onTertiaryContainer,
+        tonalElevation = AlertDialogDefaults.TonalElevation,
         confirmButton = {
             TextButton(onClick = onDismiss) {
                 Text(stringResource(R.string.household_close_button))

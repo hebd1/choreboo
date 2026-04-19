@@ -1,7 +1,5 @@
 package com.choreboo.app.ui.household.components
 
-import androidx.compose.animation.Crossfade
-import androidx.compose.animation.core.tween
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
@@ -29,7 +27,9 @@ import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.key
 import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
@@ -48,6 +48,7 @@ import com.choreboo.app.domain.model.ChorebooMood
 import com.choreboo.app.domain.model.HouseholdPet
 import com.choreboo.app.domain.model.PetType
 import com.choreboo.app.ui.components.PetBackgroundImage
+import com.choreboo.app.ui.components.PetSceneSwipeMask
 import com.choreboo.app.ui.components.WebmAnimationView
 import com.choreboo.app.ui.components.FOX_ANIM_IDLE
 import com.choreboo.app.ui.components.FOX_IDLE_ITERATIONS
@@ -72,7 +73,7 @@ import com.choreboo.app.ui.theme.softGlassSurface
 private enum class HouseholdAnimPhase { MOOD, IDLE }
 
 private val HOUSEHOLD_PET_SCENE_OFFSET_X = 0.dp
-private val HOUSEHOLD_PET_SCENE_OFFSET_Y = 16.dp
+private val HOUSEHOLD_PET_SCENE_OFFSET_Y = 12.dp
 
 /**
  * Compact card designed for a 2-column grid.
@@ -119,6 +120,7 @@ fun HouseholdPetCard(
                         .height(112.dp)
                         .clip(RoundedCornerShape(18.dp)),
                 ) {
+                    var petSceneTransitionKey by remember { mutableIntStateOf(0) }
                     val isDark = isSystemInDarkTheme()
                     val moodBg = when (pet.mood) {
                         ChorebooMood.HAPPY, ChorebooMood.CONTENT ->
@@ -154,10 +156,15 @@ fun HouseholdPetCard(
                         petType = pet.petType,
                         mood = pet.mood,
                         animationOffsetMs = animationOffsetMs,
+                        onTransition = { petSceneTransitionKey++ },
                         modifier = Modifier
                             .align(Alignment.BottomCenter)
                             .offset(x = HOUSEHOLD_PET_SCENE_OFFSET_X, y = HOUSEHOLD_PET_SCENE_OFFSET_Y)
                             .size(94.dp),
+                    )
+                    PetSceneSwipeMask(
+                        transitionKey = petSceneTransitionKey,
+                        modifier = Modifier.fillMaxSize(),
                     )
 
                     OwnerAvatarBadge(
@@ -283,11 +290,21 @@ private fun HouseholdPetAnimation(
     petType: PetType,
     mood: ChorebooMood,
     animationOffsetMs: Long = 0L,
+    onTransition: () -> Unit,
     modifier: Modifier = Modifier,
 ) {
     if (petType == PetType.FOX) {
         var phase by remember { mutableStateOf(HouseholdAnimPhase.MOOD) }
+        var animationKey by remember { mutableIntStateOf(0) }
         var started by remember { mutableStateOf(animationOffsetMs == 0L) }
+
+        fun transitionTo(nextPhase: HouseholdAnimPhase) {
+            if (phase != nextPhase) {
+                phase = nextPhase
+                animationKey++
+                onTransition()
+            }
+        }
 
         // If an offset is specified, delay before starting animations
         LaunchedEffect(Unit) {
@@ -297,51 +314,46 @@ private fun HouseholdPetAnimation(
             }
         }
 
-        val (assetPath, iterations) = when (phase) {
-            HouseholdAnimPhase.MOOD -> foxMoodAssetPath(mood) to 1
-            HouseholdAnimPhase.IDLE -> FOX_ANIM_IDLE to FOX_IDLE_ITERATIONS
-        }
-
         Box(modifier = modifier, contentAlignment = Alignment.Center) {
-            Crossfade(
-                targetState = phase,
-                animationSpec = tween(durationMillis = 100),
-                label = "householdPetAnimCrossfade",
-            ) { animPhase ->
-                val (currentAsset, currentIterations) = when (animPhase) {
-                    HouseholdAnimPhase.MOOD -> foxMoodAssetPath(mood) to 1
-                    HouseholdAnimPhase.IDLE -> FOX_ANIM_IDLE to FOX_IDLE_ITERATIONS
-                }
+            if (started) {
+                key(animationKey, phase, mood) {
+                    val renderedPhase = phase
+                    val (assetPath, iterations) = when (phase) {
+                        HouseholdAnimPhase.MOOD -> foxMoodAssetPath(mood) to 1
+                        HouseholdAnimPhase.IDLE -> FOX_ANIM_IDLE to FOX_IDLE_ITERATIONS
+                    }
 
-                if (started) {
                     WebmAnimationView(
-                        assetPath = currentAsset,
-                        iterations = currentIterations,
+                        assetPath = assetPath,
+                        iterations = iterations,
                         onComplete = {
-                            when (animPhase) {
-                                HouseholdAnimPhase.MOOD -> {
-                                    if (phase == HouseholdAnimPhase.MOOD) {
-                                        phase = HouseholdAnimPhase.IDLE
-                                    }
-                                }
-                                HouseholdAnimPhase.IDLE -> {
-                                    if (phase == HouseholdAnimPhase.IDLE) {
-                                        phase = HouseholdAnimPhase.MOOD
-                                    }
-                                }
+                            if (phase != renderedPhase) return@WebmAnimationView
+
+                            when (renderedPhase) {
+                                HouseholdAnimPhase.MOOD -> transitionTo(HouseholdAnimPhase.IDLE)
+                                HouseholdAnimPhase.IDLE -> transitionTo(HouseholdAnimPhase.MOOD)
                             }
                         },
                         modifier = Modifier.fillMaxSize(),
                     )
-                } else {
-                    // Show a blank box while waiting for the animation to start
-                    Box(modifier = Modifier.fillMaxSize())
                 }
+            } else {
+                // Show a blank box while waiting for the animation to start
+                Box(modifier = Modifier.fillMaxSize())
             }
         }
     } else if (petType == PetType.PANDA) {
         var phase by remember { mutableStateOf(HouseholdAnimPhase.MOOD) }
+        var animationKey by remember { mutableIntStateOf(0) }
         var started by remember { mutableStateOf(animationOffsetMs == 0L) }
+
+        fun transitionTo(nextPhase: HouseholdAnimPhase) {
+            if (phase != nextPhase) {
+                phase = nextPhase
+                animationKey++
+                onTransition()
+            }
+        }
 
         LaunchedEffect(Unit) {
             if (animationOffsetMs > 0) {
@@ -351,39 +363,30 @@ private fun HouseholdPetAnimation(
         }
 
         Box(modifier = modifier, contentAlignment = Alignment.Center) {
-            Crossfade(
-                targetState = phase,
-                animationSpec = tween(durationMillis = 100),
-                label = "householdPandaAnimCrossfade",
-            ) { animPhase ->
-                val (currentAsset, currentIterations) = when (animPhase) {
-                    HouseholdAnimPhase.MOOD -> pandaMoodAssetPath(mood) to 1
-                    HouseholdAnimPhase.IDLE -> PANDA_ANIM_IDLE to PANDA_IDLE_ITERATIONS
-                }
+            if (started) {
+                key(animationKey, phase, mood) {
+                    val renderedPhase = phase
+                    val (assetPath, iterations) = when (phase) {
+                        HouseholdAnimPhase.MOOD -> pandaMoodAssetPath(mood) to 1
+                        HouseholdAnimPhase.IDLE -> PANDA_ANIM_IDLE to PANDA_IDLE_ITERATIONS
+                    }
 
-                if (started) {
                     WebmAnimationView(
-                        assetPath = currentAsset,
-                        iterations = currentIterations,
+                        assetPath = assetPath,
+                        iterations = iterations,
                         onComplete = {
-                            when (animPhase) {
-                                HouseholdAnimPhase.MOOD -> {
-                                    if (phase == HouseholdAnimPhase.MOOD) {
-                                        phase = HouseholdAnimPhase.IDLE
-                                    }
-                                }
-                                HouseholdAnimPhase.IDLE -> {
-                                    if (phase == HouseholdAnimPhase.IDLE) {
-                                        phase = HouseholdAnimPhase.MOOD
-                                    }
-                                }
+                            if (phase != renderedPhase) return@WebmAnimationView
+
+                            when (renderedPhase) {
+                                HouseholdAnimPhase.MOOD -> transitionTo(HouseholdAnimPhase.IDLE)
+                                HouseholdAnimPhase.IDLE -> transitionTo(HouseholdAnimPhase.MOOD)
                             }
                         },
                         modifier = Modifier.fillMaxSize(),
                     )
-                } else {
-                    Box(modifier = Modifier.fillMaxSize())
                 }
+            } else {
+                Box(modifier = Modifier.fillMaxSize())
             }
         }
     } else {

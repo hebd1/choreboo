@@ -440,7 +440,11 @@ private fun StreakXpBentoGrid(
             ) {
                 Column(horizontalAlignment = Alignment.CenterHorizontally) {
                     Row(verticalAlignment = Alignment.CenterVertically) {
-                        Text(text = stringResource(R.string.stats_xp_today), fontSize = 16.sp)
+                        Text(
+                            text = stringResource(R.string.stats_xp_today),
+                            fontSize = 16.sp,
+                            color = MaterialTheme.colorScheme.onSurface,
+                        )
                         Spacer(modifier = Modifier.width(4.dp))
                         Text(
                             text = "+$todayXp",
@@ -467,7 +471,11 @@ private fun StreakXpBentoGrid(
             ) {
                 Column(horizontalAlignment = Alignment.CenterHorizontally) {
                     Row(verticalAlignment = Alignment.CenterVertically) {
-                        Text(text = stringResource(R.string.stats_star_points), fontSize = 16.sp)
+                        Text(
+                            text = stringResource(R.string.stats_star_points),
+                            fontSize = 16.sp,
+                            color = MaterialTheme.colorScheme.onSurface,
+                        )
                         Spacer(modifier = Modifier.width(4.dp))
                         Text(
                             text = "$starPoints",
@@ -573,6 +581,7 @@ private fun PetStatusBentoGrid(
                 Text(
                     text = level.toString(),
                     fontSize = 44.sp,
+                    color = MaterialTheme.colorScheme.onPrimaryContainer,
                     modifier = Modifier.align(Alignment.CenterHorizontally),
                 )
                 Text(
@@ -652,7 +661,8 @@ private fun BadgeBottomSheet(
         onDismissRequest = onDismiss,
         sheetState = sheetState,
         shape = RoundedCornerShape(topStart = 24.dp, topEnd = 24.dp),
-        containerColor = MaterialTheme.colorScheme.surface.copy(alpha = 0.94f),
+        containerColor = MaterialTheme.colorScheme.tertiaryContainer.copy(alpha = 0.96f),
+        contentColor = MaterialTheme.colorScheme.onTertiaryContainer,
     ) {
         Column(
             modifier = Modifier

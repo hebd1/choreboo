@@ -31,6 +31,7 @@ import androidx.compose.material.icons.filled.Lock
 import androidx.compose.material.icons.filled.Visibility
 import androidx.compose.material.icons.filled.VisibilityOff
 import androidx.compose.material3.AlertDialog
+import androidx.compose.material3.AlertDialogDefaults
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.CircularProgressIndicator
@@ -140,6 +141,11 @@ fun AuthScreen(
     if (formState.showForgotPassword) {
         AlertDialog(
             onDismissRequest = { viewModel.toggleForgotPassword(false) },
+            containerColor = MaterialTheme.colorScheme.tertiaryContainer,
+            iconContentColor = MaterialTheme.colorScheme.onTertiaryContainer,
+            titleContentColor = MaterialTheme.colorScheme.onTertiaryContainer,
+            textContentColor = MaterialTheme.colorScheme.onTertiaryContainer,
+            tonalElevation = AlertDialogDefaults.TonalElevation,
             title = { Text(stringResource(R.string.auth_reset_password_title)) },
             text = {
                 Text(

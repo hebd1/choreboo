@@ -593,20 +593,38 @@ class HabitRepository @Inject constructor(
      * Called when the user leaves a household.
      * - Deletes other members' synced household habits from Room.
      * - Converts the user's own household habits to personal (clears isHouseholdHabit + householdId).
+     * - Reconciles reminder ownership now that assigned household work is no longer household-scoped.
      * Write-through updates each converted habit in Data Connect (fire-and-forget, silent on failure).
      */
     suspend fun convertHouseholdHabitsToPersonal(uid: String) {
-        // Remove other members' habits from Room
-        habitDao.deleteNonOwnedHouseholdHabits(uid)
-
-        // Convert own household habits to personal
         val allHabits = habitDao.getAllHabitsSync()
+        val otherMembersHouseholdHabits = allHabits.filter {
+            it.ownerUid != uid && it.isHouseholdHabit
+        }
         val ownHouseholdHabits = allHabits.filter {
             it.ownerUid == uid && it.isHouseholdHabit
         }
+
+        // Remove other members' habits from Room and cancel any reminder alarms they owned.
+        otherMembersHouseholdHabits.forEach { habit ->
+            reminderScheduler.cancel(context, habit.id)
+        }
+        habitDao.deleteNonOwnedHouseholdHabits(uid)
+
+        // Convert own household habits to personal and re-evaluate reminder ownership.
         for (entity in ownHouseholdHabits) {
             val updated = entity.copy(isHouseholdHabit = false, householdId = null, assignedToUid = null, assignedToName = null)
             habitDao.upsertHabit(updated)
+            syncReminderFromCloud(
+                localHabitId = updated.id,
+                title = updated.title,
+                reminderEnabled = updated.reminderEnabled,
+                reminderTime = updated.reminderTime,
+                isArchived = updated.isArchived,
+                customDays = updated.customDays,
+                shouldOwnReminder = true,
+                logTag = "convertHouseholdHabit:${entity.id}",
+            )
 
             // Write-through: update in Data Connect as owner (fire-and-forget, with retry)
             entity.remoteId?.let { remoteId ->

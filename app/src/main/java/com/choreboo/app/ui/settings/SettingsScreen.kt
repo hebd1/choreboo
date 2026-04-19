@@ -41,6 +41,7 @@ import androidx.compose.material.icons.filled.VisibilityOff
 import androidx.compose.material.icons.filled.VolumeUp
 import androidx.compose.material.icons.filled.WorkspacePremium
 import androidx.compose.material3.AlertDialog
+import androidx.compose.material3.AlertDialogDefaults
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.Card
@@ -227,6 +228,11 @@ fun SettingsScreen(
     if (showEditNameDialog) {
         AlertDialog(
             onDismissRequest = { if (!isUpdatingName) showEditNameDialog = false },
+            containerColor = MaterialTheme.colorScheme.tertiaryContainer,
+            iconContentColor = MaterialTheme.colorScheme.onTertiaryContainer,
+            titleContentColor = MaterialTheme.colorScheme.onTertiaryContainer,
+            textContentColor = MaterialTheme.colorScheme.onTertiaryContainer,
+            tonalElevation = AlertDialogDefaults.TonalElevation,
             title = { Text(stringResource(R.string.settings_change_username_title)) },
             text = {
                 Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
@@ -292,6 +298,11 @@ fun SettingsScreen(
     if (showEditPetNameDialog) {
         AlertDialog(
             onDismissRequest = { if (!isUpdatingPetName) showEditPetNameDialog = false },
+            containerColor = MaterialTheme.colorScheme.tertiaryContainer,
+            iconContentColor = MaterialTheme.colorScheme.onTertiaryContainer,
+            titleContentColor = MaterialTheme.colorScheme.onTertiaryContainer,
+            textContentColor = MaterialTheme.colorScheme.onTertiaryContainer,
+            tonalElevation = AlertDialogDefaults.TonalElevation,
             title = { Text(stringResource(R.string.settings_rename_pet)) },
             text = {
                 OutlinedTextField(
@@ -336,6 +347,11 @@ fun SettingsScreen(
         val pendingPetType = PetType.valueOf(pendingPetTypeName)
         AlertDialog(
             onDismissRequest = { if (!isSwitchingPet) showCreatePetDialog = false },
+            containerColor = MaterialTheme.colorScheme.tertiaryContainer,
+            iconContentColor = MaterialTheme.colorScheme.onTertiaryContainer,
+            titleContentColor = MaterialTheme.colorScheme.onTertiaryContainer,
+            textContentColor = MaterialTheme.colorScheme.onTertiaryContainer,
+            tonalElevation = AlertDialogDefaults.TonalElevation,
             title = { Text(stringResource(R.string.settings_name_your_pet_title, pendingPetType.displayName())) },
             text = {
                 OutlinedTextField(
@@ -376,6 +392,11 @@ fun SettingsScreen(
     if (showSignOutDialog) {
         AlertDialog(
             onDismissRequest = { showSignOutDialog = false },
+            containerColor = MaterialTheme.colorScheme.tertiaryContainer,
+            iconContentColor = MaterialTheme.colorScheme.onTertiaryContainer,
+            titleContentColor = MaterialTheme.colorScheme.onTertiaryContainer,
+            textContentColor = MaterialTheme.colorScheme.onTertiaryContainer,
+            tonalElevation = AlertDialogDefaults.TonalElevation,
             title = { Text(stringResource(R.string.settings_sign_out_dialog_title)) },
             text = {
                 Text(
@@ -413,6 +434,11 @@ fun SettingsScreen(
                 resetPassword = ""
                 resetPasswordVisible = false
             },
+            containerColor = MaterialTheme.colorScheme.tertiaryContainer,
+            iconContentColor = MaterialTheme.colorScheme.onTertiaryContainer,
+            titleContentColor = MaterialTheme.colorScheme.onTertiaryContainer,
+            textContentColor = MaterialTheme.colorScheme.onTertiaryContainer,
+            tonalElevation = AlertDialogDefaults.TonalElevation,
             title = { Text(stringResource(R.string.settings_reset_dialog_title)) },
             text = {
                 Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
@@ -521,6 +547,11 @@ fun SettingsScreen(
     if (showPhotoOptionsDialog) {
         AlertDialog(
             onDismissRequest = { showPhotoOptionsDialog = false },
+            containerColor = MaterialTheme.colorScheme.tertiaryContainer,
+            iconContentColor = MaterialTheme.colorScheme.onTertiaryContainer,
+            titleContentColor = MaterialTheme.colorScheme.onTertiaryContainer,
+            textContentColor = MaterialTheme.colorScheme.onTertiaryContainer,
+            tonalElevation = AlertDialogDefaults.TonalElevation,
             title = { Text(stringResource(R.string.settings_change_profile_photo)) },
             text = {
                 Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
@@ -567,6 +598,11 @@ fun SettingsScreen(
         var householdName by rememberSaveable { mutableStateOf("") }
         AlertDialog(
             onDismissRequest = { showCreateHouseholdDialog = false },
+            containerColor = MaterialTheme.colorScheme.tertiaryContainer,
+            iconContentColor = MaterialTheme.colorScheme.onTertiaryContainer,
+            titleContentColor = MaterialTheme.colorScheme.onTertiaryContainer,
+            textContentColor = MaterialTheme.colorScheme.onTertiaryContainer,
+            tonalElevation = AlertDialogDefaults.TonalElevation,
             title = { Text(stringResource(R.string.settings_create_household_dialog_title)) },
             text = {
                 Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
@@ -642,6 +678,11 @@ fun SettingsScreen(
         var inviteCode by rememberSaveable { mutableStateOf("") }
         AlertDialog(
             onDismissRequest = { showJoinDialog = false },
+            containerColor = MaterialTheme.colorScheme.tertiaryContainer,
+            iconContentColor = MaterialTheme.colorScheme.onTertiaryContainer,
+            titleContentColor = MaterialTheme.colorScheme.onTertiaryContainer,
+            textContentColor = MaterialTheme.colorScheme.onTertiaryContainer,
+            tonalElevation = AlertDialogDefaults.TonalElevation,
             title = { Text(stringResource(R.string.settings_join_household_dialog_title)) },
             text = {
                 Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
@@ -703,6 +744,11 @@ fun SettingsScreen(
     if (showInviteDialog) {
         AlertDialog(
             onDismissRequest = { showInviteDialog = false },
+            containerColor = MaterialTheme.colorScheme.tertiaryContainer,
+            iconContentColor = MaterialTheme.colorScheme.onTertiaryContainer,
+            titleContentColor = MaterialTheme.colorScheme.onTertiaryContainer,
+            textContentColor = MaterialTheme.colorScheme.onTertiaryContainer,
+            tonalElevation = AlertDialogDefaults.TonalElevation,
             title = { Text(stringResource(R.string.settings_invite_code_label)) },
             text = {
                 Column(
@@ -743,6 +789,11 @@ fun SettingsScreen(
     if (showManageMembersDialog) {
         AlertDialog(
             onDismissRequest = { showManageMembersDialog = false },
+            containerColor = MaterialTheme.colorScheme.tertiaryContainer,
+            iconContentColor = MaterialTheme.colorScheme.onTertiaryContainer,
+            titleContentColor = MaterialTheme.colorScheme.onTertiaryContainer,
+            textContentColor = MaterialTheme.colorScheme.onTertiaryContainer,
+            tonalElevation = AlertDialogDefaults.TonalElevation,
             title = { Text(stringResource(R.string.settings_household_members)) },
             text = {
                 Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
@@ -822,6 +873,11 @@ fun SettingsScreen(
     if (showLeaveHouseholdDialog) {
         AlertDialog(
             onDismissRequest = { showLeaveHouseholdDialog = false },
+            containerColor = MaterialTheme.colorScheme.tertiaryContainer,
+            iconContentColor = MaterialTheme.colorScheme.onTertiaryContainer,
+            titleContentColor = MaterialTheme.colorScheme.onTertiaryContainer,
+            textContentColor = MaterialTheme.colorScheme.onTertiaryContainer,
+            tonalElevation = AlertDialogDefaults.TonalElevation,
             title = { Text(stringResource(R.string.settings_leave_household_dialog_title)) },
             text = {
                 Text(

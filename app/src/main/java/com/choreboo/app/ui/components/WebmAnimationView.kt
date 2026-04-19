@@ -79,9 +79,7 @@ private fun AnimatedWebpViewImpl(
 
     LaunchedEffect(assetPath) {
         try {
-            // Stop and clear the previous animation before loading the new one.
-            (imageView.drawable as? AnimatedImageDrawable)?.stop()
-            imageView.setImageDrawable(null)
+            val previousDrawable = imageView.drawable as? AnimatedImageDrawable
 
             Timber.d("Loading animated WebP: $assetPath")
             val drawable = withContext(Dispatchers.IO) {
@@ -107,6 +105,7 @@ private fun AnimatedWebpViewImpl(
                 }
             })
 
+            previousDrawable?.stop()
             imageView.setImageDrawable(drawable)
             drawable.start()
             Timber.d("Animation started: $assetPath")

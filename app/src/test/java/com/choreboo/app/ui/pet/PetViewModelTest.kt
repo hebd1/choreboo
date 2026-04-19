@@ -195,17 +195,14 @@ class PetViewModelTest {
     // -----------------------------------------------------------------------
 
     @Test
-    fun `feedChoreboo emits Fed when enough points`() = runTest {
+    fun `feedChoreboo feeds pet when enough points`() = runTest {
         coEvery { userPreferences.deductPoints(10) } returns true
 
         val vm = createViewModel()
         advanceUntilIdle()
 
-        vm.events.test {
-            vm.feedChoreboo()
-            val event = awaitItem()
-            assertTrue(event is PetEvent.Fed)
-        }
+        vm.feedChoreboo()
+        advanceUntilIdle()
 
         coVerify { chorebooRepository.feedChoreboo() }
     }
@@ -259,23 +256,20 @@ class PetViewModelTest {
     // -----------------------------------------------------------------------
 
     @Test
-    fun `sleepChoreboo emits Sleeping when pet is awake`() = runTest {
+    fun `sleepChoreboo puts pet to sleep when pet is awake`() = runTest {
         coEvery { chorebooRepository.getChorebooSync() } returns defaultChoreboo.copy(sleepUntil = 0)
 
         val vm = createViewModel()
         advanceUntilIdle()
 
-        vm.events.test {
-            vm.sleepChoreboo()
-            val event = awaitItem()
-            assertTrue(event is PetEvent.Sleeping)
-        }
+        vm.sleepChoreboo()
+        advanceUntilIdle()
 
         coVerify { chorebooRepository.putToSleep() }
     }
 
     @Test
-    fun `sleepChoreboo emits AlreadySleeping when pet is sleeping`() = runTest {
+    fun `sleepChoreboo does not put pet to sleep when already sleeping`() = runTest {
         val futureSleepUntil = System.currentTimeMillis() + 1_000_000
         coEvery { chorebooRepository.getChorebooSync() } returns defaultChoreboo.copy(
             sleepUntil = futureSleepUntil,
@@ -284,11 +278,8 @@ class PetViewModelTest {
         val vm = createViewModel()
         advanceUntilIdle()
 
-        vm.events.test {
-            vm.sleepChoreboo()
-            val event = awaitItem()
-            assertTrue(event is PetEvent.AlreadySleeping)
-        }
+        vm.sleepChoreboo()
+        advanceUntilIdle()
 
         coVerify(exactly = 0) { chorebooRepository.putToSleep() }
     }
@@ -473,27 +464,46 @@ class PetViewModelTest {
     }
 
     @Test
-    fun `habits sorts completed habits to the bottom`() = runTest {
-        // Three habits: ids 1, 2, 3 in DAO order
+    fun `habits sorts completed habits to the bottom by completion time`() = runTest {
+        // Four habits: ids 1, 2, 3, 4 in DAO order
         habitsFlow.value = listOf(
             Habit(id = 1, title = "First"),
             Habit(id = 2, title = "Second"),
             Habit(id = 3, title = "Third"),
+            Habit(id = 4, title = "Fourth"),
         )
-        // Habit 2 has a completion today — it should sink to the bottom
+        // Habits 2 and 3 are complete today; the more recently completed one should be last.
         logsForDateFlow.value = listOf(
-            HabitLog(id = 1, habitId = 2, date = "2026-04-14", xpEarned = 10, streakAtCompletion = 0, completedByUid = null),
+            HabitLog(
+                id = 1,
+                habitId = 2,
+                completedAt = 100L,
+                date = "2026-04-14",
+                xpEarned = 10,
+                streakAtCompletion = 0,
+                completedByUid = null,
+            ),
+            HabitLog(
+                id = 2,
+                habitId = 3,
+                completedAt = 200L,
+                date = "2026-04-14",
+                xpEarned = 10,
+                streakAtCompletion = 0,
+                completedByUid = null,
+            ),
         )
 
         val vm = createViewModel()
 
         vm.habits.test {
             val habits = awaitItem()
-            assertEquals(3, habits.size)
-            // Incomplete habits come first (original order preserved), completed last
+            assertEquals(4, habits.size)
+            // Incomplete habits stay in DAO order, completed habits are ordered oldest -> newest.
             assertEquals(1L, habits[0].id)
-            assertEquals(3L, habits[1].id)
+            assertEquals(4L, habits[1].id)
             assertEquals(2L, habits[2].id)
+            assertEquals(3L, habits[3].id)
         }
     }
 

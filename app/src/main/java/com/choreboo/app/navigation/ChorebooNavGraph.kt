@@ -65,16 +65,10 @@ fun ChorebooNavGraph(
             )
         }
 
-        composable(Screen.Pet.route) { backStackEntry ->
-            val habitCreated by backStackEntry.savedStateHandle
-                .getStateFlow("habitCreated", false)
-                .collectAsStateWithLifecycle()
-
+        composable(Screen.Pet.route) {
             PetScreen(
                 onAddHabit = { navController.navigate(Screen.AddEditHabit.createRoute()) },
                 onEditHabit = { id -> navController.navigate(Screen.AddEditHabit.createRoute(id)) },
-                habitJustCreated = habitCreated,
-                onHabitCreatedConsumed = { backStackEntry.savedStateHandle["habitCreated"] = false },
             )
         }
 
@@ -90,18 +84,13 @@ fun ChorebooNavGraph(
                     defaultValue = -1L
                 }
             )
-        ) {
-            AddEditHabitScreen(
-                onNavigateBack = { navController.popBackStack() },
-                onSavedBack = { isNew ->
-                    if (isNew) {
-                        navController.previousBackStackEntry
-                            ?.savedStateHandle
-                            ?.set("habitCreated", true)
-                    }
-                    navController.popBackStack()
-                },
-                onDeletedBack = { navController.popBackStack() },
+                ) {
+                    AddEditHabitScreen(
+                        onNavigateBack = { navController.popBackStack() },
+                        onSavedBack = {
+                            navController.popBackStack()
+                        },
+                        onDeletedBack = { navController.popBackStack() },
             )
         }
 

@@ -129,6 +129,27 @@ class HabitRepositorySyncTest {
     }
 
     @Test
+    fun `convertHouseholdHabitsToPersonal keeps owned household habit by upserting instead of deleting`() = runTest {
+        val ownHouseholdHabit = habitEntity(
+            id = 1L,
+            ownerUid = testUid,
+            isHouseholdHabit = true,
+            householdId = "hh-001",
+            assignedToUid = otherUid,
+            assignedToName = "Other User",
+        )
+        coEvery { habitDao.getAllHabitsSync() } returns listOf(ownHouseholdHabit)
+        coEvery { habitDao.upsertHabit(any()) } returns 1L
+
+        repo.convertHouseholdHabitsToPersonal(testUid)
+
+        coVerify(exactly = 1) { habitDao.upsertHabit(any()) }
+        coVerify(exactly = 0) { habitDao.deleteHabit(any()) }
+        coVerify(exactly = 0) { habitDao.deleteHabitById(any()) }
+        coVerify(exactly = 1) { habitDao.deleteNonOwnedHouseholdHabits(testUid) }
+    }
+
+    @Test
     fun `convertHouseholdHabitsToPersonal skips other users household habits`() = runTest {
         // This habit is owned by another user — should NOT be converted
         val otherUsersHabit = habitEntity(
@@ -167,6 +188,80 @@ class HabitRepositorySyncTest {
 
         // Both should be converted
         coVerify(exactly = 2) { habitDao.upsertHabit(any()) }
+    }
+
+    @Test
+    fun `convertHouseholdHabitsToPersonal cancels reminders for deleted other members household habits`() = runTest {
+        val otherUsersHabit = habitEntity(
+            id = 7L,
+            ownerUid = otherUid,
+            isHouseholdHabit = true,
+            householdId = "hh-001",
+        ).copy(
+            reminderEnabled = true,
+            reminderTime = "07:45",
+        )
+        coEvery { habitDao.getAllHabitsSync() } returns listOf(otherUsersHabit)
+
+        repo.convertHouseholdHabitsToPersonal(testUid)
+
+        coVerify(exactly = 1) { reminderScheduler.cancel(any(), 7L) }
+        coVerify(exactly = 1) { habitDao.deleteNonOwnedHouseholdHabits(testUid) }
+        coVerify(exactly = 0) { reminderScheduler.schedule(any(), any(), any(), any(), any()) }
+    }
+
+    @Test
+    fun `convertHouseholdHabitsToPersonal reschedules converted owned habit reminder for owner`() = runTest {
+        val ownAssignedHouseholdHabit = habitEntity(
+            id = 8L,
+            title = "Take out trash",
+            ownerUid = testUid,
+            isHouseholdHabit = true,
+            householdId = "hh-001",
+            assignedToUid = otherUid,
+            assignedToName = "Other User",
+        ).copy(
+            reminderEnabled = true,
+            reminderTime = "06:30",
+            customDays = "MON,THU",
+        )
+        coEvery { habitDao.getAllHabitsSync() } returns listOf(ownAssignedHouseholdHabit)
+        coEvery { habitDao.upsertHabit(any()) } returns 8L
+
+        repo.convertHouseholdHabitsToPersonal(testUid)
+
+        coVerify(exactly = 1) {
+            reminderScheduler.schedule(
+                any(),
+                8L,
+                "Take out trash",
+                LocalTime.of(6, 30),
+                listOf("MON", "THU"),
+            )
+        }
+        coVerify(exactly = 0) { reminderScheduler.cancel(any(), 8L) }
+    }
+
+    @Test
+    fun `convertHouseholdHabitsToPersonal cancels converted owned habit reminder when archived`() = runTest {
+        val archivedOwnHouseholdHabit = habitEntity(
+            id = 9L,
+            title = "Laundry",
+            ownerUid = testUid,
+            isHouseholdHabit = true,
+            householdId = "hh-001",
+        ).copy(
+            reminderEnabled = true,
+            reminderTime = "10:00",
+            isArchived = true,
+        )
+        coEvery { habitDao.getAllHabitsSync() } returns listOf(archivedOwnHouseholdHabit)
+        coEvery { habitDao.upsertHabit(any()) } returns 9L
+
+        repo.convertHouseholdHabitsToPersonal(testUid)
+
+        coVerify(exactly = 1) { reminderScheduler.cancel(any(), 9L) }
+        coVerify(exactly = 0) { reminderScheduler.schedule(any(), any(), any(), any(), any()) }
     }
 
     // ── deleteHabit ─────────────────────────────────────────────────────

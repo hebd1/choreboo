@@ -31,6 +31,20 @@ class HouseholdViewModel @Inject constructor(
     private val authRepository: AuthRepository,
 ) : ViewModel() {
 
+    val totalPoints: StateFlow<Int> = userPreferences.totalPoints
+        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), 0)
+
+    val profilePhotoUri: StateFlow<String?> = userPreferences.profilePhotoUri
+        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), null)
+
+    val googlePhotoUrl: StateFlow<String?> = authRepository.currentUser
+        .map { it?.photoUrl?.toString() }
+        .stateIn(
+            viewModelScope,
+            SharingStarted.WhileSubscribed(5000),
+            authRepository.currentFirebaseUser?.photoUrl?.toString(),
+        )
+
     val currentHousehold: StateFlow<Household?> = householdRepository.currentHousehold
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), null)
 

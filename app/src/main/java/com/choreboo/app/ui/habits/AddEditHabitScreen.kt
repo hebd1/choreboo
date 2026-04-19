@@ -41,6 +41,7 @@ import androidx.compose.material.icons.filled.PersonOutline
 import androidx.compose.material.icons.filled.Schedule
 import androidx.compose.material.icons.filled.TaskAlt
 import androidx.compose.material3.AlertDialog
+import androidx.compose.material3.AlertDialogDefaults
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.HorizontalDivider
@@ -645,6 +646,11 @@ fun AddEditHabitScreen(
     if (showDeleteConfirm) {
         AlertDialog(
             onDismissRequest = { showDeleteConfirm = false },
+            containerColor = MaterialTheme.colorScheme.tertiaryContainer,
+            iconContentColor = MaterialTheme.colorScheme.onTertiaryContainer,
+            titleContentColor = MaterialTheme.colorScheme.onTertiaryContainer,
+            textContentColor = MaterialTheme.colorScheme.onTertiaryContainer,
+            tonalElevation = AlertDialogDefaults.TonalElevation,
             title = { Text(stringResource(R.string.pet_delete_habit_title), fontWeight = FontWeight.Bold) },
             text = { Text(stringResource(R.string.add_habit_delete_confirm_body)) },
             confirmButton = {
@@ -673,11 +679,6 @@ private fun ChorebooTopBar(
     Row(
         modifier = Modifier
             .fillMaxWidth()
-            .softGlassSurface(
-                shape = RoundedCornerShape(28.dp),
-                containerColor = MaterialTheme.colorScheme.surfaceContainerLow.copy(alpha = 0.8f),
-                borderColor = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.22f),
-            )
             .padding(horizontal = 16.dp, vertical = 12.dp),
         horizontalArrangement = Arrangement.SpaceBetween,
         verticalAlignment = Alignment.CenterVertically,
@@ -935,6 +936,11 @@ private fun ReminderCard(
     if (showPermissionDialog) {
         AlertDialog(
             onDismissRequest = { showPermissionDialog = false },
+            containerColor = MaterialTheme.colorScheme.tertiaryContainer,
+            iconContentColor = MaterialTheme.colorScheme.onTertiaryContainer,
+            titleContentColor = MaterialTheme.colorScheme.onTertiaryContainer,
+            textContentColor = MaterialTheme.colorScheme.onTertiaryContainer,
+            tonalElevation = AlertDialogDefaults.TonalElevation,
             title = { Text(stringResource(R.string.add_habit_notification_permission_title)) },
             text = { Text(stringResource(R.string.add_habit_notification_permission_body)) },
             confirmButton = {
@@ -1100,6 +1106,11 @@ private fun TimePickerDialog(
 
     AlertDialog(
         onDismissRequest = onDismiss,
+        containerColor = MaterialTheme.colorScheme.tertiaryContainer,
+        iconContentColor = MaterialTheme.colorScheme.onTertiaryContainer,
+        titleContentColor = MaterialTheme.colorScheme.onTertiaryContainer,
+        textContentColor = MaterialTheme.colorScheme.onTertiaryContainer,
+        tonalElevation = AlertDialogDefaults.TonalElevation,
         title = { Text(stringResource(R.string.add_habit_select_time)) },
         text = {
             TimePicker(state = state)
@@ -1129,6 +1140,11 @@ private fun EmojiPickerDialog(    onEmojiSelected: (String) -> Unit,
 
     AlertDialog(
         onDismissRequest = onDismiss,
+        containerColor = MaterialTheme.colorScheme.tertiaryContainer,
+        iconContentColor = MaterialTheme.colorScheme.onTertiaryContainer,
+        titleContentColor = MaterialTheme.colorScheme.onTertiaryContainer,
+        textContentColor = MaterialTheme.colorScheme.onTertiaryContainer,
+        tonalElevation = AlertDialogDefaults.TonalElevation,
         title = { Text(stringResource(R.string.add_habit_custom_emoji_dialog)) },
         text = {
             Box(

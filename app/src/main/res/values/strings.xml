@@ -338,6 +338,7 @@
     <string name="calendar_legend_none">None</string>
 
     <!-- ===== HOUSEHOLD SCREEN ===== -->
+    <string name="household_points_cd">Points</string>
     <string name="household_title_fallback">Household</string>
     <string name="household_chores_section">Household Chores</string>
     <string name="household_close_button">Close</string>

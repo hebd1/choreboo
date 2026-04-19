@@ -70,6 +70,7 @@ import androidx.compose.ui.text.input.ImeAction
 import androidx.hilt.navigation.compose.hiltViewModel
 import com.choreboo.app.R
 import com.choreboo.app.domain.model.PetType
+import com.choreboo.app.ui.components.StitchSnackbar
 import com.choreboo.app.ui.theme.softGlassSurface
 import com.choreboo.app.ui.util.displayName
 import com.choreboo.app.ui.util.findActivity
@@ -247,7 +248,9 @@ fun OnboardingScreen(
         SnackbarHost(
             hostState = snackbarHostState,
             modifier = Modifier.align(Alignment.BottomCenter),
-        )
+        ) { data ->
+            StitchSnackbar(data)
+        }
     }
 }
 

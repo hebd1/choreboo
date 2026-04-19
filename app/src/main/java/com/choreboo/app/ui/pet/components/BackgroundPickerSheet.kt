@@ -77,7 +77,8 @@ fun BackgroundPickerSheet(
     ModalBottomSheet(
         onDismissRequest = onDismiss,
         sheetState = sheetState,
-        containerColor = MaterialTheme.colorScheme.surface.copy(alpha = 0.92f),
+        containerColor = MaterialTheme.colorScheme.tertiaryContainer.copy(alpha = 0.96f),
+        contentColor = MaterialTheme.colorScheme.onTertiaryContainer,
     ) {
         Column(modifier = Modifier.fillMaxWidth()) {
             // Header
@@ -268,7 +269,7 @@ private fun BackgroundCell(
                         modifier = Modifier
                             .clip(RoundedCornerShape(50.dp))
                             .background(
-                                if (canAfford) MaterialTheme.colorScheme.secondary
+                                if (canAfford) MaterialTheme.colorScheme.tertiary
                                 else MaterialTheme.colorScheme.surfaceContainerHighest,
                             )
                             .clickable(enabled = canAfford) { onPurchase() }
@@ -281,7 +282,7 @@ private fun BackgroundCell(
                             Icon(
                                 Icons.Default.Stars,
                                 contentDescription = null,
-                                tint = if (canAfford) MaterialTheme.colorScheme.onSecondary
+                                tint = if (canAfford) MaterialTheme.colorScheme.onTertiary
                                 else MaterialTheme.colorScheme.onSurfaceVariant,
                                 modifier = Modifier.size(10.dp),
                             )
@@ -289,7 +290,7 @@ private fun BackgroundCell(
                                 text = "${item.cost}",
                                 style = MaterialTheme.typography.labelSmall,
                                 fontWeight = FontWeight.Bold,
-                                color = if (canAfford) MaterialTheme.colorScheme.onSecondary
+                                color = if (canAfford) MaterialTheme.colorScheme.onTertiary
                                 else MaterialTheme.colorScheme.onSurfaceVariant,
                             )
                         }

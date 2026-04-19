@@ -124,18 +124,33 @@ class PetViewModel @Inject constructor(
         }
         .onEach { _isLoading.value = false }
 
-    /** Today's completions as a reactive flow — no manual refresh needed. */
-    val todayCompletions: StateFlow<Map<Long, Int>> = _todayDate
+    /** Today's habit logs as a shared upstream for completion state and ordering. */
+    private val todayLogs = _todayDate
         .flatMapLatest { date -> habitRepository.getLogsForDate(date) }
+        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), emptyList())
+
+    /** Today's completions as a reactive flow — no manual refresh needed. */
+    val todayCompletions: StateFlow<Map<Long, Int>> = todayLogs
         .map { logs -> logs.groupBy { it.habitId }.mapValues { it.value.size } }
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), emptyMap())
 
+    /** Latest completion timestamp for each habit completed today — drives completed-item ordering. */
+    private val latestCompletionTimes: StateFlow<Map<Long, Long>> = todayLogs
+        .map { logs -> logs.groupBy { it.habitId }.mapValues { (_, value) -> value.maxOf { it.completedAt } } }
+        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), emptyMap())
+
     /**
-     * Habits sorted so completed habits (any completion today) sink to the bottom.
-     * Within each group the original DAO order (createdAt DESC) is preserved via stable sort.
+     * Habits sorted so incomplete items stay first, while completed items are ordered by the
+     * time they were completed today. This lets a newly completed habit animate to the true
+     * bottom of the list instead of jumping to the top of the completed section.
      */
-    val habits: StateFlow<List<Habit>> = combine(_rawHabits, todayCompletions) { habitList, completions ->
-        habitList.sortedWith(compareBy { (completions[it.id] ?: 0) >= 1 })
+    val habits: StateFlow<List<Habit>> = combine(
+        _rawHabits,
+        todayCompletions,
+        latestCompletionTimes,
+    ) { habitList, completions, completionTimes ->
+        val (incompleteHabits, completedHabits) = habitList.partition { (completions[it.id] ?: 0) < 1 }
+        incompleteHabits + completedHabits.sortedBy { completionTimes[it.id] ?: Long.MAX_VALUE }
     }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), emptyList())
 
     val streaks: StateFlow<Map<Long, Int>> = habitRepository.getStreaksForToday()
@@ -206,10 +221,7 @@ class PetViewModel @Inject constructor(
      * (only populated for habits NOT completed by the current user).
      * Used to show "Completed by [name]" on household habit cards.
      */
-    val householdCompleterNames: StateFlow<Map<Long, String?>> = combine(
-        _todayDate.flatMapLatest { date -> habitRepository.getLogsForDate(date) },
-        householdRepository.householdMembers,
-    ) { logs, members ->
+    val householdCompleterNames: StateFlow<Map<Long, String?>> = combine(todayLogs, householdRepository.householdMembers) { logs, members ->
         val memberNameMap = members.associate { it.uid to it.displayName }
         val currentUid = authRepository.currentFirebaseUser?.uid
         logs
@@ -271,7 +283,6 @@ class PetViewModel @Inject constructor(
                 if (deducted) {
                     chorebooRepository.feedChoreboo()
                     _isEating.value = true
-                    _events.emit(PetEvent.Fed)
                     // Write-through: sync deducted points so cloud stays current
                     val newPoints = userPreferences.totalPoints.first()
                     val newLifetimeXp = userPreferences.totalLifetimeXp.first()
@@ -292,10 +303,9 @@ class PetViewModel @Inject constructor(
             try {
                 val choreboo = chorebooRepository.getChorebooSync()
                 if (choreboo?.isSleeping() == true) {
-                    _events.emit(PetEvent.AlreadySleeping)
+                    return@launch
                 } else {
                     chorebooRepository.putToSleep()
-                    _events.emit(PetEvent.Sleeping)
                 }
             } catch (e: Exception) {
                 Timber.e(e, "sleepChoreboo failed")
@@ -375,8 +385,7 @@ class PetViewModel @Inject constructor(
 
     /**
      * Purchase a background: deduct points and record the unlock.
-     * Emits [PetEvent.BackgroundPurchased] on success or [PetEvent.InsufficientPoints] if
-     * the user doesn't have enough points.
+     * Emits [PetEvent.InsufficientPoints] if the user doesn't have enough points.
      */
     fun purchaseBackground(item: BackgroundItem) {
         viewModelScope.launch {
@@ -397,7 +406,6 @@ class PetViewModel @Inject constructor(
                     newPoints = userPreferences.totalPoints.first()
                 }
                 backgroundRepository.purchaseBackground(item.id, cost, newPoints)
-                _events.emit(PetEvent.BackgroundPurchased(item))
             } catch (e: Exception) {
                 Timber.e(e, "purchaseBackground failed for item=${item.id}")
                 _events.emit(PetEvent.PurchaseError)
@@ -426,10 +434,7 @@ class PetViewModel @Inject constructor(
 }
 
 sealed class PetEvent {
-    data object Fed : PetEvent()
     data object InsufficientPoints : PetEvent()
-    data object Sleeping : PetEvent()
-    data object AlreadySleeping : PetEvent()
     data class HabitCompleted(
         val habitId: Long,
         val xpEarned: Int,
@@ -445,5 +450,4 @@ sealed class PetEvent {
     data object SleepError : PetEvent()
     data object DeleteError : PetEvent()
     data object PurchaseError : PetEvent()
-    data class BackgroundPurchased(val item: BackgroundItem) : PetEvent()
 }
