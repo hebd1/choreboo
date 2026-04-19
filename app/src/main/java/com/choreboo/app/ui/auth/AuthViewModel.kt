@@ -179,7 +179,7 @@ class AuthViewModel @Inject constructor(
                 // Phase 3: Detect whether this user has already completed onboarding.
                 // A non-null choreboo in Room (just synced from cloud) means they have.
                 // Restore the local DataStore flag so cold-start and post-login both agree.
-                val hasChoreboo = chorebooRepository.getChorebooSync() != null
+                val hasChoreboo = chorebooRepository.hasAnyChoreboo()
                 if (hasChoreboo) {
                     userPreferences.setOnboardingComplete(true)
                 }

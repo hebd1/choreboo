@@ -7,7 +7,9 @@ import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
@@ -23,6 +25,7 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.choreboo.app.R
 import com.choreboo.app.domain.model.HouseholdHabitStatus
+import com.choreboo.app.ui.habits.components.getEmojiForIconName
 import androidx.compose.ui.res.stringResource
 
 /**
@@ -39,6 +42,7 @@ fun HouseholdHabitCard(
     modifier: Modifier = Modifier,
 ) {
     val isCompleted = habit.completedByName != null
+    val emoji = getEmojiForIconName(habit.iconName)
 
     Card(
         modifier = modifier.fillMaxWidth(),
@@ -56,6 +60,26 @@ fun HouseholdHabitCard(
                 .padding(horizontal = 16.dp, vertical = 12.dp),
             verticalAlignment = Alignment.CenterVertically,
         ) {
+            Box(
+                modifier = Modifier
+                    .size(44.dp)
+                    .clip(CircleShape)
+                    .background(
+                        if (isCompleted) {
+                            MaterialTheme.colorScheme.primary.copy(alpha = 0.15f)
+                        } else {
+                            MaterialTheme.colorScheme.surfaceContainerHighest
+                        }
+                    ),
+                contentAlignment = Alignment.Center,
+            ) {
+                Text(
+                    text = emoji,
+                    fontSize = 22.sp,
+                )
+            }
+
+            Spacer(modifier = Modifier.width(12.dp))
 
             Column(modifier = Modifier.weight(1f)) {
                 Text(

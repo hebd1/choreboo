@@ -18,6 +18,7 @@ type User @table {
   email: String
   photoUrl: String
   household: Household @ref
+  activeChoreboo: Choreboo @ref
   createdAt: Timestamp! @default(expr: "request.time")
   totalPoints: Int! @default(value: 0)
   totalLifetimeXp: Int! @default(value: 0)
@@ -34,12 +35,12 @@ type Household @table {
 }
 
 # ---- Choreboo (Pet) ----
-# One per user. Owner tracked by ownerUid FK to User.
+# One per pet type per user. Owner tracked by ownerUid FK to User.
 # backgroundId references the selected background from the BACKGROUND_REGISTRY (e.g. "sunset").
 # Null means the default mood-based gradient is shown.
-type Choreboo @table {
+type Choreboo @table @unique(fields: ["owner", "petType"]) {
   id: UUID! @default(expr: "uuidV4()")
-  owner: User! @ref @unique
+  owner: User! @ref
   name: String!
   stage: String!
   level: Int!

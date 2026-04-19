@@ -24,7 +24,7 @@ A Tamagotchi-style habit tracker Android app where users complete daily habits t
 - **Database:** Room (local cache) + Firebase Data Connect (PostgreSQL cloud backend)
 - **Auth:** Firebase Auth (email/password + Google sign-in via **Android Credential Manager API** — `androidx.credentials` 1.5.0 + `googleid` 1.1.1; legacy GMS `GoogleSignIn` API not used)
 - **Preferences:** DataStore
-- **Animations:** Lottie Compose (placeholder emoji for now, swappable to Lottie later)
+- **Animations:** Animated WebP assets via `AnimatedImageDrawable` with emoji fallback on unsupported pet types / API levels
 - **Images:** Coil
 - **Background Work:** AlarmManager (per-habit reminders) + WorkManager (reschedule on reboot)
 - **Widget:** Glance (not yet implemented)
@@ -43,7 +43,7 @@ A Tamagotchi-style habit tracker Android app where users complete daily habits t
   ├── navigation/                      # ChorebooNavGraph.kt, Screen sealed class (8 routes)
   ├── data/
   │   ├── local/
-│   │   ├── ChorebooDatabase.kt      # Room DB v16, 7 entities, fallbackToDestructiveMigration
+│   │   ├── ChorebooDatabase.kt      # Room DB v23, 7 entities, fallbackToDestructiveMigration
 │   │   ├── converter/
 │   │   │   └── Converters.kt        # Gson TypeConverter for List<String>
 │   │   ├── entity/                  # HabitEntity, HabitLogEntity, ChorebooEntity, HouseholdMemberEntity, HouseholdEntity, HouseholdHabitStatusEntity, PurchasedBackgroundEntity
@@ -73,10 +73,10 @@ A Tamagotchi-style habit tracker Android app where users complete daily habits t
       └── BootReceiver.kt             # BOOT_COMPLETED receiver that triggers ReminderRescheduleWorker
   ```
 
-## Room Database Schema (v16, 7 entities)
+## Room Database Schema (v23, 7 entities)
 - **habits** – id, title, description, iconName, customDays, difficulty, baseXp, reminderEnabled, reminderTime, createdAt, isArchived, isHouseholdHabit, ownerUid, householdId, assignedToUid, assignedToName, remoteId (`remoteId` indexed)
 - **habit_logs** – id, habitId (FK→habits CASCADE), completedAt, date (ISO string), xpEarned, streakAtCompletion, completedByUid, remoteId (`remoteId` indexed, `date` indexed, UNIQUE(`habitId`, `date`))
-- **choreboos** – id, name, stage, level, xp, hunger, happiness, energy, petType, lastInteractionAt, createdAt, sleepUntil, ownerUid, remoteId, backgroundId (`remoteId` indexed)
+- **choreboos** – id, name, stage, level, xp, hunger, happiness, energy, petType, lastInteractionAt, createdAt, sleepUntil, ownerUid, remoteId, isActive, backgroundId (`remoteId` indexed, UNIQUE(`ownerUid`, `petType`))
 - **household_members** – uid (String PK = Firebase Auth UID), displayName, photoUrl, email, chorebooId, chorebooName, chorebooStage, chorebooLevel, chorebooXp, chorebooHunger, chorebooHappiness, chorebooEnergy, chorebooPetType, chorebooBackgroundId, lastSyncedAt
 - **households** – id (String PK = Data Connect UUID), name, inviteCode, createdByUid, createdByName
 - **household_habit_statuses** – habitId (String PK = Data Connect UUID), title, iconName, ownerName, ownerUid, baseXp, assignedToUid, assignedToName, completedByName, completedByUid, cachedDate
@@ -172,8 +172,8 @@ Deploy the backend (Data Connect schema/connectors + Storage rules) to the `chor
 Emoji-based system using `EmojiIcon` data class. 15 preset emoji (e.g., "🥗", "💧", "🏃", "📚", "🧘", "🎵", "🔥", "🏋️", "😴", "💻", "🍽️", "🧹", "📖", "🎨", "❤️") plus custom emoji input. Not Material Icons.
 
 ## Pet Animation Strategy
-- Currently using placeholder emoji per stage
-- Designed to be swapped with Lottie JSON files in `res/raw/` (choreboo_idle.json, choreboo_happy.json, etc.)
+- FOX and PANDA use animated WebP assets; AXOLOTL and CAPYBARA still use emoji placeholders
+- `WebmAnimationView` selects the correct asset set and falls back gracefully on API 24-27
 - `PetAnimationView` composable selects animation based on `ChorebooMood`
 - Pet size scales by `ChorebooStage`
 
@@ -201,5 +201,4 @@ Emoji-based system using `EmojiIcon` data class. 15 preset emoji (e.g., "🥗", 
 - Glance widget (today's habits + pet mood)
 - Sound effects (play on completion, feeding, level-up)
 - Lottie animations (replace emoji placeholders)
-- Multiple Choreboos
 - IME keyboard padding (`imePadding()` not yet applied to Auth, Onboarding, AddEditHabit, Settings screens)

@@ -124,7 +124,7 @@ class OnboardingViewModelTest {
 
     @Test
     fun `hatchChoreboo advances to STEP_PAYWALL on success`() = runTest {
-        coEvery { chorebooRepository.getOrCreateChoreboo(any(), any()) } returns mockk(relaxed = true)
+        coEvery { chorebooRepository.createOrActivatePetType(any(), any()) } returns mockk(relaxed = true)
         val vm = createViewModel()
         vm.hatchChoreboo("Foxy")
         assertEquals(STEP_PAYWALL, vm.currentStep.value)
@@ -132,7 +132,7 @@ class OnboardingViewModelTest {
 
     @Test
     fun `hatchChoreboo emits Error event on failure`() = runTest {
-        coEvery { chorebooRepository.getOrCreateChoreboo(any(), any()) } throws RuntimeException("DB error")
+        coEvery { chorebooRepository.createOrActivatePetType(any(), any()) } throws RuntimeException("DB error")
         val vm = createViewModel()
 
         vm.events.test {
@@ -146,18 +146,29 @@ class OnboardingViewModelTest {
 
     @Test
     fun `hatchChoreboo uses pet type name as default name when chorebooName is blank`() = runTest {
-        coEvery { chorebooRepository.getOrCreateChoreboo(any(), any()) } returns mockk(relaxed = true)
+        coEvery { chorebooRepository.createOrActivatePetType(any(), any()) } returns mockk(relaxed = true)
         val vm = createViewModel()
         vm.selectPetType(PetType.PANDA)
         vm.hatchChoreboo("")
-        coVerify { chorebooRepository.getOrCreateChoreboo("Panda", PetType.PANDA) }
+        coVerify { chorebooRepository.createOrActivatePetType("Panda", PetType.PANDA) }
+    }
+
+    @Test
+    fun `hatchChoreboo does not create premium pet when user is not premium`() = runTest {
+        val vm = createViewModel()
+        vm.selectPetType(PetType.CAPYBARA)
+
+        vm.hatchChoreboo("Capy")
+
+        coVerify(exactly = 0) { chorebooRepository.createOrActivatePetType(any(), any()) }
+        assertEquals(STEP_PAYWALL, vm.currentStep.value)
     }
 
     // ── skipPremium ──────────────────────────────────────────────────────────
 
     @Test
     fun `skipPremium completes onboarding for free pet type`() = runTest {
-        coEvery { chorebooRepository.getOrCreateChoreboo(any(), any()) } returns mockk(relaxed = true)
+        coEvery { chorebooRepository.createOrActivatePetType(any(), any()) } returns mockk(relaxed = true)
         val vm = createViewModel()
         vm.selectPetType(PetType.FOX)
         vm.hatchChoreboo("Foxy")
@@ -173,7 +184,7 @@ class OnboardingViewModelTest {
 
     @Test
     fun `skipPremium emits PremiumPetFallback event for premium pet type`() = runTest {
-        coEvery { chorebooRepository.getOrCreateChoreboo(any(), any()) } returns mockk(relaxed = true)
+        coEvery { chorebooRepository.createOrActivatePetType(any(), any()) } returns mockk(relaxed = true)
         coEvery { chorebooRepository.getChorebooNameSync() } returns "Axey"
         val vm = createViewModel()
         vm.selectPetType(PetType.AXOLOTL)

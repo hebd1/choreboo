@@ -82,7 +82,7 @@ class AuthViewModelTest {
         every { userPreferences.profilePhotoUri } returns flowOf(null)
         coEvery { authRepository.signInWithGoogle("google-token") } returns AuthResult.Success(mockUser)
         coEvery { syncManager.syncAll(any()) } returns true
-        coEvery { chorebooRepository.getChorebooSync() } returns null
+        coEvery { chorebooRepository.hasAnyChoreboo() } returns false
     }
 
     private fun createViewModel() = AuthViewModel(
@@ -253,7 +253,7 @@ class AuthViewModelTest {
 
     @Test
     fun `successful sign-in with no choreboo emits AuthSuccess with onboardingComplete false`() = runTest {
-        coEvery { chorebooRepository.getChorebooSync() } returns null
+        coEvery { chorebooRepository.hasAnyChoreboo() } returns false
         val vm = createViewModel()
 
         vm.events.test {
@@ -266,7 +266,7 @@ class AuthViewModelTest {
 
     @Test
     fun `successful sign-in with no choreboo does not restore onboardingComplete in DataStore`() = runTest {
-        coEvery { chorebooRepository.getChorebooSync() } returns null
+        coEvery { chorebooRepository.hasAnyChoreboo() } returns false
         val vm = createViewModel()
 
         vm.signInWithGoogle("google-token")
@@ -279,7 +279,7 @@ class AuthViewModelTest {
 
     @Test
     fun `successful sign-in with existing choreboo emits AuthSuccess with onboardingComplete true`() = runTest {
-        coEvery { chorebooRepository.getChorebooSync() } returns defaultChoreboo
+        coEvery { chorebooRepository.hasAnyChoreboo() } returns true
         val vm = createViewModel()
 
         vm.events.test {
@@ -292,7 +292,7 @@ class AuthViewModelTest {
 
     @Test
     fun `successful sign-in with existing choreboo restores onboardingComplete in DataStore`() = runTest {
-        coEvery { chorebooRepository.getChorebooSync() } returns defaultChoreboo
+        coEvery { chorebooRepository.hasAnyChoreboo() } returns true
         val vm = createViewModel()
 
         vm.signInWithGoogle("google-token")

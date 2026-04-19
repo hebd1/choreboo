@@ -243,9 +243,10 @@ class PetViewModel @Inject constructor(
         viewModelScope.launch {
             try {
                 _initError.value = false
-                // Ensure a choreboo exists (handles empty DB after destructive migration)
-                chorebooRepository.getOrCreateChoreboo()
-                chorebooRepository.applyStatDecay()
+                // Ensure an active pet is selected before applying decay.
+                if (chorebooRepository.ensureActiveChoreboo() != null) {
+                    chorebooRepository.applyStatDecay()
+                }
             } catch (e: Exception) {
                 Timber.e(e, "PetViewModel init failed")
                 _initError.value = true

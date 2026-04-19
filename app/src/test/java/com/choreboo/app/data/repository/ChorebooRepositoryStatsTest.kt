@@ -72,7 +72,7 @@ class ChorebooRepositoryStatsTest {
 
     @Test
     fun `applyStatDecay does nothing when no choreboo exists`() = runTest {
-        coEvery { chorebooDao.getChorebooSync() } returns null
+        coEvery { chorebooDao.getActiveChorebooSync() } returns null
 
         repo.applyStatDecay()
 
@@ -83,7 +83,7 @@ class ChorebooRepositoryStatsTest {
     fun `applyStatDecay updates lastInteractionAt when pet is sleeping`() = runTest {
         val futureMs = System.currentTimeMillis() + 10_000L
         val entity = baseEntity(sleepUntil = futureMs)
-        coEvery { chorebooDao.getChorebooSync() } returns entity
+        coEvery { chorebooDao.getActiveChorebooSync() } returns entity
         val saved = slot<ChorebooEntity>()
         coEvery { chorebooDao.updateChoreboo(capture(saved)) } returns Unit
 
@@ -100,7 +100,7 @@ class ChorebooRepositoryStatsTest {
     fun `applyStatDecay does nothing for very recent interaction`() = runTest {
         // lastInteractionAt = now → hoursSinceInteraction ≈ 0 < 0.01 threshold
         val entity = baseEntity(lastInteractionAt = System.currentTimeMillis())
-        coEvery { chorebooDao.getChorebooSync() } returns entity
+        coEvery { chorebooDao.getActiveChorebooSync() } returns entity
 
         repo.applyStatDecay()
 
@@ -113,7 +113,7 @@ class ChorebooRepositoryStatsTest {
         // Simulate 4 hours ago — expect decayAmount = 4 (roundToInt)
         val fourHoursAgo = System.currentTimeMillis() - 4 * 60 * 60 * 1000L
         val entity = baseEntity(hunger = 80, happiness = 80, energy = 80, lastInteractionAt = fourHoursAgo)
-        coEvery { chorebooDao.getChorebooSync() } returns entity
+        coEvery { chorebooDao.getActiveChorebooSync() } returns entity
         val saved = slot<ChorebooEntity>()
         coEvery { chorebooDao.updateChoreboo(capture(saved)) } returns Unit
 
@@ -135,7 +135,7 @@ class ChorebooRepositoryStatsTest {
         // 200 hours ago → decay = 50 (capped). Stats at 10 would go to max(0, 10-50) = 0
         val twoHundredHoursAgo = System.currentTimeMillis() - 200L * 60 * 60 * 1000L
         val entity = baseEntity(hunger = 10, happiness = 10, energy = 10, lastInteractionAt = twoHundredHoursAgo)
-        coEvery { chorebooDao.getChorebooSync() } returns entity
+        coEvery { chorebooDao.getActiveChorebooSync() } returns entity
         val saved = slot<ChorebooEntity>()
         coEvery { chorebooDao.updateChoreboo(capture(saved)) } returns Unit
 
@@ -150,7 +150,7 @@ class ChorebooRepositoryStatsTest {
 
     @Test
     fun `feedChoreboo does nothing when no choreboo exists`() = runTest {
-        coEvery { chorebooDao.getChorebooSync() } returns null
+        coEvery { chorebooDao.getActiveChorebooSync() } returns null
 
         repo.feedChoreboo()
 
@@ -160,7 +160,7 @@ class ChorebooRepositoryStatsTest {
     @Test
     fun `feedChoreboo adds 20 hunger`() = runTest {
         val entity = baseEntity(hunger = 50)
-        coEvery { chorebooDao.getChorebooSync() } returns entity
+        coEvery { chorebooDao.getActiveChorebooSync() } returns entity
         val saved = slot<ChorebooEntity>()
         coEvery { chorebooDao.updateChoreboo(capture(saved)) } returns Unit
 
@@ -172,7 +172,7 @@ class ChorebooRepositoryStatsTest {
     @Test
     fun `feedChoreboo caps hunger at 100`() = runTest {
         val entity = baseEntity(hunger = 95)
-        coEvery { chorebooDao.getChorebooSync() } returns entity
+        coEvery { chorebooDao.getActiveChorebooSync() } returns entity
         val saved = slot<ChorebooEntity>()
         coEvery { chorebooDao.updateChoreboo(capture(saved)) } returns Unit
 
@@ -184,7 +184,7 @@ class ChorebooRepositoryStatsTest {
     @Test
     fun `feedChoreboo does not change happiness or energy`() = runTest {
         val entity = baseEntity(hunger = 40, happiness = 60, energy = 70)
-        coEvery { chorebooDao.getChorebooSync() } returns entity
+        coEvery { chorebooDao.getActiveChorebooSync() } returns entity
         val saved = slot<ChorebooEntity>()
         coEvery { chorebooDao.updateChoreboo(capture(saved)) } returns Unit
 
@@ -198,7 +198,7 @@ class ChorebooRepositoryStatsTest {
 
     @Test
     fun `putToSleep does nothing when no choreboo exists`() = runTest {
-        coEvery { chorebooDao.getChorebooSync() } returns null
+        coEvery { chorebooDao.getActiveChorebooSync() } returns null
 
         repo.putToSleep()
 
@@ -209,7 +209,7 @@ class ChorebooRepositoryStatsTest {
     fun `putToSleep sets sleepUntil to 24 hours in the future`() = runTest {
         val before = System.currentTimeMillis()
         val entity = baseEntity(sleepUntil = 0L)
-        coEvery { chorebooDao.getChorebooSync() } returns entity
+        coEvery { chorebooDao.getActiveChorebooSync() } returns entity
         val saved = slot<ChorebooEntity>()
         coEvery { chorebooDao.updateChoreboo(capture(saved)) } returns Unit
 
@@ -229,7 +229,7 @@ class ChorebooRepositoryStatsTest {
     fun `putToSleep updates lastInteractionAt`() = runTest {
         val before = System.currentTimeMillis()
         val entity = baseEntity(lastInteractionAt = before - 60_000L)
-        coEvery { chorebooDao.getChorebooSync() } returns entity
+        coEvery { chorebooDao.getActiveChorebooSync() } returns entity
         val saved = slot<ChorebooEntity>()
         coEvery { chorebooDao.updateChoreboo(capture(saved)) } returns Unit
 
@@ -247,7 +247,7 @@ class ChorebooRepositoryStatsTest {
     @Test
     fun `getOrCreateChoreboo returns existing choreboo when one is found`() = runTest {
         val existing = baseEntity(id = 5L, hunger = 55)
-        coEvery { chorebooDao.getChorebooSync() } returns existing
+        coEvery { chorebooDao.getChorebooByPetType(PetType.FOX.name) } returns existing
 
         val result = repo.getOrCreateChoreboo("TestBoo")
 
@@ -259,7 +259,7 @@ class ChorebooRepositoryStatsTest {
 
     @Test
     fun `getOrCreateChoreboo inserts a new choreboo when none exists`() = runTest {
-        coEvery { chorebooDao.getChorebooSync() } returns null
+        coEvery { chorebooDao.getChorebooByPetType(PetType.FOX.name) } returns null
         coEvery { chorebooDao.insertChoreboo(any()) } returns 42L
 
         val result = repo.getOrCreateChoreboo("NewBoo")
@@ -273,7 +273,7 @@ class ChorebooRepositoryStatsTest {
 
     @Test
     fun `getOrCreateChoreboo sets default stats on new choreboo`() = runTest {
-        coEvery { chorebooDao.getChorebooSync() } returns null
+        coEvery { chorebooDao.getChorebooByPetType(PetType.FOX.name) } returns null
         val saved = slot<ChorebooEntity>()
         coEvery { chorebooDao.insertChoreboo(capture(saved)) } returns 1L
 
@@ -285,11 +285,23 @@ class ChorebooRepositoryStatsTest {
         assertEquals(PetType.FOX.name, saved.captured.petType)
     }
 
+    @Test
+    fun `getOrCreateChoreboo switches to existing pet type when found inactive`() = runTest {
+        val existing = baseEntity(id = 7L).copy(isActive = false, petType = PetType.PANDA.name)
+        coEvery { chorebooDao.getChorebooByPetType(PetType.PANDA.name) } returns existing
+
+        val result = repo.getOrCreateChoreboo("Panda", PetType.PANDA)
+
+        assertEquals(7L, result.id)
+        coVerify(exactly = 1) { chorebooDao.setActiveChoreboo(7L) }
+        coVerify(exactly = 0) { chorebooDao.insertChoreboo(any()) }
+    }
+
     // ── autoFeedIfNeeded ─────────────────────────────────────────────────
 
     @Test
     fun `autoFeedIfNeeded does nothing when no choreboo exists`() = runTest {
-        coEvery { chorebooDao.getChorebooSync() } returns null
+        coEvery { chorebooDao.getActiveChorebooSync() } returns null
         val userPreferences = mockk<UserPreferences>(relaxed = true)
 
         repo.autoFeedIfNeeded(userPreferences)
@@ -300,7 +312,7 @@ class ChorebooRepositoryStatsTest {
     @Test
     fun `autoFeedIfNeeded does nothing when hunger is already 30 or above`() = runTest {
         val entity = baseEntity(hunger = 30)
-        coEvery { chorebooDao.getChorebooSync() } returns entity
+        coEvery { chorebooDao.getActiveChorebooSync() } returns entity
         val userPreferences = mockk<UserPreferences>(relaxed = true)
 
         repo.autoFeedIfNeeded(userPreferences)
@@ -311,7 +323,7 @@ class ChorebooRepositoryStatsTest {
     @Test
     fun `autoFeedIfNeeded does nothing when user has fewer than 10 points`() = runTest {
         val entity = baseEntity(hunger = 10)
-        coEvery { chorebooDao.getChorebooSync() } returns entity
+        coEvery { chorebooDao.getActiveChorebooSync() } returns entity
         val userPreferences = mockk<UserPreferences>(relaxed = true)
         coEvery { userPreferences.totalPoints } returns flowOf(9)
 
@@ -323,7 +335,7 @@ class ChorebooRepositoryStatsTest {
     @Test
     fun `autoFeedIfNeeded feeds when hunger below 30 and user has enough points`() = runTest {
         val entity = baseEntity(hunger = 15)
-        coEvery { chorebooDao.getChorebooSync() } returns entity
+        coEvery { chorebooDao.getActiveChorebooSync() } returns entity
         val userPreferences = mockk<UserPreferences>(relaxed = true)
         coEvery { userPreferences.totalPoints } returns flowOf(50)
         coEvery { userPreferences.deductPoints(10) } returns true
@@ -341,7 +353,7 @@ class ChorebooRepositoryStatsTest {
     @Test
     fun `autoFeedIfNeeded does not feed when deductPoints returns false`() = runTest {
         val entity = baseEntity(hunger = 10)
-        coEvery { chorebooDao.getChorebooSync() } returns entity
+        coEvery { chorebooDao.getActiveChorebooSync() } returns entity
         val userPreferences = mockk<UserPreferences>(relaxed = true)
         coEvery { userPreferences.totalPoints } returns flowOf(10)
         coEvery { userPreferences.deductPoints(10) } returns false
@@ -354,15 +366,15 @@ class ChorebooRepositoryStatsTest {
     @Test
     fun `autoFeedIfNeeded caps hunger at 100 when feeding near-full pet`() = runTest {
         val entity = baseEntity(hunger = 25)
-        coEvery { chorebooDao.getChorebooSync() } returns entity
+        coEvery { chorebooDao.getActiveChorebooSync() } returns entity
         val userPreferences = mockk<UserPreferences>(relaxed = true)
         // hunger = 25 < 30 → triggers feed. 25 + 20 = 45 (under cap, but let's use 85 to test cap)
         val entityAtCap = baseEntity(hunger = 85)
         // Re-stub with a hunger that would overflow
-        coEvery { chorebooDao.getChorebooSync() } returns baseEntity(hunger = 85)
+        coEvery { chorebooDao.getActiveChorebooSync() } returns baseEntity(hunger = 85)
         coEvery { userPreferences.totalPoints } returns flowOf(50)
         // hunger=85 is NOT < 30, so this won't trigger. Use hunger=25 to verify 25+20=45≤100
-        coEvery { chorebooDao.getChorebooSync() } returns baseEntity(hunger = 25)
+        coEvery { chorebooDao.getActiveChorebooSync() } returns baseEntity(hunger = 25)
         coEvery { userPreferences.deductPoints(10) } returns true
         coEvery { userPreferences.totalLifetimeXp } returns flowOf(0)
 

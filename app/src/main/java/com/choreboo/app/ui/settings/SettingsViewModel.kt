@@ -16,8 +16,10 @@ import com.choreboo.app.data.repository.HouseholdResult
 import com.choreboo.app.data.repository.ResetRepository
 import com.choreboo.app.data.repository.ResetResult
 import com.choreboo.app.data.repository.UserRepository
+import com.choreboo.app.domain.model.ChorebooStats
 import com.choreboo.app.domain.model.Household
 import com.choreboo.app.domain.model.HouseholdMember
+import com.choreboo.app.domain.model.PetType
 import com.google.firebase.auth.EmailAuthProvider
 import com.google.firebase.auth.GoogleAuthProvider
 import dagger.hilt.android.lifecycle.HiltViewModel
@@ -93,8 +95,20 @@ class SettingsViewModel @Inject constructor(
     )
     val currentDisplayName: StateFlow<String> = _currentDisplayName.asStateFlow()
 
+    val activeChoreboo: StateFlow<ChorebooStats?> = chorebooRepository.getChoreboo()
+        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), null)
+
+    val ownedChoreboos: StateFlow<List<ChorebooStats>> = chorebooRepository.getAllChoreboos()
+        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), emptyList())
+
     private val _isUpdatingName = MutableStateFlow(false)
     val isUpdatingName: StateFlow<Boolean> = _isUpdatingName.asStateFlow()
+
+    private val _isUpdatingPetName = MutableStateFlow(false)
+    val isUpdatingPetName: StateFlow<Boolean> = _isUpdatingPetName.asStateFlow()
+
+    private val _isSwitchingPet = MutableStateFlow(false)
+    val isSwitchingPet: StateFlow<Boolean> = _isSwitchingPet.asStateFlow()
 
     private val _isUploadingPhoto = MutableStateFlow(false)
     val isUploadingPhoto: StateFlow<Boolean> = _isUploadingPhoto.asStateFlow()
@@ -295,6 +309,58 @@ class SettingsViewModel @Inject constructor(
                 _events.emit(SettingsEvent.ShowError(messageRes))
             } finally {
                 _isUpdatingName.value = false
+            }
+        }
+    }
+
+    fun renameChoreboo(chorebooId: Long, name: String) {
+        viewModelScope.launch {
+            _isUpdatingPetName.value = true
+            try {
+                chorebooRepository.renameChoreboo(chorebooId, name)
+                _events.emit(SettingsEvent.ShowSuccess(R.string.settings_msg_pet_name_updated))
+            } catch (e: Exception) {
+                val messageRes = when {
+                    e is IllegalArgumentException -> R.string.settings_msg_invalid_pet_name
+                    else -> R.string.settings_msg_pet_name_update_failed
+                }
+                _events.emit(SettingsEvent.ShowError(messageRes))
+            } finally {
+                _isUpdatingPetName.value = false
+            }
+        }
+    }
+
+    fun selectOrCreatePet(petType: PetType, nameForNewPet: String? = null) {
+        viewModelScope.launch {
+            _isSwitchingPet.value = true
+            try {
+                val existing = chorebooRepository.getChorebooForPetType(petType)
+                if (existing != null) {
+                    chorebooRepository.switchActiveChoreboo(existing.id)
+                    _events.emit(SettingsEvent.ShowSuccess(R.string.settings_msg_pet_switched, existing.name))
+                } else {
+                    if (petType.isPremium && !isPremium.value) {
+                        _events.emit(SettingsEvent.ShowError(R.string.settings_msg_premium_pet_locked))
+                        return@launch
+                    }
+                    val name = nameForNewPet?.trim().orEmpty()
+                    if (name.isBlank()) {
+                        _events.emit(SettingsEvent.ShowError(R.string.settings_msg_invalid_pet_name))
+                        return@launch
+                    }
+                    val created = chorebooRepository.createOrActivatePetType(name, petType)
+                    _events.emit(SettingsEvent.ShowSuccess(R.string.settings_msg_pet_created, created.name))
+                }
+            } catch (e: Exception) {
+                val messageRes = if (e is IllegalArgumentException) {
+                    R.string.settings_msg_invalid_pet_name
+                } else {
+                    R.string.settings_msg_pet_switch_failed
+                }
+                _events.emit(SettingsEvent.ShowError(messageRes))
+            } finally {
+                _isSwitchingPet.value = false
             }
         }
     }

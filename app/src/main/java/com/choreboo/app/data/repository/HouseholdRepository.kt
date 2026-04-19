@@ -319,11 +319,11 @@ class HouseholdRepository @Inject constructor(
             }
             val users = result.data.user?.household?.users_on_household
             if (users != null) {
-                val petUsers = users.filter { it.choreboo_on_owner != null }
+                val petUsers = users.filter { it.activeChoreboo != null }
                 if (petUsers.isNotEmpty()) {
                     val now = System.currentTimeMillis()
                     petUsers.forEach { user ->
-                        val pet = user.choreboo_on_owner!!
+                        val pet = user.activeChoreboo!!
                         householdMemberDao.upsertPetColumns(
                             uid = user.id,
                             displayName = user.displayName,

@@ -77,7 +77,7 @@ class HabitReminderReceiver : BroadcastReceiver() {
                 if (todayCount >= 1) return@launch
 
                 // Get pet name from database
-                val choreboo = chorebooDao.getChorebooSync()
+                val choreboo = chorebooDao.getActiveChorebooSync()
                 val petName = choreboo?.name ?: context.getString(R.string.notif_pet_name_fallback)
 
                 // Post notification with cute message and Mark Complete action

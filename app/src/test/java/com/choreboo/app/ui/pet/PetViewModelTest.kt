@@ -110,7 +110,7 @@ class PetViewModelTest {
         every { authRepository.currentUser } returns flowOf(currentUser)
 
         // init block calls
-        coEvery { chorebooRepository.getOrCreateChoreboo(any(), any()) } returns mockk(relaxed = true)
+        coEvery { chorebooRepository.ensureActiveChoreboo() } returns defaultChoreboo
         coEvery { chorebooRepository.applyStatDecay() } returns Unit
     }
 
@@ -131,11 +131,11 @@ class PetViewModelTest {
     // -----------------------------------------------------------------------
 
     @Test
-    fun `init calls getOrCreateChoreboo and applyStatDecay`() = runTest {
+    fun `init calls ensureActiveChoreboo and applyStatDecay`() = runTest {
         createViewModel()
         advanceUntilIdle()
 
-        coVerify(exactly = 1) { chorebooRepository.getOrCreateChoreboo(any(), any()) }
+        coVerify(exactly = 1) { chorebooRepository.ensureActiveChoreboo() }
         coVerify(exactly = 1) { chorebooRepository.applyStatDecay() }
     }
 

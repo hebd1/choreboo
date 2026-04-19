@@ -13,6 +13,7 @@ data class ChorebooStats(
     val lastInteractionAt: Long = 0L,
     val createdAt: Long = 0L,
     val sleepUntil: Long = 0,
+    val isActive: Boolean = false,
     /** Selected background id (matches BackgroundItem.id). Null = Default mood gradient. */
     val backgroundId: String? = null,
 ) {

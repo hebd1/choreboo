@@ -93,9 +93,11 @@ import androidx.credentials.CredentialManager
 import androidx.credentials.GetCredentialRequest
 import androidx.credentials.exceptions.GetCredentialException
 import com.choreboo.app.R
+import com.choreboo.app.domain.model.PetType
 import com.choreboo.app.ui.components.ChorebooTopAppBar
 import com.choreboo.app.ui.components.PremiumBadge
 import com.choreboo.app.ui.components.ProfileAvatar
+import com.choreboo.app.ui.util.displayName
 import com.choreboo.app.ui.util.findActivity
 import com.google.android.libraries.identity.googleid.GetGoogleIdOption
 import com.google.android.libraries.identity.googleid.GoogleIdTokenCredential
@@ -118,6 +120,10 @@ fun SettingsScreen(
     val isResetting by viewModel.isResetting.collectAsStateWithLifecycle()
     val currentDisplayName by viewModel.currentDisplayName.collectAsStateWithLifecycle()
     val isUpdatingName by viewModel.isUpdatingName.collectAsStateWithLifecycle()
+    val activeChoreboo by viewModel.activeChoreboo.collectAsStateWithLifecycle()
+    val ownedChoreboos by viewModel.ownedChoreboos.collectAsStateWithLifecycle()
+    val isUpdatingPetName by viewModel.isUpdatingPetName.collectAsStateWithLifecycle()
+    val isSwitchingPet by viewModel.isSwitchingPet.collectAsStateWithLifecycle()
     val isGoogleUser = viewModel.isGoogleUser
     val snackbarHostState = remember { SnackbarHostState() }
     val scope = rememberCoroutineScope()
@@ -133,6 +139,10 @@ fun SettingsScreen(
     var showCreateHouseholdDialog by rememberSaveable { mutableStateOf(false) }
     var showEditNameDialog by rememberSaveable { mutableStateOf(false) }
     var editNameText by rememberSaveable { mutableStateOf("") }
+    var showEditPetNameDialog by rememberSaveable { mutableStateOf(false) }
+    var showCreatePetDialog by rememberSaveable { mutableStateOf(false) }
+    var editPetNameText by rememberSaveable { mutableStateOf("") }
+    var pendingPetTypeName by rememberSaveable { mutableStateOf(PetType.FOX.name) }
 
     // Credential Manager — used for Google re-authentication before account reset.
     // Not wrapped in remember{} so it is never tied to a stale Activity context after
@@ -186,6 +196,8 @@ fun SettingsScreen(
                 }
                 is SettingsEvent.ShowSuccess -> {
                     showEditNameDialog = false
+                    showEditPetNameDialog = false
+                    showCreatePetDialog = false
                     scope.launch {
                         val msg = if (event.formatArg != null)
                             context.getString(event.messageRes, event.formatArg)
@@ -270,6 +282,90 @@ fun SettingsScreen(
                     onClick = { showEditNameDialog = false },
                     enabled = !isUpdatingName,
                 ) {
+                    Text(stringResource(R.string.common_cancel))
+                }
+            },
+        )
+    }
+
+    if (showEditPetNameDialog) {
+        AlertDialog(
+            onDismissRequest = { if (!isUpdatingPetName) showEditPetNameDialog = false },
+            title = { Text(stringResource(R.string.settings_rename_pet)) },
+            text = {
+                OutlinedTextField(
+                    value = editPetNameText,
+                    onValueChange = { if (it.length <= 20) editPetNameText = it },
+                    label = { Text(stringResource(R.string.settings_pet_name_label)) },
+                    singleLine = true,
+                    enabled = !isUpdatingPetName,
+                    modifier = Modifier.fillMaxWidth(),
+                    keyboardOptions = KeyboardOptions(imeAction = ImeAction.Done),
+                    keyboardActions = KeyboardActions(onDone = { focusManager.clearFocus() }),
+                )
+            },
+            confirmButton = {
+                Button(
+                    onClick = {
+                        val activeId = activeChoreboo?.id ?: return@Button
+                        viewModel.renameChoreboo(activeId, editPetNameText)
+                    },
+                    enabled = !isUpdatingPetName && editPetNameText.trim().isNotBlank(),
+                ) {
+                    if (isUpdatingPetName) {
+                        CircularProgressIndicator(
+                            modifier = Modifier.size(16.dp),
+                            strokeWidth = 2.dp,
+                            color = MaterialTheme.colorScheme.onPrimary,
+                        )
+                    } else {
+                        Text(stringResource(R.string.settings_save_button))
+                    }
+                }
+            },
+            dismissButton = {
+                TextButton(onClick = { showEditPetNameDialog = false }, enabled = !isUpdatingPetName) {
+                    Text(stringResource(R.string.common_cancel))
+                }
+            },
+        )
+    }
+
+    if (showCreatePetDialog) {
+        val pendingPetType = PetType.valueOf(pendingPetTypeName)
+        AlertDialog(
+            onDismissRequest = { if (!isSwitchingPet) showCreatePetDialog = false },
+            title = { Text(stringResource(R.string.settings_name_your_pet_title, pendingPetType.displayName())) },
+            text = {
+                OutlinedTextField(
+                    value = editPetNameText,
+                    onValueChange = { if (it.length <= 20) editPetNameText = it },
+                    label = { Text(stringResource(R.string.settings_pet_name_label)) },
+                    singleLine = true,
+                    enabled = !isSwitchingPet,
+                    modifier = Modifier.fillMaxWidth(),
+                    keyboardOptions = KeyboardOptions(imeAction = ImeAction.Done),
+                    keyboardActions = KeyboardActions(onDone = { focusManager.clearFocus() }),
+                )
+            },
+            confirmButton = {
+                Button(
+                    onClick = { viewModel.selectOrCreatePet(pendingPetType, editPetNameText) },
+                    enabled = !isSwitchingPet && editPetNameText.trim().isNotBlank(),
+                ) {
+                    if (isSwitchingPet) {
+                        CircularProgressIndicator(
+                            modifier = Modifier.size(16.dp),
+                            strokeWidth = 2.dp,
+                            color = MaterialTheme.colorScheme.onPrimary,
+                        )
+                    } else {
+                        Text(stringResource(R.string.settings_save_button))
+                    }
+                }
+            },
+            dismissButton = {
+                TextButton(onClick = { showCreatePetDialog = false }, enabled = !isSwitchingPet) {
                     Text(stringResource(R.string.common_cancel))
                 }
             },
@@ -1136,6 +1232,122 @@ fun SettingsScreen(
                         )
                     }
                     Switch(checked = soundEnabled, onCheckedChange = { viewModel.setSoundEnabled(it) })
+                }
+            }
+
+            SettingsSectionHeader(
+                icon = { Icon(Icons.Default.AutoAwesome, contentDescription = null, tint = MaterialTheme.colorScheme.primary) },
+                label = stringResource(R.string.settings_pet_section),
+            )
+            Card(
+                shape = RoundedCornerShape(16.dp),
+                colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceContainerLowest),
+                modifier = Modifier.fillMaxWidth(),
+            ) {
+                Column(
+                    modifier = Modifier.padding(20.dp),
+                    verticalArrangement = Arrangement.spacedBy(12.dp),
+                ) {
+                    Text(
+                        text = stringResource(R.string.settings_active_pet_label),
+                        style = MaterialTheme.typography.labelSmall,
+                        fontWeight = FontWeight.SemiBold,
+                    )
+                    Text(
+                        text = activeChoreboo?.name ?: stringResource(R.string.settings_pet_tap_to_manage),
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    )
+
+                    if (activeChoreboo != null) {
+                        Row(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .clip(RoundedCornerShape(12.dp))
+                                .background(MaterialTheme.colorScheme.surfaceContainerHighest)
+                                .clickable {
+                                    editPetNameText = activeChoreboo?.name.orEmpty()
+                                    showEditPetNameDialog = true
+                                }
+                                .padding(12.dp),
+                            verticalAlignment = Alignment.CenterVertically,
+                            horizontalArrangement = Arrangement.spacedBy(12.dp),
+                        ) {
+                            Text(activeChoreboo?.petType?.emoji ?: "🦊", fontSize = 24.sp)
+                            Column(modifier = Modifier.weight(1f)) {
+                                Text(
+                                    text = activeChoreboo?.name.orEmpty(),
+                                    style = MaterialTheme.typography.labelMedium,
+                                    fontWeight = FontWeight.SemiBold,
+                                )
+                                Text(
+                                    text = stringResource(R.string.settings_pet_level_format, activeChoreboo?.level ?: 1),
+                                    style = MaterialTheme.typography.bodySmall,
+                                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                )
+                            }
+                            Icon(Icons.Default.Edit, contentDescription = null, tint = MaterialTheme.colorScheme.secondary)
+                        }
+                    }
+
+                    PetType.entries.forEach { petType ->
+                        val ownedPet = ownedChoreboos.firstOrNull { it.petType == petType }
+                        val isLocked = ownedPet == null && petType.isPremium && !isPremium
+
+                        Row(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .clip(RoundedCornerShape(12.dp))
+                                .background(MaterialTheme.colorScheme.surfaceContainerHighest)
+                                .clickable(enabled = !isSwitchingPet && !isLocked) {
+                                    if (ownedPet != null) {
+                                        viewModel.selectOrCreatePet(petType)
+                                    } else {
+                                        pendingPetTypeName = petType.name
+                                        editPetNameText = ""
+                                        showCreatePetDialog = true
+                                    }
+                                }
+                                .padding(12.dp),
+                            verticalAlignment = Alignment.CenterVertically,
+                            horizontalArrangement = Arrangement.spacedBy(12.dp),
+                        ) {
+                            Text(petType.emoji, fontSize = 24.sp)
+                            Column(modifier = Modifier.weight(1f)) {
+                                Row(
+                                    verticalAlignment = Alignment.CenterVertically,
+                                    horizontalArrangement = Arrangement.spacedBy(8.dp),
+                                ) {
+                                    Text(
+                                        text = petType.displayName(),
+                                        style = MaterialTheme.typography.labelMedium,
+                                        fontWeight = FontWeight.SemiBold,
+                                    )
+                                    if (ownedPet?.isActive == true) {
+                                        Text(
+                                            text = stringResource(R.string.settings_pet_active_badge),
+                                            style = MaterialTheme.typography.labelSmall,
+                                            color = MaterialTheme.colorScheme.primary,
+                                        )
+                                    }
+                                }
+                                Text(
+                                    text = when {
+                                        ownedPet != null -> "${ownedPet.name} • ${context.getString(R.string.settings_pet_level_format, ownedPet.level)}"
+                                        isLocked -> stringResource(R.string.settings_pet_locked_premium)
+                                        else -> stringResource(R.string.settings_pet_not_created)
+                                    },
+                                    style = MaterialTheme.typography.bodySmall,
+                                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                )
+                            }
+                            if (isLocked) {
+                                Icon(Icons.Default.Lock, contentDescription = null, tint = MaterialTheme.colorScheme.onSurfaceVariant)
+                            } else if (isSwitchingPet && ownedPet?.isActive != true) {
+                                CircularProgressIndicator(modifier = Modifier.size(18.dp), strokeWidth = 2.dp)
+                            }
+                        }
+                    }
                 }
             }
 

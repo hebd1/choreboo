@@ -28,7 +28,7 @@ Repositories also call the **Firebase Data Connect generated SDK** for cloud wri
 - **Cloud-to-local sync**: Triggered **after auth** (`force = true`, bypasses cooldown) and **on every app foreground** (`force = false`, 5-minute cooldown). `SyncManager` orchestrates all sync with a `Mutex` to prevent concurrent runs. `SyncManager.syncAll()` calls `getIdToken(false).await()` before any Data Connect calls to ensure the auth token is cached and available for the gRPC interceptor. Order: habits + choreboo + user points + purchased backgrounds (parallel) → habit logs (sequential, needs habit remoteIds) → household habit logs (best-effort). Conflict resolution: **cloud wins**.
 - **App foreground sync**: `AppLifecycleObserver` (registered via `ProcessLifecycleOwner`) calls `syncManager.syncAll(force = false)` on every `onStart`. Cold-start sync is **skipped** here — `MainViewModel` handles it as part of the coordinated splash-screen startup sequence. Only subsequent warm resumes trigger the observer's sync.
 - **Error visibility**: Only the post-auth sync shows errors (snackbar). Write-through failures are silent.
-- **Security**: All 16 queries and 27 mutations have `@auth(level: USER)` directives with auth-scoped filters. `connector.yaml` has `authMode: PUBLIC` (each operation has its own auth check). 4 household queries (`GetMyHousehold`, `GetMyHouseholdMembers`, `GetMyHouseholdChoreboos`, `GetMyHouseholdHabits`) are **inherently auth-scoped** — they traverse from `auth.uid` to the user's household, so no `householdId` parameter is needed and callers can only see their own household data. 3 habit/log queries (`GetHabitById`, `GetLogsForHabit`, `GetLogsForHabitAndDate`) that allow access to household habits now require household membership verification — the `isHouseholdHabit` branch checks that the caller's `auth.uid` is a member of the habit's household. Habit updates are split: `UpdateOwnHabit` (owner only, all fields) and `UpdateAssignedHabit` (assignee, safe fields only — no ownership or household fields).
+- **Security**: All Data Connect operations have `@auth(level: USER)` directives with auth-scoped filters. `connector.yaml` has `authMode: PUBLIC` (each operation has its own auth check). 4 household queries (`GetMyHousehold`, `GetMyHouseholdMembers`, `GetMyHouseholdChoreboos`, `GetMyHouseholdHabits`) are **inherently auth-scoped** — they traverse from `auth.uid` to the user's household, so no `householdId` parameter is needed and callers can only see their own household data. `GetLogsForHabitAndDate` also verifies household membership before allowing access to household habit logs. Habit updates are split: `UpdateOwnHabit` (owner only, all fields) and `UpdateAssignedHabit` (assignee, safe fields only — no ownership or household fields).
 
 ### Data Connect Schema (6 cloud tables)
 
@@ -38,7 +38,7 @@ Defined in `dataconnect/schema/schema.gql`:
 |-------|------------|
 | **User** | uid (String PK from Firebase Auth), displayName, email, photoUrl, household FK, createdAt, totalPoints, totalLifetimeXp |
 | **Household** | UUID PK, name, inviteCode (unique), createdBy FK→User, createdAt |
-| **Choreboo** | UUID PK, owner FK→User (unique), name, stage, level, xp, hunger, happiness, energy, petType, lastInteractionAt, createdAt, sleepUntil, backgroundId (nullable) |
+| **Choreboo** | UUID PK, owner FK→User, name, stage, level, xp, hunger, happiness, energy, petType, lastInteractionAt, createdAt, sleepUntil, backgroundId (nullable) |
 | **PurchasedBackground** | composite PK (owner FK→User, backgroundId String), purchasedAt |
 | **Habit** | UUID PK, owner FK→User, household FK→Household (nullable), assignedTo FK→User (nullable), title, description, iconName, customDays, difficulty, baseXp, reminderEnabled, reminderTime, isHouseholdHabit, isArchived, createdAt |
 | **HabitLog** | UUID PK, habit FK→Habit, completedBy FK→User, completedAt, date, xpEarned, streakAtCompletion |
@@ -48,8 +48,8 @@ Defined in `dataconnect/schema/schema.gql`:
 - `dataconnect/dataconnect.yaml` — project config
 - `dataconnect/schema/schema.gql` — 6 tables
 - `dataconnect/choreboo-connector/connector.yaml` — authMode: PUBLIC
-- `dataconnect/choreboo-connector/queries.gql` — 16 queries, all auth-scoped
-- `dataconnect/choreboo-connector/mutations.gql` — 27 mutations, all auth-scoped (22 operational + 5 dev reset). Operational mutations include `UnarchiveHabit`, `NullifyHouseholdForMembers`, and `DeleteLogsForHabit` added since initial implementation.
+- `dataconnect/choreboo-connector/queries.gql` — auth-scoped queries including `GetCurrentUser`, `GetMyChoreboos`, and a retired `GetMyChoreboo` compatibility stub
+- `dataconnect/choreboo-connector/mutations.gql` — auth-scoped mutations including `SetActiveChoreboo`, `ClearActiveChoreboo`, `UnarchiveHabit`, `NullifyHouseholdForMembers`, and `DeleteLogsForHabit`
 
 ## Data Flow Patterns
 
@@ -69,13 +69,13 @@ Defined in `dataconnect/schema/schema.gql`:
 - **Habit list query**: `HabitDao.getHabitsForUser(uid, date)` returns a **three-way** union: (1) personal habits owned by the user with no assignee, (2) household habits assigned to the user, and (3) household habits owned by the user with no assignee. Habits owned by the user but assigned to someone else are excluded — the assignee sees them, not the owner.
 - **Cloud-to-local sync**: `HabitRepository.syncHabitsFromCloud()`, `HabitRepository.syncHabitLogsFromCloud()`, `ChorebooRepository.syncFromCloud()`, `BackgroundRepository.syncFromCloud()`. Called from `SyncManager.syncAll()`.
 
-## Room Database (v16, 7 entities)
+## Room Database (v23, 7 entities)
 
 | Table | Columns | Indexes |
 |-------|---------|---------|
 | **habits** | id, title, description, iconName, customDays, difficulty, baseXp, reminderEnabled, reminderTime, createdAt, isArchived, isHouseholdHabit, ownerUid, householdId, assignedToUid, assignedToName, remoteId, pendingSync | `remoteId`, `pendingSync` |
 | **habit_logs** | id, habitId (FK→habits CASCADE), completedAt, date (ISO string), xpEarned, streakAtCompletion, completedByUid, remoteId, pendingSync | `remoteId`, `date`, `pendingSync`, UNIQUE(`habitId`, `date`) |
-| **choreboos** | id, name, stage, level, xp, hunger, happiness, energy, petType, lastInteractionAt, createdAt, sleepUntil, ownerUid, remoteId, backgroundId, pendingSync | `remoteId`, `pendingSync` |
+| **choreboos** | id, name, stage, level, xp, hunger, happiness, energy, petType, lastInteractionAt, createdAt, sleepUntil, ownerUid, remoteId, isActive, backgroundId, pendingSync | `remoteId`, `pendingSync`, UNIQUE(`ownerUid`, `petType`) |
 | **household_members** | uid (String PK = Firebase Auth UID), displayName, photoUrl, email, chorebooId, chorebooName, chorebooStage, chorebooLevel, chorebooXp, chorebooHunger, chorebooHappiness, chorebooEnergy, chorebooPetType, chorebooBackgroundId, lastSyncedAt | — |
 | **households** | id (String PK = Data Connect UUID), name, inviteCode, createdByUid, createdByName | — |
 | **household_habit_statuses** | habitId (String PK = Data Connect UUID), title, iconName, ownerName, ownerUid, baseXp, assignedToUid, assignedToName, completedByName, completedByUid, cachedDate | — |
@@ -218,7 +218,7 @@ Deploy the backend (Data Connect schema/connectors + Storage rules) to the `chor
 - Use `AlertDialog` for confirmations; `ModalBottomSheet` for selection lists (feed, background picker).
 - **`PetBackgroundImage`** (`ui/components/PetBackgroundImage.kt`) — renders the selected background behind the pet. If `backgroundId` is null or `"default"`, shows the mood-based color gradient. Otherwise loads the image from `assets/backgrounds/<id>.webp` via Coil's `rememberAsyncImagePainter`. Used in `PetScreen` and `HouseholdPetCard`.
 - **`ShimmerPlaceholder`** (`ui/components/ShimmerPlaceholder.kt`) — reusable loading skeleton. Renders a rounded rectangle pulsing between alpha 0.3–0.7 with a 1-second tween. Parameters: `width: Dp = 100.dp`, `height: Dp = 24.dp`, `modifier`. Used in `PetScreen` while the Choreboo name is loading.
-- **Pet animations**: Animated WebP files with alpha transparency. FOX pet type has 9 animations (mood-based + action-based). Other pet types (AXOLOTL, CAPYBARA, PANDA) use emoji placeholders until WebP assets are added. `WebmAnimationView` composable in `ui/components/` handles playback via `AnimatedImageDrawable` (API 28+); API 24–27 gets a transparent placeholder. No ExoPlayer dependency.
+- **Pet animations**: Animated WebP files with alpha transparency. FOX and PANDA pet types have 9 animations each (mood-based + action-based). AXOLOTL and CAPYBARA still use emoji placeholders. `WebmAnimationView` composable in `ui/components/` handles playback via `AnimatedImageDrawable` (API 28+); API 24–27 gets a transparent placeholder. No ExoPlayer dependency.
 - Pet size scales by `ChorebooStage`.
 - **Auth screen**: Syncing overlay blocks interaction during cloud-to-local sync after login.
 - **Splash screen**: `MainActivity` shows a branded splash until `MainViewModel.isAppReady` becomes `true`. For fully authenticated+onboarded users, it waits for Room warmup only (sub-second). Cloud sync and WebP animation loading run in the background without blocking the splash.
@@ -234,7 +234,7 @@ com.choreboo.app/
 ├── navigation/                      # ChorebooNavGraph.kt, Screen sealed class (8 routes)
 ├── data/
 │   ├── local/
-│   │   ├── ChorebooDatabase.kt      # Room DB v16, 7 entities, fallbackToDestructiveMigration
+│   │   ├── ChorebooDatabase.kt      # Room DB v23, 7 entities, fallbackToDestructiveMigration
 │   │   ├── converter/
 │   │   │   └── Converters.kt        # Gson TypeConverter for List<String>
 │   │   ├── entity/                  # HabitEntity, HabitLogEntity, ChorebooEntity, HouseholdMemberEntity, HouseholdEntity, HouseholdHabitStatusEntity, PurchasedBackgroundEntity
@@ -310,7 +310,7 @@ The app navigates to the Auth screen. Re-register with the same email (or any em
 2. **Fast path** (unauthenticated or not-yet-onboarded users) — sets `_startupComplete = true` immediately. Room and sync are never touched.
 3. **Full path** (authenticated + onboarded users):
    - **Cloud sync** (fire-and-forget): `syncManager.syncAll(force = false)` is launched in a separate coroutine — it does NOT block the splash screen.
-   - **Room warmup** (blocking): `chorebooRepository.getOrCreateChoreboo()` + `applyStatDecay()` ensures the local DB is consistent before the first screen renders. This is the only task that blocks the splash.
+   - **Room warmup** (blocking): `chorebooRepository.ensureActiveChoreboo()` + `applyStatDecay()` ensures the local DB is consistent before the first screen renders without implicitly creating or switching pets. This is the only task that blocks the splash.
    - **WebP animation loading**: `AnimatedImageDrawable` loads animated WebP files when `PetScreen` is rendered — `MainViewModel` does not await it. PetScreen shows emoji fallback until the drawable is ready.
 4. After Room warmup completes, `_startupComplete = true` and the splash dismisses.
 
@@ -389,7 +389,7 @@ app/src/test/java/com/example/choreboo.app/
 │   ├── BillingRepositoryTest.kt                       # launchPurchaseFlow + verifyPremiumStatus guards (7)
 │   ├── ChorebooRepositoryAddXpTest.kt                 # XP addition, level-up, stage evolution, validation (12)
 │   ├── ChorebooRepositoryStatDecayTest.kt             # Stat decay calculation, time-based hunger/happiness/energy (19)
-│   ├── ChorebooRepositoryStatsTest.kt                 # getOrCreateChoreboo, updateName, feed, sleep, stats (21)
+│   ├── ChorebooRepositoryStatsTest.kt                 # create/switch active pet, updateName, feed, sleep, stats (21)
 │   ├── HabitRepositorySyncTest.kt                     # syncHabitsFromCloud, syncHabitLogsFromCloud, deletion reconciliation (9)
 │   ├── HabitRepositoryTest.kt                         # completeHabit, upsertHabit, custom-schedule streaks, validation guards (20)
 │   ├── HouseholdRepositoryLeaveTest.kt                # leaveHousehold success/error paths, creator vs member (5)
@@ -455,8 +455,8 @@ app/src/test/java/com/example/choreboo.app/
 | HabitRepository | `upsertHabit()` | title <= 100 chars |
 | HabitRepository | `upsertHabit()` | baseXp > 0 |
 | HabitRepository | `completeHabit()` | habitId > 0 |
-| ChorebooRepository | `getOrCreateChoreboo()` | name non-blank |
-| ChorebooRepository | `getOrCreateChoreboo()` | name <= 20 chars |
+| ChorebooRepository | `createOrActivatePetType()` / `getOrCreateChoreboo()` | name non-blank |
+| ChorebooRepository | `createOrActivatePetType()` / `getOrCreateChoreboo()` | name <= 20 chars |
 | ChorebooRepository | `addXp()` | amount > 0 |
 | ChorebooRepository | `updateName()` | name non-blank |
 | ChorebooRepository | `updateName()` | name <= 20 chars |
@@ -612,6 +612,47 @@ tag = data[frame_data_start:frame_data_start+4]
 print('First sub-chunk in ANMF:', tag)  # should be b'ALPH'
 ```
 
+### Converting Lottie image-sequence JSON → animated WebP
+
+Some Lottie files (e.g. those exported by "Image to Lottie" tools) are image-sequence Lotties: each frame is a full pre-rendered image stored as a `data:image/webp;base64,...` URI in the `assets` array. These can be converted without a Lottie renderer — extract the frames directly and feed them to ffmpeg.
+
+The conversion script is `/tmp/lottie_to_webp.py` (re-create from the template below if `/tmp` is cleared):
+
+```python
+#!/usr/bin/env python3
+"""Convert Lottie image-sequence JSON files to animated WebP using ffmpeg."""
+import json, base64, os, subprocess, tempfile
+
+FFMPEG = "/tmp/ffmpeg-static/ffmpeg-7.0.2-amd64-static/ffmpeg"
+
+def convert(json_path: str, webp_path: str) -> None:
+    with open(json_path) as f:
+        data = json.load(f)
+    assets = data.get("assets", [])
+    src_fps = data.get("fr", 30)
+    out_fps = max(1, src_fps // 2)   # halve fps (30 -> 15) to cut file size ~50%
+
+    with tempfile.TemporaryDirectory() as tmpdir:
+        for i, asset in enumerate(assets):
+            p = asset.get("p", "")
+            if not p.startswith("data:"):
+                raise ValueError(f"Asset {i} is not an embedded data URL — not an image-sequence Lottie")
+            b64 = p.split(",", 1)[1]
+            with open(os.path.join(tmpdir, f"frame_{i:04d}.webp"), "wb") as out:
+                out.write(base64.b64decode(b64))
+
+        subprocess.run([
+            FFMPEG, "-y",
+            "-framerate", str(src_fps),
+            "-i", os.path.join(tmpdir, "frame_%04d.webp"),
+            "-vf", f"fps={out_fps},format=yuva420p",
+            "-loop", "0", "-vcodec", "libwebp", "-lossless", "0", "-quality", "70",
+            webp_path,
+        ], check=True)
+```
+
+**How to detect an image-sequence Lottie**: open the JSON and check `assets[0]["p"]` — if it starts with `data:image/`, the frames are embedded. If `assets[0]["u"]` is a directory path, the images are external files (different pipeline needed).
+
 ### Current fox animation inventory
 
 | File | Source | Size | Notes |
@@ -626,6 +667,22 @@ print('First sub-chunk in ANMF:', tag)  # should be b'ALPH'
 | `fox_start_sleep.webp` | WebM (VP8+alpha) | 863 KB | |
 | `fox_loop_sleeping.webp` | WebM (VP8+alpha) | 365 KB | |
 
+### Current panda animation inventory
+
+Converted from image-sequence Lottie JSON files (`*_lottie.json`) in `app/src/main/assets/animations/panda/` using the script above. Source: 30 fps, output: 15 fps.
+
+| File | Source JSON | Size | Frames |
+|------|-------------|------|--------|
+| `panda_happy.webp` | `panda_happy_lottie.json` | 663 KB | 75 |
+| `panda_idle.webp` | `panda_idle_lottie.json` | 1.3 MB | 145 |
+| `panda_sad.webp` | `panda_sad_lottie.json` | 1.2 MB | 150 |
+| `panda_eating.webp` | `panda_eating_lottie.json` | 658 KB | 75 |
+| `panda_hungry.webp` | `panda_hungry_lottie.json` | 1.4 MB | 148 |
+| `panda_interact.webp` | `panda_interact_lottie.json` | 555 KB | 60 |
+| `panda_thumbs_up.webp` | `panda_thumbs_up_lottie.json` | 1.3 MB | 150 |
+| `panda_start_sleep.webp` | `panda_sleep_lottie.json` | 466 KB | 58 |
+| `panda_loop_sleeping.webp` | `panda_loop_sleeping.json` | 264 KB | 33 |
+
 ### `repeatCount` semantics
 
 `AnimatedImageDrawable.repeatCount` = extra plays **after** the first play:
@@ -637,6 +694,5 @@ print('First sub-chunk in ANMF:', tag)  # should be b'ALPH'
 
 - Glance widget (today's habits + pet mood)
 - Sound effects
-- WebP animations for other pet types (AXOLOTL, CAPYBARA, PANDA)
-- Multiple Choreboos
+- WebP animations for other pet types (AXOLOTL, CAPYBARA)
 - IME keyboard padding — `imePadding()` / `WindowInsets.ime` not yet applied to text-input screens (Auth, Onboarding, AddEditHabit, Settings)

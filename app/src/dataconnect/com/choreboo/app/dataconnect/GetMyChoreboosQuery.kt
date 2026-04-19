@@ -18,10 +18,10 @@ import kotlinx.coroutines.flow.filterNotNull as _flow_filterNotNull
 import kotlinx.coroutines.flow.map as _flow_map
 
 
-public interface GetMyChorebooQuery :
+public interface GetMyChoreboosQuery :
     com.google.firebase.dataconnect.generated.GeneratedQuery<
       ChorebooConnector,
-      GetMyChorebooQuery.Data,
+      GetMyChoreboosQuery.Data,
       Unit
     >
 {
@@ -75,7 +75,7 @@ public interface GetMyChorebooQuery :
   
 
   public companion object {
-    public val operationName: String = "GetMyChoreboo"
+    public val operationName: String = "GetMyChoreboos"
 
     public val dataDeserializer: kotlinx.serialization.DeserializationStrategy<Data> =
       kotlinx.serialization.serializer()
@@ -85,10 +85,10 @@ public interface GetMyChorebooQuery :
   }
 }
 
-public fun GetMyChorebooQuery.ref(
+public fun GetMyChoreboosQuery.ref(
   
 ): com.google.firebase.dataconnect.QueryRef<
-    GetMyChorebooQuery.Data,
+    GetMyChoreboosQuery.Data,
     Unit
   > =
   ref(
@@ -97,12 +97,12 @@ public fun GetMyChorebooQuery.ref(
     
   )
 
-public suspend fun GetMyChorebooQuery.execute(
+public suspend fun GetMyChoreboosQuery.execute(
 
   
 
   ): com.google.firebase.dataconnect.QueryResult<
-    GetMyChorebooQuery.Data,
+    GetMyChoreboosQuery.Data,
     Unit
   > =
   ref(
@@ -110,9 +110,9 @@ public suspend fun GetMyChorebooQuery.execute(
   ).execute()
 
 
-  public fun GetMyChorebooQuery.flow(
+  public fun GetMyChoreboosQuery.flow(
     
-    ): kotlinx.coroutines.flow.Flow<GetMyChorebooQuery.Data> =
+    ): kotlinx.coroutines.flow.Flow<GetMyChoreboosQuery.Data> =
     ref(
         
       ).subscribe()

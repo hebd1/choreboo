@@ -61,6 +61,7 @@ fun HabitCard(
     completedToday: Int,
     currentStreak: Int = 0,
     isScheduledToday: Boolean = true,
+    nextScheduledLabel: String? = null,
     onComplete: () -> Unit,
     onClick: () -> Unit = {},
     /**
@@ -220,10 +221,17 @@ fun HabitCard(
                           }
                       }
                       // Reminder countdown — shown only when not yet complete and reminder is set
+                      if (!isComplete && !isScheduledToday && nextScheduledLabel != null) {
+                          Text(
+                              text = nextScheduledLabel,
+                              style = MaterialTheme.typography.labelSmall,
+                              color = MaterialTheme.colorScheme.onSurfaceVariant,
+                          )
+                      }
                       if (!isComplete && isScheduledToday) {
-                          val minutesUntil = remember(habit.reminderEnabled, habit.reminderTime, habit.customDays, now) {
-                              habit.timeUntilNextReminderMinutes(now)
-                          }
+                           val minutesUntil = remember(habit.reminderEnabled, habit.reminderTime, habit.customDays, now) {
+                               habit.timeUntilNextReminderMinutes(now)
+                           }
                           if (minutesUntil != null && minutesUntil > 0) {
                               Spacer(modifier = Modifier.height(4.dp))
                               Row(

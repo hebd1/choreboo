@@ -81,8 +81,8 @@ val connector: ChorebooConnector = ChorebooConnector.getInstance(
 
 The `choreboo` Data Connect connector defines
 12 queries and
-26 mutations,
-a total of 38 operations.
+28 mutations,
+a total of 40 operations.
 Each of these operations is exposed
 as a property of [ChorebooConnector].
 
@@ -220,15 +220,15 @@ last argument of the `execute()` method.
 If a mutation has no variables then it can be easily executed
 by calling the `execute()` method with no arguments.
 
-For example, the "DeleteAllMyHabitLogs" mutation has no variables
+For example, the "ClearActiveChoreboo" mutation has no variables
 and can be executed via the
-[ChorebooConnector.deleteAllMyHabitLogs]
+[ChorebooConnector.clearActiveChoreboo]
 property as follows:
 
 ```kotlin
 val connector = ChorebooConnector.instance
-val mutationResult = connector.deleteAllMyHabitLogs.execute()
-println("DeleteAllMyHabitLogs mutation returned: ${mutationResult.data}")
+val mutationResult = connector.clearActiveChoreboo.execute()
+println("ClearActiveChoreboo mutation returned: ${mutationResult.data}")
 ```
 
 

@@ -31,12 +31,7 @@ import kotlin.math.max
 import kotlin.math.roundToInt
 
 private const val CLOUD_TIMEOUT_MS = 5000L
-private const val SLEEP_DURATION_MS = 24 * 60 * 60 * 1000L // 24 hours
-
-/**
- * D2: Retry delays for write-through failures. 3 attempts total:
- * 1st attempt immediate, 2nd after 1 s, 3rd after 3 s.
- */
+private const val SLEEP_DURATION_MS = 24 * 60 * 60 * 1000L
 private val CHOREBOO_WRITE_THROUGH_RETRY_DELAYS_MS = listOf(1_000L, 3_000L)
 
 data class XpResult(
@@ -53,34 +48,16 @@ class ChorebooRepository @Inject constructor(
 ) {
     private val connector by lazy { ChorebooConnector.instance }
 
-    /** Fire-and-forget scope for silent write-through calls. */
     @Volatile
     private var writeScope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
 
-    /** Prevents concurrent auto-feed attempts from both passing the hunger/points check. */
     private val autoFeedMutex = Mutex()
 
-    /**
-     * Cancel all pending write-through coroutines and create a fresh scope.
-     * Called on sign-out and account reset to prevent stale writes executing after
-     * the user's data has been cleared.
-     *
-     * Thread-safety: must be called from the main thread (SettingsViewModel/ResetRepository
-     * always invoke this from viewModelScope which is confined to Main). The cancel() and
-     * scope reassignment are therefore sequentially ordered — no new coroutines can be
-     * launched on the old scope after this returns because all callers hold a reference to
-     * the *current* writeScope at launch time.
-     */
     fun cancelPendingWrites() {
         writeScope.coroutineContext[Job]?.cancel()
         writeScope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
     }
 
-    /**
-     * D2: Execute [block] with up to 3 attempts (1 immediate + 2 retries with backoff).
-     * Returns true on success, false after all attempts fail.
-     * Callers set pendingSync=true before calling, clear it after this returns.
-     */
     private suspend fun retryWithBackoff(tag: String, block: suspend () -> Unit): Boolean {
         var attempt = 0
         while (true) {
@@ -101,36 +78,73 @@ class ChorebooRepository @Inject constructor(
         }
     }
 
-    fun getChoreboo(): Flow<ChorebooStats?> = chorebooDao.getChoreboo().map { it?.toDomain() }
+    fun getChoreboo(): Flow<ChorebooStats?> = chorebooDao.getActiveChoreboo().map { it?.toDomain() }
 
-    suspend fun getChorebooSync(): ChorebooStats? = chorebooDao.getChorebooSync()?.toDomain()
+    fun getAllChoreboos(): Flow<List<ChorebooStats>> = chorebooDao.getAllChoreboos().map { entities ->
+        entities.map { it.toDomain() }
+    }
 
-    /** Returns just the name of the local choreboo, or null if none exists. */
-    suspend fun getChorebooNameSync(): String? = chorebooDao.getChorebooSync()?.name
+    suspend fun getChorebooSync(): ChorebooStats? = chorebooDao.getActiveChorebooSync()?.toDomain()
+
+    suspend fun getAllChoreboosSync(): List<ChorebooStats> = chorebooDao.getAllChoreboosSync().map { it.toDomain() }
+
+    suspend fun getChorebooNameSync(): String? = chorebooDao.getActiveChorebooSync()?.name
+
+    suspend fun hasAnyChoreboo(): Boolean = chorebooDao.getAllChoreboosSync().isNotEmpty()
+
+    suspend fun hasPetType(petType: PetType): Boolean = chorebooDao.getChorebooByPetType(petType.name) != null
+
+    suspend fun getChorebooForPetType(petType: PetType): ChorebooStats? =
+        chorebooDao.getChorebooByPetType(petType.name)?.toDomain()
+
+    suspend fun ensureActiveChoreboo(): ChorebooStats? {
+        val active = chorebooDao.getActiveChorebooSync()
+        if (active != null) return active.toDomain()
+
+        val first = chorebooDao.getAllChoreboosSync().firstOrNull() ?: return null
+        chorebooDao.setActiveChoreboo(first.id)
+        syncActiveChorebooToCloud(first.remoteId)
+        return first.copy(isActive = true).toDomain()
+    }
 
     suspend fun getOrCreateChoreboo(name: String = "Choreboo", petType: PetType = PetType.FOX): ChorebooStats {
-        require(name.isNotBlank()) { "Choreboo name must not be blank" }
-        require(name.length <= 20) { "Choreboo name must be 20 characters or fewer, was ${name.length}" }
+        return createOrActivatePetType(name, petType)
+    }
 
-        val existing = chorebooDao.getChorebooSync()
-        if (existing != null) return existing.toDomain()
+    suspend fun createOrActivatePetType(name: String, petType: PetType): ChorebooStats {
+        val trimmed = name.trim()
+        require(trimmed.isNotBlank()) { "Choreboo name must not be blank" }
+        require(trimmed.length <= 20) { "Choreboo name must be 20 characters or fewer, was ${trimmed.length}" }
 
+        val existing = chorebooDao.getChorebooByPetType(petType.name)
+        if (existing != null) {
+            if (!existing.isActive) {
+                chorebooDao.setActiveChoreboo(existing.id)
+                syncActiveChorebooToCloud(existing.remoteId)
+            }
+            return existing.copy(isActive = true).toDomain()
+        }
+
+        val ownerUid = userRepository.getCurrentUid()
         val newChoreboo = ChorebooEntity(
-            name = name,
+            name = trimmed,
             stage = ChorebooStage.EGG.name,
             hunger = 10,
             happiness = 80,
             energy = 80,
             petType = petType.name,
+            ownerUid = ownerUid,
+            isActive = true,
         )
+
+        chorebooDao.clearActiveChoreboo()
         val id = chorebooDao.insertChoreboo(newChoreboo)
         val created = newChoreboo.copy(id = id)
 
-        // Write-through: insert into Data Connect (fire-and-forget, with retry)
         writeScope.launch {
             retryWithBackoff("insertChoreboo:${created.id}") {
                 val result = connector.insertChoreboo.execute(
-                    name = name,
+                    name = trimmed,
                     stage = ChorebooStage.EGG.name,
                     level = 1,
                     xp = 0,
@@ -139,9 +153,14 @@ class ChorebooRepository @Inject constructor(
                     energy = 80,
                     petType = petType.name,
                     lastInteractionAt = Timestamp(Date(created.lastInteractionAt)),
-                )
+                ) {
+                    sleepUntil = null
+                }
+
                 val remoteId = result.data.choreboo_insert.id.toString()
-                chorebooDao.updateChoreboo(created.copy(remoteId = remoteId))
+                val synced = created.copy(remoteId = remoteId)
+                chorebooDao.updateChoreboo(synced)
+                syncActiveChorebooToCloud(remoteId)
                 Timber.d("Created choreboo in cloud: %s", remoteId)
             }
         }
@@ -149,58 +168,74 @@ class ChorebooRepository @Inject constructor(
         return created.toDomain()
     }
 
+    suspend fun switchActiveChoreboo(localId: Long) {
+        val target = chorebooDao.getChorebooById(localId) ?: return
+        if (target.isActive) return
+
+        chorebooDao.setActiveChoreboo(localId)
+        syncActiveChorebooToCloud(target.remoteId)
+    }
+
+    suspend fun switchActiveChoreboo(petType: PetType) {
+        val target = chorebooDao.getChorebooByPetType(petType.name) ?: return
+        switchActiveChoreboo(target.id)
+    }
+
+    suspend fun renameChoreboo(id: Long, name: String) {
+        val trimmed = name.trim()
+        require(trimmed.isNotBlank()) { "Choreboo name must not be blank" }
+        require(trimmed.length <= 20) { "Choreboo name must be 20 characters or fewer, was ${trimmed.length}" }
+
+        val choreboo = chorebooDao.getChorebooById(id) ?: return
+        val updated = choreboo.copy(name = trimmed)
+        chorebooDao.updateChoreboo(updated)
+        syncFullChoreboo(updated, "renameChoreboo:${updated.id}")
+    }
+
+    suspend fun updateName(name: String) {
+        val active = chorebooDao.getActiveChorebooSync() ?: return
+        renameChoreboo(active.id, name)
+    }
+
     suspend fun applyStatDecay() {
-        val choreboo = chorebooDao.getChorebooSync() ?: return
+        val choreboo = chorebooDao.getActiveChorebooSync() ?: return
         val now = System.currentTimeMillis()
 
-        // If sleeping, keep lastInteractionAt current to prevent decay accumulation
         if (choreboo.sleepUntil > now) {
-            // Pet is still sleeping, update lastInteractionAt to now to prevent decay
             chorebooDao.updateChoreboo(choreboo.copy(lastInteractionAt = now))
             return
         }
 
-        // If sleep just expired, set lastInteractionAt to sleepUntil time for proper decay calc
         val decayFromTime = if (choreboo.sleepUntil > 0 && choreboo.sleepUntil <= now) {
             choreboo.sleepUntil
         } else {
             choreboo.lastInteractionAt
         }
 
-        // Use floating-point division so sub-hour decay (≥ 30 min rounds to 1) is applied.
-        // Integer division would give 0 for elapsed < 1 hour, causing stats to never decay
-        // for users who open the app frequently.
         val hoursSinceInteraction = (now - decayFromTime).toFloat() / (1000f * 60f * 60f)
-
         if (hoursSinceInteraction < 0.01f) {
-            // Clear sleep if it's expired
             if (choreboo.sleepUntil > 0 && choreboo.sleepUntil <= now) {
                 val updated = choreboo.copy(sleepUntil = 0, lastInteractionAt = now)
                 chorebooDao.updateChoreboo(updated)
-                // Sync cleared sleep state to cloud
                 syncSleepToCloud(updated)
             }
             return
         }
 
-        val decayAmount = hoursSinceInteraction.roundToInt().coerceAtMost(50) // cap decay
+        val decayAmount = hoursSinceInteraction.roundToInt().coerceAtMost(50)
         val updated = choreboo.copy(
             hunger = max(0, choreboo.hunger - decayAmount),
             happiness = max(0, choreboo.happiness - (decayAmount / 2)),
             energy = max(0, choreboo.energy - (decayAmount / 2)),
             lastInteractionAt = now,
-            sleepUntil = 0, // Clear sleep when it expires
+            sleepUntil = 0,
         )
         chorebooDao.updateChoreboo(updated)
 
-        // Write-through: update stats in Data Connect (fire-and-forget)
-        // D2: Mark pendingSync so a concurrent cloud-wins sync doesn't overwrite the decayed stats
-        // before the write-through reaches the cloud.
         if (updated.remoteId != null) {
             chorebooDao.markPendingSync(updated.id)
             writeScope.launch {
                 retryWithBackoff("applyStatDecayStats:${updated.id}") { syncStatsToCloud(updated) }
-                // Sync cleared sleep state to cloud if sleep just expired
                 if (choreboo.sleepUntil > 0) {
                     retryWithBackoff("applyStatDecaySleep:${updated.id}") { syncSleepToCloud(updated) }
                 }
@@ -212,13 +247,17 @@ class ChorebooRepository @Inject constructor(
     suspend fun addXp(amount: Int): XpResult {
         require(amount > 0) { "XP amount must be positive, was $amount" }
 
-        val choreboo = chorebooDao.getChorebooSync() ?: return XpResult()
+        val choreboo = chorebooDao.getActiveChorebooSync() ?: return XpResult()
         val oldLevel = choreboo.level
-        val oldStage = try { ChorebooStage.valueOf(choreboo.stage) } catch (e: Exception) { Timber.w(e, "Unknown ChorebooStage value: ${choreboo.stage}"); ChorebooStage.EGG }
+        val oldStage = try {
+            ChorebooStage.valueOf(choreboo.stage)
+        } catch (e: Exception) {
+            Timber.w(e, "Unknown ChorebooStage value: ${choreboo.stage}")
+            ChorebooStage.EGG
+        }
+
         var newXp = choreboo.xp + amount
         var newLevel = choreboo.level
-
-        // Level up logic
         var xpNeeded = newLevel * 50
         while (newXp >= xpNeeded) {
             newXp -= xpNeeded
@@ -226,7 +265,6 @@ class ChorebooRepository @Inject constructor(
             xpNeeded = newLevel * 50
         }
 
-        // Stage evolution
         val totalXpEarned = (1 until newLevel).sumOf { it * 50 } + newXp
         val newStage = ChorebooStage.fromTotalXp(totalXpEarned)
 
@@ -238,9 +276,6 @@ class ChorebooRepository @Inject constructor(
         )
         chorebooDao.updateChoreboo(updated)
 
-        // Write-through: update XP in Data Connect (fire-and-forget)
-        // D2: Set pendingSync=true to prevent cloud-wins sync from overwriting the new XP
-        // before the write-through reaches the cloud.
         updated.remoteId?.let { remoteId ->
             chorebooDao.markPendingSync(updated.id)
             writeScope.launch {
@@ -267,17 +302,14 @@ class ChorebooRepository @Inject constructor(
         )
     }
 
-    /** Manual feed from pet screen: +20 hunger, costs 10 points (already deducted by caller). */
     suspend fun feedChoreboo() {
-        val choreboo = chorebooDao.getChorebooSync() ?: return
+        val choreboo = chorebooDao.getActiveChorebooSync() ?: return
         val updated = choreboo.copy(
             hunger = (choreboo.hunger + 20).coerceAtMost(100),
             lastInteractionAt = System.currentTimeMillis(),
         )
         chorebooDao.updateChoreboo(updated)
 
-        // Write-through: update stats in Data Connect (fire-and-forget)
-        // D2: Mark pendingSync so a concurrent sync doesn't overwrite the hunger increase.
         if (updated.remoteId != null) {
             chorebooDao.markPendingSync(updated.id)
             writeScope.launch {
@@ -287,9 +319,8 @@ class ChorebooRepository @Inject constructor(
         }
     }
 
-    /** Put pet to sleep for 24 hours -- freezes all stat decay during sleep. */
     suspend fun putToSleep() {
-        val choreboo = chorebooDao.getChorebooSync() ?: return
+        val choreboo = chorebooDao.getActiveChorebooSync() ?: return
         val now = System.currentTimeMillis()
         val sleepUntilTime = now + SLEEP_DURATION_MS
         val updated = choreboo.copy(
@@ -298,8 +329,6 @@ class ChorebooRepository @Inject constructor(
         )
         chorebooDao.updateChoreboo(updated)
 
-        // Write-through: update sleep in Data Connect (fire-and-forget)
-        // D2: Mark pendingSync so a concurrent sync doesn't overwrite the sleep state.
         updated.remoteId?.let { remoteId ->
             chorebooDao.markPendingSync(updated.id)
             writeScope.launch {
@@ -318,17 +347,13 @@ class ChorebooRepository @Inject constructor(
         }
     }
 
-    /**
-     * Auto-feed: called silently after habit completion.
-     * If hunger < 30 AND user has >= 10 points, deduct 10 points and add +20 hunger.
-     * No animation triggered -- purely background operation.
-     */
     suspend fun autoFeedIfNeeded(userPreferences: UserPreferences) {
         autoFeedMutex.withLock {
-            val choreboo = chorebooDao.getChorebooSync() ?: return@withLock
+            val choreboo = chorebooDao.getActiveChorebooSync() ?: return@withLock
             if (choreboo.hunger >= 30) return@withLock
             val points = userPreferences.totalPoints.first()
             if (points < 10) return@withLock
+
             val deducted = userPreferences.deductPoints(10)
             if (deducted) {
                 val updated = choreboo.copy(
@@ -337,8 +362,6 @@ class ChorebooRepository @Inject constructor(
                 )
                 chorebooDao.updateChoreboo(updated)
 
-                // Write-through: sync pet stats (fire-and-forget)
-                // D2: Mark pendingSync so a concurrent sync doesn't overwrite the hunger increase.
                 if (updated.remoteId != null) {
                     chorebooDao.markPendingSync(updated.id)
                     writeScope.launch {
@@ -347,7 +370,6 @@ class ChorebooRepository @Inject constructor(
                     }
                 }
 
-                // Write-through: sync deducted points so cloud stays current
                 writeScope.launch {
                     val newPoints = userPreferences.totalPoints.first()
                     val newLifetimeXp = userPreferences.totalLifetimeXp.first()
@@ -357,56 +379,12 @@ class ChorebooRepository @Inject constructor(
         }
     }
 
-    suspend fun updateName(name: String) {
-        require(name.isNotBlank()) { "Choreboo name must not be blank" }
-        require(name.length <= 20) { "Choreboo name must be 20 characters or fewer, was ${name.length}" }
-
-        val choreboo = chorebooDao.getChorebooSync() ?: return
-        val updated = choreboo.copy(name = name)
-        chorebooDao.updateChoreboo(updated)
-
-        // Write-through: full update to Data Connect (fire-and-forget)
-        // D2: Mark pendingSync so a concurrent sync doesn't overwrite the new name.
-        updated.remoteId?.let { remoteId ->
-            chorebooDao.markPendingSync(updated.id)
-            writeScope.launch {
-                val success = retryWithBackoff("updateChorebooName:${updated.id}") {
-                    connector.updateChorebooFull.execute(
-                        chorebooId = UUID.fromString(remoteId),
-                        name = name,
-                        stage = updated.stage,
-                        level = updated.level,
-                        xp = updated.xp,
-                        hunger = updated.hunger,
-                        happiness = updated.happiness,
-                        energy = updated.energy,
-                        petType = updated.petType,
-                        lastInteractionAt = Timestamp(Date(updated.lastInteractionAt)),
-                    ) {
-                        sleepUntil = if (updated.sleepUntil > 0) Timestamp(Date(updated.sleepUntil)) else null
-                        backgroundId = updated.backgroundId
-                    }
-                }
-                if (success) {
-                    Timber.d("Synced name update to cloud")
-                }
-                chorebooDao.clearPendingSync(updated.id)
-            }
-        }
-    }
-
-    /**
-     * Update the background for this user's Choreboo locally and write-through to cloud.
-     * Pass null (or [BACKGROUND_DEFAULT_ID]) to revert to the free mood-gradient default.
-     */
     suspend fun updateBackground(backgroundId: String?) {
-        val choreboo = chorebooDao.getChorebooSync() ?: return
-        // Store null for "default" so cloud schema stays clean
+        val choreboo = chorebooDao.getActiveChorebooSync() ?: return
         val cloudId = if (backgroundId == com.choreboo.app.domain.model.BACKGROUND_DEFAULT_ID) null else backgroundId
         val updated = choreboo.copy(backgroundId = cloudId)
         chorebooDao.updateChoreboo(updated)
 
-        // D2: Mark pendingSync so a concurrent sync doesn't overwrite the background change.
         updated.remoteId?.let { remoteId ->
             chorebooDao.markPendingSync(updated.id)
             writeScope.launch {
@@ -425,9 +403,122 @@ class ChorebooRepository @Inject constructor(
         }
     }
 
-    /**
-     * Sync stats (hunger, happiness, energy, lastInteractionAt) to Data Connect.
-     */
+    suspend fun syncFromCloud() {
+        try {
+            val cloudUser = withTimeoutOrNull(CLOUD_TIMEOUT_MS) { connector.getCurrentUser.execute() }
+            if (cloudUser == null) {
+                Timber.w("syncFromCloud: user query timed out")
+                return
+            }
+            val activeRemoteId = cloudUser.data.user?.activeChoreboo?.id?.toString()
+
+            val result = withTimeoutOrNull(CLOUD_TIMEOUT_MS) { connector.getMyChoreboos.execute() }
+            if (result == null) {
+                Timber.w("syncFromCloud: choreboos query timed out")
+                return
+            }
+
+            val cloudPets = result.data.choreboos
+            if (cloudPets.isEmpty()) {
+                chorebooDao.deleteAllChoreboos()
+                Timber.d("No choreboos found in cloud — cleared local cache")
+                return
+            }
+
+            val remoteIds = cloudPets.map { it.id.toString() }
+            cloudPets.forEach { cloudPet ->
+                val remoteId = cloudPet.id.toString()
+                val existing = chorebooDao.getChorebooByRemoteId(remoteId)
+                    ?: chorebooPetByOwnerAndType(cloudPet.owner.id, cloudPet.petType)
+
+                if (existing?.pendingSync == true) {
+                    Timber.d("syncFromCloud: skipping pendingSync choreboo remoteId=%s", remoteId)
+                    return@forEach
+                }
+
+                val entity = ChorebooEntity(
+                    id = existing?.id ?: 0,
+                    name = cloudPet.name,
+                    stage = cloudPet.stage,
+                    level = cloudPet.level,
+                    xp = cloudPet.xp,
+                    hunger = cloudPet.hunger,
+                    happiness = cloudPet.happiness,
+                    energy = cloudPet.energy,
+                    petType = cloudPet.petType,
+                    lastInteractionAt = cloudPet.lastInteractionAt.toDate().time,
+                    createdAt = cloudPet.createdAt.toDate().time,
+                    sleepUntil = cloudPet.sleepUntil?.toDate()?.time ?: 0L,
+                    ownerUid = cloudPet.owner.id,
+                    remoteId = remoteId,
+                    isActive = remoteId == activeRemoteId,
+                    backgroundId = cloudPet.backgroundId,
+                )
+
+                if (existing != null) {
+                    chorebooDao.updateChoreboo(entity)
+                } else {
+                    chorebooDao.insertChoreboo(entity)
+                }
+            }
+
+            chorebooDao.deleteRemoteChoreboosNotIn(remoteIds)
+
+            val resolvedActiveRemoteId = activeRemoteId ?: remoteIds.firstOrNull()
+            if (resolvedActiveRemoteId != null) {
+                val activeEntity = chorebooDao.getChorebooByRemoteId(resolvedActiveRemoteId)
+                if (activeEntity != null) {
+                    chorebooDao.setActiveChoreboo(activeEntity.id)
+                    if (activeRemoteId == null) {
+                        syncActiveChorebooToCloud(resolvedActiveRemoteId)
+                    }
+                }
+            }
+
+            Timber.d("Synced %d choreboos from cloud", cloudPets.size)
+        } catch (e: Exception) {
+            Timber.e(e, "Failed to sync choreboos from cloud")
+            throw e
+        }
+    }
+
+    suspend fun clearLocalData() {
+        chorebooDao.deleteAllChoreboos()
+    }
+
+    private suspend fun chorebooPetByOwnerAndType(ownerUid: String, petType: String): ChorebooEntity? {
+        return chorebooDao.getChorebooByOwnerAndPetType(ownerUid, petType)
+    }
+
+    private suspend fun syncFullChoreboo(entity: ChorebooEntity, tag: String) {
+        entity.remoteId?.let { remoteId ->
+            chorebooDao.markPendingSync(entity.id)
+            writeScope.launch {
+                val success = retryWithBackoff(tag) {
+                    connector.updateChorebooFull.execute(
+                        chorebooId = UUID.fromString(remoteId),
+                        name = entity.name,
+                        stage = entity.stage,
+                        level = entity.level,
+                        xp = entity.xp,
+                        hunger = entity.hunger,
+                        happiness = entity.happiness,
+                        energy = entity.energy,
+                        petType = entity.petType,
+                        lastInteractionAt = Timestamp(Date(entity.lastInteractionAt)),
+                    ) {
+                        sleepUntil = if (entity.sleepUntil > 0) Timestamp(Date(entity.sleepUntil)) else null
+                        backgroundId = entity.backgroundId
+                    }
+                }
+                if (success) {
+                    Timber.d("Synced full choreboo update to cloud")
+                }
+                chorebooDao.clearPendingSync(entity.id)
+            }
+        }
+    }
+
     private suspend fun syncStatsToCloud(entity: ChorebooEntity) {
         entity.remoteId?.let { remoteId ->
             try {
@@ -444,9 +535,6 @@ class ChorebooRepository @Inject constructor(
         }
     }
 
-    /**
-     * Sync sleepUntil state to Data Connect (used when sleep expires during decay).
-     */
     private suspend fun syncSleepToCloud(entity: ChorebooEntity) {
         entity.remoteId?.let { remoteId ->
             try {
@@ -461,87 +549,46 @@ class ChorebooRepository @Inject constructor(
         }
     }
 
-    /**
-     * Pull choreboo from Data Connect and merge into Room (cloud wins).
-     * Called once after successful authentication.
-     */
-    suspend fun syncFromCloud() {
-        try {
-            val result = withTimeoutOrNull(CLOUD_TIMEOUT_MS) { connector.getMyChoreboo.execute() }
-            if (result == null) {
-                Timber.w("syncFromCloud: timed out")
-                return
-            }
-            val cloudPet = result.data.choreboos.firstOrNull()
-            if (cloudPet == null) {
-                Timber.d("No choreboo found in cloud — skipping sync")
-                return
-            }
-
-            val remoteId = cloudPet.id.toString()
-            val existing = chorebooDao.getChorebooByRemoteId(remoteId)
-                ?: chorebooDao.getChorebooSync()
-
-            val lastInteractionMs = cloudPet.lastInteractionAt.toDate().time
-            val createdAtMs = cloudPet.createdAt.toDate().time
-            val sleepUntilMs = cloudPet.sleepUntil?.toDate()?.time ?: 0L
-
-            val entity = ChorebooEntity(
-                id = existing?.id ?: 0,
-                name = cloudPet.name,
-                stage = cloudPet.stage,
-                level = cloudPet.level,
-                xp = cloudPet.xp,
-                hunger = cloudPet.hunger,
-                happiness = cloudPet.happiness,
-                energy = cloudPet.energy,
-                petType = cloudPet.petType,
-                lastInteractionAt = lastInteractionMs,
-                createdAt = createdAtMs,
-                sleepUntil = sleepUntilMs,
-                ownerUid = cloudPet.owner.id,
-                remoteId = remoteId,
-                backgroundId = cloudPet.backgroundId,
-            )
-
-            if (existing != null) {
-                // D2: Skip overwriting if a write-through is in flight. The local state is
-                // ahead of cloud; overwriting it would revert the user's change.
-                if (existing.pendingSync) {
-                    Timber.d("syncFromCloud: skipping pendingSync choreboo remoteId=$remoteId")
-                    return
+    private fun syncActiveChorebooToCloud(remoteId: String?) {
+        writeScope.launch {
+            try {
+                if (remoteId == null) {
+                    connector.clearActiveChoreboo.execute()
+                } else {
+                    connector.setActiveChoreboo.execute {
+                        chorebooId = UUID.fromString(remoteId)
+                    }
                 }
-                chorebooDao.updateChoreboo(entity)
-            } else {
-                chorebooDao.insertChoreboo(entity)
+            } catch (e: Exception) {
+                Timber.e(e, "Failed to sync active choreboo to cloud")
             }
-            Timber.d("Synced choreboo from cloud: %s (level=%d)", remoteId, cloudPet.level)
-        } catch (e: Exception) {
-            Timber.e(e, "Failed to sync choreboo from cloud")
-            throw e
         }
-    }
-
-    /**
-     * Clear all local choreboo data — used for sign-out cleanup.
-     */
-    suspend fun clearLocalData() {
-        chorebooDao.deleteAllChoreboos()
     }
 }
 
 private fun ChorebooEntity.toDomain() = ChorebooStats(
     id = id,
     name = name,
-    stage = try { ChorebooStage.valueOf(stage) } catch (e: Exception) { Timber.w(e, "Unknown ChorebooStage value: $stage"); ChorebooStage.EGG },
+    stage = try {
+        ChorebooStage.valueOf(stage)
+    } catch (e: Exception) {
+        Timber.w(e, "Unknown ChorebooStage value: $stage")
+        ChorebooStage.EGG
+    },
     level = level,
     xp = xp,
     hunger = hunger,
     happiness = happiness,
     energy = energy,
-    petType = try { PetType.valueOf(petType) } catch (e: Exception) { Timber.w(e, "Unknown PetType value: $petType"); PetType.FOX },
+    petType = try {
+        PetType.valueOf(petType)
+    } catch (e: Exception) {
+        Timber.w(e, "Unknown PetType value: $petType")
+        PetType.FOX
+    },
     lastInteractionAt = lastInteractionAt,
     createdAt = createdAt,
     sleepUntil = sleepUntil,
+    isActive = isActive,
     backgroundId = backgroundId,
 )

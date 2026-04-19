@@ -127,7 +127,11 @@ class OnboardingViewModel @Inject constructor(
             _isHatching.value = true
             try {
                 val name = chorebooName.ifBlank { _selectedPetType.value.name.lowercase().replaceFirstChar { it.uppercase() } }
-                chorebooRepository.getOrCreateChoreboo(name, _selectedPetType.value)
+                if (_selectedPetType.value.isPremium && !billingRepository.isPremium.value) {
+                    _currentStep.value = STEP_PAYWALL
+                    return@launch
+                }
+                chorebooRepository.createOrActivatePetType(name, _selectedPetType.value)
                 // Move to paywall — do NOT mark onboarding complete yet.
                 _currentStep.value = STEP_PAYWALL
             } catch (e: Exception) {
@@ -167,10 +171,10 @@ class OnboardingViewModel @Inject constructor(
     fun skipPremium() {
         viewModelScope.launch {
             if (_selectedPetType.value.isPremium) {
-                // Fall back to FOX and re-create the Choreboo with FOX type.
+                // Fall back to FOX and make it the active pet for free users.
                 _selectedPetType.value = PetType.FOX
                 try {
-                    chorebooRepository.getOrCreateChoreboo(
+                    chorebooRepository.createOrActivatePetType(
                         chorebooRepository.getChorebooNameSync() ?: PetType.FOX.name.lowercase().replaceFirstChar { it.uppercase() },
                         PetType.FOX,
                     )

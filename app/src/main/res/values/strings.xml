@@ -418,6 +418,18 @@
     <string name="settings_sound_section">Sound</string>
     <string name="settings_sound_effects">Sound Effects</string>
     <string name="settings_sound_effects_body">Play magic chimes on task complete</string>
+    <!-- Pet section -->
+    <string name="settings_pet_section">Pets</string>
+    <string name="settings_active_pet_label">Active Pet</string>
+    <string name="settings_pet_tap_to_manage">Tap a pet to switch or create it</string>
+    <string name="settings_pet_locked_premium">Premium required to unlock this pet</string>
+    <string name="settings_pet_not_created">Not created yet</string>
+    <string name="settings_pet_active_badge">Active</string>
+    <string name="settings_pet_level_format">Level %1$d</string>
+    <string name="settings_rename_pet">Rename Pet</string>
+    <string name="settings_name_your_pet_title">Name Your %1$s</string>
+    <string name="settings_pet_name_label">Pet Name</string>
+    <string name="settings_tap_to_set_pet_name">Tap to set pet name</string>
     <!-- Account section -->
     <string name="settings_account_section">Account</string>
     <string name="settings_profile_photo">Profile Photo</string>
@@ -458,8 +470,15 @@
     <string name="settings_msg_household_joined">Joined \"%1$s\"!</string>
     <string name="settings_msg_household_left">Left household.</string>
     <string name="settings_msg_username_updated">Username updated!</string>
+    <string name="settings_msg_pet_name_updated">Pet name updated!</string>
     <string name="settings_msg_invalid_username">Invalid username</string>
+    <string name="settings_msg_invalid_pet_name">Invalid pet name</string>
     <string name="settings_msg_username_update_failed">Failed to update username. Please try again.</string>
+    <string name="settings_msg_pet_name_update_failed">Failed to update pet name. Please try again.</string>
+    <string name="settings_msg_pet_switch_failed">Failed to switch pets. Please try again.</string>
+    <string name="settings_msg_premium_pet_locked">That pet requires an active Premium subscription.</string>
+    <string name="settings_msg_pet_created">%1$s is ready to go!</string>
+    <string name="settings_msg_pet_switched">Switched to %1$s.</string>
     <string name="settings_msg_photo_saved">Photo saved</string>
     <string name="settings_msg_photo_synced">Profile photo synced to cloud!</string>
     <string name="settings_msg_photo_sync_failed">Photo saved locally but failed to sync to cloud. It will sync when you check your connection.</string>
@@ -679,6 +698,7 @@
         <string name="habit_frequency_weekends">Weekends</string>
         <string name="habit_frequency_not_today">Not today</string>
         <string name="habit_frequency_custom">Custom</string>
+        <string name="habit_card_next_scheduled">Next: %1$s</string>
 
         <!-- StatsScreen -->
         <string name="stats_feeling_loved">Feeling Loved</string>

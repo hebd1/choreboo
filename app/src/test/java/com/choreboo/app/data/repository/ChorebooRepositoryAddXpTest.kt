@@ -61,7 +61,7 @@ class ChorebooRepositoryAddXpTest {
 
     @Test
     fun `addXp adds XP without leveling up`() = runTest {
-        coEvery { chorebooDao.getChorebooSync() } returns baseEntity(level = 1, xp = 0)
+        coEvery { chorebooDao.getActiveChorebooSync() } returns baseEntity(level = 1, xp = 0)
         val saved = slot<ChorebooEntity>()
         coEvery { chorebooDao.updateChoreboo(capture(saved)) } returns Unit
 
@@ -77,7 +77,7 @@ class ChorebooRepositoryAddXpTest {
 
     @Test
     fun `addXp returns empty result when no choreboo exists`() = runTest {
-        coEvery { chorebooDao.getChorebooSync() } returns null
+        coEvery { chorebooDao.getActiveChorebooSync() } returns null
 
         val result = repo.addXp(10)
 
@@ -92,7 +92,7 @@ class ChorebooRepositoryAddXpTest {
     @Test
     fun `addXp levels up when XP reaches threshold`() = runTest {
         // level 1: xpNeeded = 50. Add 50 → level 2, xp = 0
-        coEvery { chorebooDao.getChorebooSync() } returns baseEntity(level = 1, xp = 0)
+        coEvery { chorebooDao.getActiveChorebooSync() } returns baseEntity(level = 1, xp = 0)
         val saved = slot<ChorebooEntity>()
         coEvery { chorebooDao.updateChoreboo(capture(saved)) } returns Unit
 
@@ -107,7 +107,7 @@ class ChorebooRepositoryAddXpTest {
     @Test
     fun `addXp levels up with overflow XP`() = runTest {
         // level 1: xpNeeded = 50. xp = 40 + 25 = 65. 65 - 50 = 15 remainder at level 2
-        coEvery { chorebooDao.getChorebooSync() } returns baseEntity(level = 1, xp = 40)
+        coEvery { chorebooDao.getActiveChorebooSync() } returns baseEntity(level = 1, xp = 40)
         val saved = slot<ChorebooEntity>()
         coEvery { chorebooDao.updateChoreboo(capture(saved)) } returns Unit
 
@@ -122,7 +122,7 @@ class ChorebooRepositoryAddXpTest {
     fun `addXp multiple level-ups in one call`() = runTest {
         // level 1 xpNeeded=50, level 2 xpNeeded=100. Add 200:
         // 200 - 50 = 150 (level 2), 150 - 100 = 50 (level 3), 50 < 150 → stop at level 3 xp=50
-        coEvery { chorebooDao.getChorebooSync() } returns baseEntity(level = 1, xp = 0)
+        coEvery { chorebooDao.getActiveChorebooSync() } returns baseEntity(level = 1, xp = 0)
         val saved = slot<ChorebooEntity>()
         coEvery { chorebooDao.updateChoreboo(capture(saved)) } returns Unit
 
@@ -144,7 +144,7 @@ class ChorebooRepositoryAddXpTest {
         // totalXpEarned = sum(1 until newLevel) { it * 50 } + newXp
         // If newLevel=3, newXp=0: totalXpEarned = (1*50)+(2*50)+0 = 50+100+0 = ... wait no.
         // (1 until 3).sumOf { it * 50 } = 1*50 + 2*50 = 150. totalXp = 150 → BABY (>=100)
-        coEvery { chorebooDao.getChorebooSync() } returns baseEntity(level = 1, xp = 0, stage = "EGG")
+        coEvery { chorebooDao.getActiveChorebooSync() } returns baseEntity(level = 1, xp = 0, stage = "EGG")
         val saved = slot<ChorebooEntity>()
         coEvery { chorebooDao.updateChoreboo(capture(saved)) } returns Unit
 
@@ -159,7 +159,7 @@ class ChorebooRepositoryAddXpTest {
     fun `addXp no evolution when stage stays the same`() = runTest {
         // Already BABY (100+), add small amount — stays BABY
         // level=3, xp=0: totalXp = (1*50)+(2*50) = 150 (BABY). Add 10 → level=3, xp=10, totalXp=160 → still BABY
-        coEvery { chorebooDao.getChorebooSync() } returns baseEntity(level = 3, xp = 0, stage = "BABY")
+        coEvery { chorebooDao.getActiveChorebooSync() } returns baseEntity(level = 3, xp = 0, stage = "BABY")
         val saved = slot<ChorebooEntity>()
         coEvery { chorebooDao.updateChoreboo(capture(saved)) } returns Unit
 
@@ -190,7 +190,7 @@ class ChorebooRepositoryAddXpTest {
 
     @Test
     fun `getOrCreateChoreboo accepts name at exactly 20 characters`() = runTest {
-        coEvery { chorebooDao.getChorebooSync() } returns baseEntity()
+        coEvery { chorebooDao.getActiveChorebooSync() } returns baseEntity()
         // Should not throw — existing choreboo returned before any insertion
         repo.getOrCreateChoreboo(name = "A".repeat(20))
     }

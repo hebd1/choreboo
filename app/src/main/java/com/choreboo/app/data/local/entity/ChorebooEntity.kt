@@ -4,7 +4,7 @@ import androidx.room.Index
 import androidx.room.PrimaryKey
 @Entity(
     tableName = "choreboos",
-    indices = [Index("remoteId")],
+    indices = [Index("remoteId"), Index(value = ["ownerUid", "petType"], unique = true)],
 )
 data class ChorebooEntity(
     @PrimaryKey(autoGenerate = true) val id: Long = 0,
@@ -21,6 +21,7 @@ data class ChorebooEntity(
     val sleepUntil: Long = 0,
     val ownerUid: String? = null,
     val remoteId: String? = null,
+    val isActive: Boolean = false,
     /** Selected background id (matches BackgroundItem.id). Null = Default mood gradient. */
     val backgroundId: String? = null,
     /**

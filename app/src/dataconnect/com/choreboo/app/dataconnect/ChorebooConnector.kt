@@ -22,6 +22,8 @@ public interface ChorebooConnector : com.google.firebase.dataconnect.generated.G
   
     public val archiveHabit: ArchiveHabitMutation
   
+    public val clearActiveChoreboo: ClearActiveChorebooMutation
+  
     public val createHabit: CreateHabitMutation
   
     public val createHabitLog: CreateHabitLogMutation
@@ -54,7 +56,7 @@ public interface ChorebooConnector : com.google.firebase.dataconnect.generated.G
   
     public val getLogsForHabitAndDate: GetLogsForHabitAndDateQuery
   
-    public val getMyChoreboo: GetMyChorebooQuery
+    public val getMyChoreboos: GetMyChoreboosQuery
   
     public val getMyHousehold: GetMyHouseholdQuery
   
@@ -73,6 +75,8 @@ public interface ChorebooConnector : com.google.firebase.dataconnect.generated.G
     public val nullifyHouseholdForMembers: NullifyHouseholdForMembersMutation
   
     public val purchaseBackground: PurchaseBackgroundMutation
+  
+    public val setActiveChoreboo: SetActiveChorebooMutation
   
     public val unarchiveHabit: UnarchiveHabitMutation
   
@@ -143,6 +147,10 @@ private class ChorebooConnectorImpl(
       ArchiveHabitMutationImpl(this)
     }
   
+    override val clearActiveChoreboo by lazy(LazyThreadSafetyMode.PUBLICATION) {
+      ClearActiveChorebooMutationImpl(this)
+    }
+  
     override val createHabit by lazy(LazyThreadSafetyMode.PUBLICATION) {
       CreateHabitMutationImpl(this)
     }
@@ -207,8 +215,8 @@ private class ChorebooConnectorImpl(
       GetLogsForHabitAndDateQueryImpl(this)
     }
   
-    override val getMyChoreboo by lazy(LazyThreadSafetyMode.PUBLICATION) {
-      GetMyChorebooQueryImpl(this)
+    override val getMyChoreboos by lazy(LazyThreadSafetyMode.PUBLICATION) {
+      GetMyChoreboosQueryImpl(this)
     }
   
     override val getMyHousehold by lazy(LazyThreadSafetyMode.PUBLICATION) {
@@ -245,6 +253,10 @@ private class ChorebooConnectorImpl(
   
     override val purchaseBackground by lazy(LazyThreadSafetyMode.PUBLICATION) {
       PurchaseBackgroundMutationImpl(this)
+    }
+  
+    override val setActiveChoreboo by lazy(LazyThreadSafetyMode.PUBLICATION) {
+      SetActiveChorebooMutationImpl(this)
     }
   
     override val unarchiveHabit by lazy(LazyThreadSafetyMode.PUBLICATION) {
@@ -300,6 +312,7 @@ private class ChorebooConnectorImpl(
   override fun mutations(): List<com.google.firebase.dataconnect.generated.GeneratedMutation<ChorebooConnector, *, *>> =
     listOf(
       archiveHabit,
+        clearActiveChoreboo,
         createHabit,
         createHabitLog,
         createHousehold,
@@ -314,6 +327,7 @@ private class ChorebooConnectorImpl(
         insertChoreboo,
         nullifyHouseholdForMembers,
         purchaseBackground,
+        setActiveChoreboo,
         unarchiveHabit,
         updateAssignedHabit,
         updateChorebooBackground,
@@ -336,7 +350,7 @@ private class ChorebooConnectorImpl(
         getHouseholdByInviteCode,
         getHouseholdHabitLogsForDate,
         getLogsForHabitAndDate,
-        getMyChoreboo,
+        getMyChoreboos,
         getMyHousehold,
         getMyHouseholdChoreboos,
         getMyHouseholdHabits,
@@ -490,6 +504,21 @@ private class ArchiveHabitMutationImpl(
     ArchiveHabitMutation.Companion.operationName,
     ArchiveHabitMutation.Companion.dataDeserializer,
     ArchiveHabitMutation.Companion.variablesSerializer,
+  )
+
+
+private class ClearActiveChorebooMutationImpl(
+  connector: ChorebooConnector
+):
+  ClearActiveChorebooMutation,
+  ChorebooConnectorGeneratedMutationImpl<
+      ClearActiveChorebooMutation.Data,
+      Unit
+  >(
+    connector,
+    ClearActiveChorebooMutation.Companion.operationName,
+    ClearActiveChorebooMutation.Companion.dataDeserializer,
+    ClearActiveChorebooMutation.Companion.variablesSerializer,
   )
 
 
@@ -733,18 +762,18 @@ private class GetLogsForHabitAndDateQueryImpl(
   )
 
 
-private class GetMyChorebooQueryImpl(
+private class GetMyChoreboosQueryImpl(
   connector: ChorebooConnector
 ):
-  GetMyChorebooQuery,
+  GetMyChoreboosQuery,
   ChorebooConnectorGeneratedQueryImpl<
-      GetMyChorebooQuery.Data,
+      GetMyChoreboosQuery.Data,
       Unit
   >(
     connector,
-    GetMyChorebooQuery.Companion.operationName,
-    GetMyChorebooQuery.Companion.dataDeserializer,
-    GetMyChorebooQuery.Companion.variablesSerializer,
+    GetMyChoreboosQuery.Companion.operationName,
+    GetMyChoreboosQuery.Companion.dataDeserializer,
+    GetMyChoreboosQuery.Companion.variablesSerializer,
   )
 
 
@@ -880,6 +909,21 @@ private class PurchaseBackgroundMutationImpl(
     PurchaseBackgroundMutation.Companion.operationName,
     PurchaseBackgroundMutation.Companion.dataDeserializer,
     PurchaseBackgroundMutation.Companion.variablesSerializer,
+  )
+
+
+private class SetActiveChorebooMutationImpl(
+  connector: ChorebooConnector
+):
+  SetActiveChorebooMutation,
+  ChorebooConnectorGeneratedMutationImpl<
+      SetActiveChorebooMutation.Data,
+      SetActiveChorebooMutation.Variables
+  >(
+    connector,
+    SetActiveChorebooMutation.Companion.operationName,
+    SetActiveChorebooMutation.Companion.dataDeserializer,
+    SetActiveChorebooMutation.Companion.variablesSerializer,
   )
 
 

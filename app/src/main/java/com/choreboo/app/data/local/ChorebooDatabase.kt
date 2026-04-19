@@ -101,7 +101,7 @@ val MIGRATION_19_20 = object : Migration(19, 20) {
         HouseholdHabitStatusEntity::class,
         PurchasedBackgroundEntity::class,
     ],
-    version = 22, // v22: remove temporary household totalPoints cache
+    version = 23, // v23: multi-pet support with active choreboo flag
     exportSchema = true,
 )
 @TypeConverters(Converters::class)

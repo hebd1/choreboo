@@ -80,6 +80,14 @@ class ResetRepository @Inject constructor(
             Timber.w(e, "Failed to delete purchased backgrounds (continuing)")
         }
 
+        try {
+            withTimeoutOrNull(CLOUD_TIMEOUT_MS) { connector.clearActiveChoreboo.execute() }
+                ?: Timber.w("clearActiveChoreboo timed out")
+            Timber.d("Cleared active Choreboo reference")
+        } catch (e: Exception) {
+            Timber.w(e, "Failed to clear active Choreboo reference (continuing)")
+        }
+
         // Step 3: Delete the Choreboo (references User)
         try {
             withTimeoutOrNull(CLOUD_TIMEOUT_MS) { connector.deleteMyChoreboo.execute() }

@@ -42,7 +42,7 @@ class PetMoodReceiver : BroadcastReceiver() {
         CoroutineScope(Dispatchers.Default).launch {
             try {
                 // Get current choreboo and apply decay
-                val choreboo = chorebooDao.getChorebooSync() ?: run {
+                val choreboo = chorebooDao.getActiveChorebooSync() ?: run {
                     Timber.w("PetMoodReceiver: no choreboo found")
                     return@launch
                 }
@@ -51,7 +51,7 @@ class PetMoodReceiver : BroadcastReceiver() {
                 chorebooRepository.applyStatDecay()
 
                 // Re-fetch the now-decayed choreboo
-                val decayedChoreboo = chorebooDao.getChorebooSync() ?: return@launch
+                val decayedChoreboo = chorebooDao.getActiveChorebooSync() ?: return@launch
                 val petName = decayedChoreboo.name
 
                 // Check if any stat is critical (< 20)

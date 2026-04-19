@@ -105,11 +105,12 @@ class MainViewModel @Inject constructor(
             }
         }
 
-        // Room warmup: ensure choreboo exists and stats are current.
+        // Room warmup: ensure an active choreboo is selected and stats are current.
         // This is a fast local DB operation (sub-second) — blocking here is fine.
         try {
-            chorebooRepository.getOrCreateChoreboo()
-            chorebooRepository.applyStatDecay()
+            if (chorebooRepository.ensureActiveChoreboo() != null) {
+                chorebooRepository.applyStatDecay()
+            }
             Timber.d("Room warmup complete")
         } catch (e: Exception) {
             Timber.e(e, "Room warmup failed")

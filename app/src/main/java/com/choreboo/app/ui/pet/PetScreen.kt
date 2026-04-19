@@ -94,10 +94,18 @@ import com.choreboo.app.ui.components.FOX_ANIM_LOOP_SLEEPING
 import com.choreboo.app.ui.components.FOX_ANIM_START_SLEEP
 import com.choreboo.app.ui.components.FOX_ANIM_THUMBS_UP
 import com.choreboo.app.ui.components.FOX_IDLE_ITERATIONS
+import com.choreboo.app.ui.components.PANDA_ANIM_EATING
+import com.choreboo.app.ui.components.PANDA_ANIM_IDLE
+import com.choreboo.app.ui.components.PANDA_ANIM_INTERACT
+import com.choreboo.app.ui.components.PANDA_ANIM_LOOP_SLEEPING
+import com.choreboo.app.ui.components.PANDA_ANIM_START_SLEEP
+import com.choreboo.app.ui.components.PANDA_ANIM_THUMBS_UP
+import com.choreboo.app.ui.components.PANDA_IDLE_ITERATIONS
 import com.choreboo.app.ui.components.PetBackgroundImage
 import com.choreboo.app.ui.components.PremiumBadge
 import com.choreboo.app.ui.components.ShimmerPlaceholder
 import com.choreboo.app.ui.components.foxMoodAssetPath
+import com.choreboo.app.ui.components.pandaMoodAssetPath
 import com.choreboo.app.ui.components.SnackbarType
 import com.choreboo.app.ui.components.StitchSnackbar
 import com.choreboo.app.ui.components.showStitchSnackbar
@@ -119,8 +127,24 @@ import com.choreboo.app.ui.util.displayName
 import com.choreboo.app.ui.util.labelRes
 import com.choreboo.app.ui.util.hasLocalizedLabel
 import kotlinx.coroutines.launch
+import java.time.LocalDate
+import java.time.format.DateTimeFormatter
+import java.time.format.TextStyle
+import java.util.Locale
 
 private enum class AnimationPhase { MOOD, IDLE, EATING, INTERACTING, THUMBS_UP, START_SLEEPING, SLEEPING }
+
+private val PET_SCENE_OFFSET_X = 12.dp
+private val PET_SCENE_OFFSET_Y = 34.dp
+
+private fun formatNextScheduledDay(nextDate: LocalDate, today: LocalDate): String {
+    val locale = Locale.getDefault()
+    return if (!nextDate.isAfter(today.plusDays(6))) {
+        nextDate.dayOfWeek.getDisplayName(TextStyle.FULL, locale)
+    } else {
+        nextDate.format(DateTimeFormatter.ofPattern("MMM d", locale))
+    }
+}
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -187,6 +211,7 @@ fun PetScreen(
     val sleepErrorMsg = stringResource(R.string.pet_snack_sleep_error)
     val deleteErrorMsg = stringResource(R.string.pet_snack_delete_error)
     val purchaseErrorMsg = stringResource(R.string.pet_snack_purchase_error)
+    val nextScheduledFmt = stringResource(R.string.habit_card_next_scheduled)
     LaunchedEffect(Unit) {
         viewModel.events.collect { event ->
             when (event) {
@@ -417,7 +442,7 @@ fun PetScreen(
                                 onTap = { isInteracting = true },
                                 modifier = Modifier
                                     .align(Alignment.BottomCenter)
-                                    .padding(bottom = 12.dp)
+                                    .offset(x = PET_SCENE_OFFSET_X, y = PET_SCENE_OFFSET_Y)
                                     .size(160.dp),
                             )
 
@@ -659,11 +684,23 @@ fun PetScreen(
                     }
 
                     items(habits, key = { it.id }) { habit ->
+                        val isScheduledToday = habit.isScheduledForToday(todayLocalDate)
                         HabitCard(
                             habit = habit,
                             completedToday = todayCompletions[habit.id] ?: 0,
                             currentStreak = streaks[habit.id] ?: 0,
-                            isScheduledToday = habit.isScheduledForToday(todayLocalDate),
+                            isScheduledToday = isScheduledToday,
+                            nextScheduledLabel = remember(habit.customDays, todayLocalDate, isScheduledToday) {
+                                if (isScheduledToday) {
+                                    null
+                                } else {
+                                    habit.nextScheduledDate(todayLocalDate)?.let { nextDate ->
+                                        nextScheduledFmt.format(
+                                            formatNextScheduledDay(nextDate, todayLocalDate),
+                                        )
+                                    }
+                                }
+                            },
                             onComplete = { viewModel.completeHabit(habit.id) },
                             onClick = { onEditHabit(habit.id) },
                             householdCompleterName = householdCompleterNames[habit.id],
@@ -1297,6 +1334,95 @@ private fun PetAnimation(
                 AnimationPhase.THUMBS_UP -> FOX_ANIM_THUMBS_UP to 1
                 AnimationPhase.START_SLEEPING -> FOX_ANIM_START_SLEEP to 1
                 AnimationPhase.SLEEPING -> FOX_ANIM_LOOP_SLEEPING to Int.MAX_VALUE
+            }
+
+            WebmAnimationView(
+                assetPath = currentAsset,
+                iterations = currentIterations,
+                onComplete = {
+                    when (animPhase) {
+                        AnimationPhase.MOOD -> {
+                            if (phase == AnimationPhase.MOOD) phase = AnimationPhase.IDLE
+                        }
+                        AnimationPhase.IDLE -> {
+                            if (phase == AnimationPhase.IDLE) phase = AnimationPhase.MOOD
+                        }
+                        AnimationPhase.EATING -> {
+                            if (phase == AnimationPhase.EATING) {
+                                onEatingComplete()
+                                phase = AnimationPhase.MOOD
+                            }
+                        }
+                        AnimationPhase.INTERACTING -> {
+                            if (phase == AnimationPhase.INTERACTING) {
+                                onInteractComplete()
+                                phase = AnimationPhase.MOOD
+                            }
+                        }
+                        AnimationPhase.THUMBS_UP -> {
+                            if (phase == AnimationPhase.THUMBS_UP) {
+                                onThumbsUpComplete()
+                                phase = AnimationPhase.MOOD
+                            }
+                        }
+                        AnimationPhase.START_SLEEPING -> {
+                            if (phase == AnimationPhase.START_SLEEPING) {
+                                onStartSleepComplete()
+                                phase = AnimationPhase.SLEEPING
+                            }
+                        }
+                        AnimationPhase.SLEEPING -> {
+                            if (phase == AnimationPhase.SLEEPING) {
+                                phase = if (isSleeping) AnimationPhase.SLEEPING else AnimationPhase.MOOD
+                            }
+                        }
+                    }
+                },
+                modifier = modifier.clickable { onTap() },
+            )
+        }
+    } else if (petType == PetType.PANDA) {
+        var phase by remember { mutableStateOf(AnimationPhase.MOOD) }
+
+        LaunchedEffect(isEating) {
+            if (isEating && !isSleeping) {
+                phase = AnimationPhase.EATING
+            }
+        }
+
+        LaunchedEffect(isInteracting) {
+            if (isInteracting && !isEating && !isSleeping) {
+                phase = AnimationPhase.INTERACTING
+            }
+        }
+
+        LaunchedEffect(showThumbsUp) {
+            if (showThumbsUp && !isEating && !isSleeping) {
+                phase = AnimationPhase.THUMBS_UP
+            }
+        }
+
+        LaunchedEffect(isSleeping) {
+            if (isSleeping) {
+                phase = if (showStartSleepAnimation) AnimationPhase.START_SLEEPING else AnimationPhase.SLEEPING
+            } else if (phase == AnimationPhase.SLEEPING || phase == AnimationPhase.START_SLEEPING) {
+                phase = AnimationPhase.MOOD
+            }
+        }
+
+        Crossfade(
+            targetState = phase,
+            animationSpec = tween(durationMillis = 100),
+            label = "pandaAnimationCrossfade",
+        ) { animPhase ->
+            val (currentAsset, currentIterations) = when (animPhase) {
+                AnimationPhase.MOOD -> pandaMoodAssetPath(mood) to 1
+                AnimationPhase.IDLE -> PANDA_ANIM_IDLE to PANDA_IDLE_ITERATIONS
+                AnimationPhase.EATING -> PANDA_ANIM_EATING to 1
+                AnimationPhase.INTERACTING -> PANDA_ANIM_INTERACT to 1
+                AnimationPhase.THUMBS_UP -> PANDA_ANIM_THUMBS_UP to 1
+                AnimationPhase.START_SLEEPING -> PANDA_ANIM_START_SLEEP to 1
+                AnimationPhase.SLEEPING -> PANDA_ANIM_LOOP_SLEEPING to Int.MAX_VALUE
             }
 
             WebmAnimationView(

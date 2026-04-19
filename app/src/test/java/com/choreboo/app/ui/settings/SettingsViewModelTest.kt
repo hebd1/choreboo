@@ -12,11 +12,15 @@ import com.choreboo.app.data.repository.HabitRepository
 import com.choreboo.app.data.repository.HouseholdRepository
 import com.choreboo.app.data.repository.ResetRepository
 import com.choreboo.app.data.repository.UserRepository
+import com.choreboo.app.domain.model.ChorebooStage
+import com.choreboo.app.domain.model.ChorebooStats
+import com.choreboo.app.domain.model.PetType
 import io.mockk.coEvery
 import io.mockk.coVerify
 import io.mockk.every
 import io.mockk.mockk
 import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.flowOf
 import kotlinx.coroutines.test.advanceUntilIdle
 import kotlinx.coroutines.test.runTest
 import org.junit.Assert.assertFalse
@@ -68,6 +72,8 @@ class SettingsViewModelTest {
         every { householdRepository.currentHousehold } returns MutableStateFlow(null)
         every { householdRepository.householdMembers } returns MutableStateFlow(emptyList())
         every { billingRepository.isPremium } returns MutableStateFlow(false)
+        every { chorebooRepository.getChoreboo() } returns MutableStateFlow(null)
+        every { chorebooRepository.getAllChoreboos() } returns MutableStateFlow(emptyList())
 
         viewModel = SettingsViewModel(
             application,
@@ -198,6 +204,49 @@ class SettingsViewModelTest {
 
         io.mockk.verify(exactly = 1) { billingRepository.launchPurchaseFlow(activity) }
     }
-}
 
+    @Test
+    fun `selectOrCreatePet switches to existing pet`() = runTest {
+        val existing = ChorebooStats(
+            id = 5L,
+            name = "Panda",
+            stage = ChorebooStage.BABY,
+            level = 3,
+            petType = PetType.PANDA,
+        )
+        coEvery { chorebooRepository.getChorebooForPetType(PetType.PANDA) } returns existing
+
+        viewModel.selectOrCreatePet(PetType.PANDA)
+        advanceUntilIdle()
+
+        coVerify { chorebooRepository.switchActiveChoreboo(existing.id) }
+    }
+
+    @Test
+    fun `selectOrCreatePet creates new free pet when missing`() = runTest {
+        coEvery { chorebooRepository.getChorebooForPetType(PetType.FOX) } returns null
+        coEvery { chorebooRepository.createOrActivatePetType("Foxy", PetType.FOX) } returns ChorebooStats(
+            id = 1L,
+            name = "Foxy",
+            stage = ChorebooStage.EGG,
+            level = 1,
+            petType = PetType.FOX,
+        )
+
+        viewModel.selectOrCreatePet(PetType.FOX, "Foxy")
+        advanceUntilIdle()
+
+        coVerify { chorebooRepository.createOrActivatePetType("Foxy", PetType.FOX) }
+    }
+
+    @Test
+    fun `selectOrCreatePet blocks locked premium pet creation`() = runTest {
+        coEvery { chorebooRepository.getChorebooForPetType(PetType.CAPYBARA) } returns null
+
+        viewModel.selectOrCreatePet(PetType.CAPYBARA, "Capy")
+        advanceUntilIdle()
+
+        coVerify(exactly = 0) { chorebooRepository.createOrActivatePetType(any(), any()) }
+    }
+}
 

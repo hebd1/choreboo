@@ -114,6 +114,8 @@ class UserRepository @Inject constructor(
                     displayName = cloudUser.displayName,
                     email = cloudUser.email,
                     photoUrl = cloudUser.photoUrl,
+                    activeChorebooId = cloudUser.activeChoreboo?.id?.toString(),
+                    activePetType = cloudUser.activeChoreboo?.petType,
                     householdId = cloudUser.household?.id?.toString(),
                     householdName = cloudUser.household?.name,
                     totalPoints = cloudUser.totalPoints,

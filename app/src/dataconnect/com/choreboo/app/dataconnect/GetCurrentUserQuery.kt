@@ -42,12 +42,24 @@ public interface GetCurrentUserQuery :
     val displayName: String,
     val email: String?,
     val photoUrl: String?,
+    val activeChoreboo: ActiveChoreboo?,
     val household: Household?,
     val createdAt: @kotlinx.serialization.Serializable(with = com.google.firebase.dataconnect.serializers.TimestampSerializer::class) com.google.firebase.Timestamp,
     val totalPoints: Int,
     val totalLifetimeXp: Int
   ) {
     
+      
+        @kotlinx.serialization.Serializable
+  public data class ActiveChoreboo(
+  
+    val id: @kotlinx.serialization.Serializable(with = com.google.firebase.dataconnect.serializers.UUIDSerializer::class) java.util.UUID,
+    val petType: String,
+    val name: String
+  ) {
+    
+    
+  }
       
         @kotlinx.serialization.Serializable
   public data class Household(

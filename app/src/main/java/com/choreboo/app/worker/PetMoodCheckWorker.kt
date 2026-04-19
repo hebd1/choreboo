@@ -34,7 +34,7 @@ class PetMoodCheckWorker @AssistedInject constructor(
         return try {
             Timber.d("PetMoodCheckWorker: running periodic mood check")
 
-            val choreboo = chorebooDao.getChorebooSync() ?: run {
+            val choreboo = chorebooDao.getActiveChorebooSync() ?: run {
                 Timber.d("PetMoodCheckWorker: no choreboo found, skipping")
                 return Result.success()
             }
@@ -45,7 +45,7 @@ class PetMoodCheckWorker @AssistedInject constructor(
             chorebooRepository.applyStatDecay()
 
             // Re-fetch the now-decayed choreboo
-            val decayedChoreboo = chorebooDao.getChorebooSync() ?: return Result.success()
+            val decayedChoreboo = chorebooDao.getActiveChorebooSync() ?: return Result.success()
 
             // Check if any stat is critical (< 20)
             val isCritical =

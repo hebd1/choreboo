@@ -55,12 +55,12 @@ public interface GetMyHouseholdChoreboosQuery :
     val id: String,
     val displayName: String,
     val photoUrl: String?,
-    val choreboo_on_owner: ChorebooOnOwner?
+    val activeChoreboo: ActiveChoreboo?
   ) {
     
       
         @kotlinx.serialization.Serializable
-  public data class ChorebooOnOwner(
+  public data class ActiveChoreboo(
   
     val id: @kotlinx.serialization.Serializable(with = com.google.firebase.dataconnect.serializers.UUIDSerializer::class) java.util.UUID,
     val name: String,
@@ -72,6 +72,7 @@ public interface GetMyHouseholdChoreboosQuery :
     val energy: Int,
     val petType: String,
     val lastInteractionAt: @kotlinx.serialization.Serializable(with = com.google.firebase.dataconnect.serializers.TimestampSerializer::class) com.google.firebase.Timestamp,
+    val createdAt: @kotlinx.serialization.Serializable(with = com.google.firebase.dataconnect.serializers.TimestampSerializer::class) com.google.firebase.Timestamp,
     val sleepUntil: @kotlinx.serialization.Serializable(with = com.google.firebase.dataconnect.serializers.TimestampSerializer::class) com.google.firebase.Timestamp?,
     val backgroundId: String?
   ) {

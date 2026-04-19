@@ -1,6 +1,8 @@
 package com.choreboo.app.domain.model
 
+import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
+import org.junit.Assert.assertNull
 import org.junit.Assert.assertTrue
 import org.junit.Test
 import java.time.LocalDate
@@ -160,5 +162,52 @@ class HabitTest {
     @Test
     fun `blank strings in customDays are ignored`() {
         assertFalse(habit(listOf("", "  ")).isScheduledForToday(testDate))
+    }
+
+    @Test
+    fun `next scheduled date returns next weekly match`() {
+        assertEquals(
+            LocalDate.of(2026, 1, 19),
+            habit(listOf("MON")).nextScheduledDate(testDate),
+        )
+    }
+
+    @Test
+    fun `next scheduled date wraps to next week for weekly schedules`() {
+        val monday = LocalDate.of(2026, 1, 19)
+        assertEquals(
+            LocalDate.of(2026, 1, 26),
+            habit(listOf("MON")).nextScheduledDate(monday),
+        )
+    }
+
+    @Test
+    fun `next scheduled date returns next monthly match in same month`() {
+        assertEquals(
+            LocalDate.of(2026, 1, 31),
+            habit(listOf("D31")).nextScheduledDate(testDate),
+        )
+    }
+
+    @Test
+    fun `next scheduled date returns normalized short month date`() {
+        val januaryLastDay = LocalDate.of(2026, 1, 31)
+        assertEquals(
+            LocalDate.of(2026, 2, 28),
+            habit(listOf("D31")).nextScheduledDate(januaryLastDay),
+        )
+    }
+
+    @Test
+    fun `next scheduled date returns earliest mixed schedule match`() {
+        assertEquals(
+            LocalDate.of(2026, 1, 16),
+            habit(listOf("MON", "D16")).nextScheduledDate(testDate),
+        )
+    }
+
+    @Test
+    fun `next scheduled date returns null for invalid schedule`() {
+        assertNull(habit(listOf("Dfoo", "HELLO")).nextScheduledDate(testDate))
     }
 }

@@ -56,6 +56,20 @@ data class Habit(
         return false
     }
 
+    fun nextScheduledDate(from: LocalDate = LocalDate.now()): LocalDate? {
+        val hasMonthlyDays = customDays.any { it.startsWith("D", ignoreCase = true) }
+        val maxDays = if (hasMonthlyDays) 31 else 7
+
+        for (daysAhead in 1..maxDays) {
+            val candidate = from.plusDays(daysAhead.toLong())
+            if (isScheduledForToday(candidate)) {
+                return candidate
+            }
+        }
+
+        return null
+    }
+
     /**
      * Returns the number of minutes until the next scheduled reminder, or null if no reminder
      * is configured. Looks up to 7 days ahead for weekly habits, 31 days for monthly.

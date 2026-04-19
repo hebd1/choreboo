@@ -12,6 +12,7 @@ import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
@@ -49,6 +50,9 @@ import com.choreboo.app.ui.components.WebmAnimationView
 import com.choreboo.app.ui.components.FOX_ANIM_IDLE
 import com.choreboo.app.ui.components.FOX_IDLE_ITERATIONS
 import com.choreboo.app.ui.components.foxMoodAssetPath
+import com.choreboo.app.ui.components.PANDA_ANIM_IDLE
+import com.choreboo.app.ui.components.PANDA_IDLE_ITERATIONS
+import com.choreboo.app.ui.components.pandaMoodAssetPath
 import androidx.compose.foundation.isSystemInDarkTheme
 import androidx.compose.ui.res.stringResource
 import com.choreboo.app.ui.theme.PetMoodContentStart
@@ -63,6 +67,9 @@ import com.choreboo.app.ui.theme.PetMoodSadStart
 import com.choreboo.app.ui.theme.PetMoodTiredStart
 
 private enum class HouseholdAnimPhase { MOOD, IDLE }
+
+private val HOUSEHOLD_PET_SCENE_OFFSET_X = 5.dp
+private val HOUSEHOLD_PET_SCENE_OFFSET_Y = 8.dp
 
 /**
  * Compact card designed for a 2-column grid.
@@ -125,7 +132,9 @@ fun HouseholdPetCard(
                             petType = pet.petType,
                             mood = pet.mood,
                             animationOffsetMs = animationOffsetMs,
-                            modifier = Modifier.size(88.dp),
+                            modifier = Modifier
+                                .offset(x = HOUSEHOLD_PET_SCENE_OFFSET_X, y = HOUSEHOLD_PET_SCENE_OFFSET_Y)
+                                .size(88.dp),
                         )
                     }
                 }
@@ -272,8 +281,45 @@ private fun HouseholdPetAnimation(
                 Box(modifier = modifier)
             }
         }
+    } else if (petType == PetType.PANDA) {
+        var phase by remember { mutableStateOf(HouseholdAnimPhase.MOOD) }
+        var started by remember { mutableStateOf(animationOffsetMs == 0L) }
+
+        LaunchedEffect(Unit) {
+            if (animationOffsetMs > 0) {
+                kotlinx.coroutines.delay(animationOffsetMs)
+                started = true
+            }
+        }
+
+        Crossfade(
+            targetState = phase,
+            animationSpec = tween(durationMillis = 100),
+            label = "householdPandaAnimCrossfade",
+        ) { animPhase ->
+            val (currentAsset, currentIterations) = when (animPhase) {
+                HouseholdAnimPhase.MOOD -> pandaMoodAssetPath(mood) to 1
+                HouseholdAnimPhase.IDLE -> PANDA_ANIM_IDLE to PANDA_IDLE_ITERATIONS
+            }
+
+            if (started) {
+                WebmAnimationView(
+                    assetPath = currentAsset,
+                    iterations = currentIterations,
+                    onComplete = {
+                        phase = when (phase) {
+                            HouseholdAnimPhase.MOOD -> HouseholdAnimPhase.IDLE
+                            HouseholdAnimPhase.IDLE -> HouseholdAnimPhase.MOOD
+                        }
+                    },
+                    modifier = modifier,
+                )
+            } else {
+                Box(modifier = modifier)
+            }
+        }
     } else {
-        // Emoji placeholder for AXOLOTL, CAPYBARA, PANDA until their WebM
+        // Emoji placeholder for AXOLOTL, CAPYBARA until their WebM
         // assets are added under assets/animations/<pettype>/.
         Box(modifier = modifier, contentAlignment = Alignment.Center) {
             Text(

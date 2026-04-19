@@ -74,7 +74,7 @@ class MainViewModelTest {
         every { chorebooRepository.getChoreboo() } returns MutableStateFlow(null)
         every { authRepository.isAuthenticated } returns true
         coEvery { syncManager.syncAll(any()) } returns true
-        coEvery { chorebooRepository.getOrCreateChoreboo(any(), any()) } returns mockk(relaxed = true)
+        coEvery { chorebooRepository.ensureActiveChoreboo() } returns defaultChoreboo
     }
 
     private fun createViewModel() = MainViewModel(
@@ -90,7 +90,7 @@ class MainViewModelTest {
     @Test
     fun `isAppReady is false before startup completes`() = runTest {
         // Room warmup never completes — block it so we can inspect in-progress state
-        coEvery { chorebooRepository.getOrCreateChoreboo(any(), any()) } coAnswers {
+        coEvery { chorebooRepository.ensureActiveChoreboo() } coAnswers {
             kotlinx.coroutines.awaitCancellation()
         }
 
@@ -156,7 +156,7 @@ class MainViewModelTest {
 
         assertTrue(vm.isAppReady.value)
         // Room and cloud must NOT be touched on fast path
-        coVerify(exactly = 0) { chorebooRepository.getOrCreateChoreboo(any(), any()) }
+        coVerify(exactly = 0) { chorebooRepository.ensureActiveChoreboo() }
         coVerify(exactly = 0) { syncManager.syncAll(any()) }
     }
 
@@ -169,7 +169,7 @@ class MainViewModelTest {
         advanceUntilIdle()
 
         assertTrue(vm.isAppReady.value)
-        coVerify(exactly = 0) { chorebooRepository.getOrCreateChoreboo(any(), any()) }
+        coVerify(exactly = 0) { chorebooRepository.ensureActiveChoreboo() }
         coVerify(exactly = 0) { syncManager.syncAll(any()) }
     }
 
@@ -181,7 +181,7 @@ class MainViewModelTest {
         advanceUntilIdle()
 
         assertTrue(vm.isAppReady.value)
-        coVerify { chorebooRepository.getOrCreateChoreboo(any(), any()) }
+        coVerify { chorebooRepository.ensureActiveChoreboo() }
         coVerify { chorebooRepository.applyStatDecay() }
         coVerify { syncManager.syncAll(force = false) }
     }
@@ -198,7 +198,7 @@ class MainViewModelTest {
 
     @Test
     fun `isAppReady becomes true even when Room warmup fails`() = runTest {
-        coEvery { chorebooRepository.getOrCreateChoreboo(any(), any()) } throws Exception("db error")
+        coEvery { chorebooRepository.ensureActiveChoreboo() } throws Exception("db error")
 
         val vm = createViewModel()
         advanceUntilIdle()

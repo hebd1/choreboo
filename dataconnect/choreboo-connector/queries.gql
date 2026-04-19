@@ -10,6 +10,11 @@ query GetCurrentUser @auth(level: USER) {
     displayName
     email
     photoUrl
+    activeChoreboo {
+      id
+      petType
+      name
+    }
     household {
       id
       name
@@ -69,8 +74,30 @@ query GetMyHouseholdMembers @auth(level: USER) {
 
 # ---- Choreboo Queries ----
 
-query GetMyChoreboo @auth(level: USER) {
+query GetMyChoreboo @auth(level: USER) @retired {
   choreboos(where: { ownerId: { eq_expr: "auth.uid" } }, limit: 1) {
+    id
+    name
+    stage
+    level
+    xp
+    hunger
+    happiness
+    energy
+    petType
+    lastInteractionAt
+    createdAt
+    sleepUntil
+    backgroundId
+    owner {
+      id
+      displayName
+    }
+  }
+}
+
+query GetMyChoreboos @auth(level: USER) {
+  choreboos(where: { ownerId: { eq_expr: "auth.uid" } }) {
     id
     name
     stage
@@ -100,7 +127,7 @@ query GetMyHouseholdChoreboos @auth(level: USER) {
         id
         displayName
         photoUrl
-        choreboo_on_owner {
+        activeChoreboo {
           id
           name
           stage
@@ -111,6 +138,7 @@ query GetMyHouseholdChoreboos @auth(level: USER) {
           energy
           petType
           lastInteractionAt
+          createdAt
           sleepUntil
           backgroundId
         }

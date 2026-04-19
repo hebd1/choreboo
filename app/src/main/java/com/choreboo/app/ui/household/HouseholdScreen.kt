@@ -59,6 +59,7 @@ import com.choreboo.app.R
 import com.choreboo.app.domain.model.HouseholdHabitStatus
 import com.choreboo.app.domain.model.HouseholdPet
 import com.choreboo.app.ui.components.StitchSnackbar
+import com.choreboo.app.ui.habits.components.getEmojiForIconName
 import com.choreboo.app.ui.household.components.HouseholdHabitCard
 import com.choreboo.app.ui.household.components.HouseholdPetCard
 import androidx.compose.ui.res.stringResource
@@ -280,6 +281,7 @@ private fun MemberHabitRow(
     modifier: Modifier = Modifier,
 ) {
     val isCompleted = habit.completedByName != null
+    val emoji = getEmojiForIconName(habit.iconName)
 
     Row(
         modifier = modifier.fillMaxWidth(),
@@ -299,7 +301,7 @@ private fun MemberHabitRow(
                 ),
         ) {
             Text(
-                text = habit.iconName,
+                text = emoji,
                 fontSize = 18.sp,
             )
         }
