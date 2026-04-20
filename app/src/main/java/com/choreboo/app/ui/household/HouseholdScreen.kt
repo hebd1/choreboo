@@ -214,10 +214,10 @@ private fun MemberHabitsDialog(
 ) {
     AlertDialog(
         onDismissRequest = onDismiss,
-        containerColor = MaterialTheme.colorScheme.tertiaryContainer,
-        iconContentColor = MaterialTheme.colorScheme.onTertiaryContainer,
-        titleContentColor = MaterialTheme.colorScheme.onTertiaryContainer,
-        textContentColor = MaterialTheme.colorScheme.onTertiaryContainer,
+        containerColor = MaterialTheme.colorScheme.surface.copy(alpha = 0.96f),
+        iconContentColor = MaterialTheme.colorScheme.onSurface,
+        titleContentColor = MaterialTheme.colorScheme.onSurface,
+        textContentColor = MaterialTheme.colorScheme.onSurface,
         tonalElevation = AlertDialogDefaults.TonalElevation,
         confirmButton = {
             TextButton(onClick = onDismiss) {

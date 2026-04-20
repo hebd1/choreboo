@@ -31,6 +31,7 @@ import androidx.compose.runtime.key
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -69,11 +70,15 @@ import com.choreboo.app.ui.theme.PetMoodHungryStart
 import com.choreboo.app.ui.theme.PetMoodSadStart
 import com.choreboo.app.ui.theme.PetMoodTiredStart
 import com.choreboo.app.ui.theme.softGlassSurface
+import kotlinx.coroutines.Job
+import kotlinx.coroutines.delay
+import kotlinx.coroutines.launch
 
 private enum class HouseholdAnimPhase { MOOD, IDLE }
 
 private val HOUSEHOLD_PET_SCENE_OFFSET_X = 0.dp
 private val HOUSEHOLD_PET_SCENE_OFFSET_Y = 12.dp
+private const val HOUSEHOLD_ANIMATION_TRANSITION_MASK_LEAD_MS = 320L
 
 /**
  * Compact card designed for a 2-column grid.
@@ -295,14 +300,24 @@ private fun HouseholdPetAnimation(
 ) {
     if (petType == PetType.FOX) {
         var phase by remember { mutableStateOf(HouseholdAnimPhase.MOOD) }
+        var pendingPhase by remember { mutableStateOf<HouseholdAnimPhase?>(null) }
         var animationKey by remember { mutableIntStateOf(0) }
         var started by remember { mutableStateOf(animationOffsetMs == 0L) }
+        var transitionJob by remember { mutableStateOf<Job?>(null) }
+        val transitionScope = rememberCoroutineScope()
 
         fun transitionTo(nextPhase: HouseholdAnimPhase) {
-            if (phase != nextPhase) {
+            if (phase == nextPhase && pendingPhase == null) return
+            if (pendingPhase == nextPhase) return
+
+            pendingPhase = nextPhase
+            onTransition()
+            transitionJob?.cancel()
+            transitionJob = transitionScope.launch {
+                delay(HOUSEHOLD_ANIMATION_TRANSITION_MASK_LEAD_MS)
                 phase = nextPhase
+                pendingPhase = null
                 animationKey++
-                onTransition()
             }
         }
 
@@ -327,7 +342,7 @@ private fun HouseholdPetAnimation(
                         assetPath = assetPath,
                         iterations = iterations,
                         onComplete = {
-                            if (phase != renderedPhase) return@WebmAnimationView
+                            if (phase != renderedPhase || pendingPhase != null) return@WebmAnimationView
 
                             when (renderedPhase) {
                                 HouseholdAnimPhase.MOOD -> transitionTo(HouseholdAnimPhase.IDLE)
@@ -344,14 +359,24 @@ private fun HouseholdPetAnimation(
         }
     } else if (petType == PetType.PANDA) {
         var phase by remember { mutableStateOf(HouseholdAnimPhase.MOOD) }
+        var pendingPhase by remember { mutableStateOf<HouseholdAnimPhase?>(null) }
         var animationKey by remember { mutableIntStateOf(0) }
         var started by remember { mutableStateOf(animationOffsetMs == 0L) }
+        var transitionJob by remember { mutableStateOf<Job?>(null) }
+        val transitionScope = rememberCoroutineScope()
 
         fun transitionTo(nextPhase: HouseholdAnimPhase) {
-            if (phase != nextPhase) {
+            if (phase == nextPhase && pendingPhase == null) return
+            if (pendingPhase == nextPhase) return
+
+            pendingPhase = nextPhase
+            onTransition()
+            transitionJob?.cancel()
+            transitionJob = transitionScope.launch {
+                delay(HOUSEHOLD_ANIMATION_TRANSITION_MASK_LEAD_MS)
                 phase = nextPhase
+                pendingPhase = null
                 animationKey++
-                onTransition()
             }
         }
 
@@ -375,7 +400,7 @@ private fun HouseholdPetAnimation(
                         assetPath = assetPath,
                         iterations = iterations,
                         onComplete = {
-                            if (phase != renderedPhase) return@WebmAnimationView
+                            if (phase != renderedPhase || pendingPhase != null) return@WebmAnimationView
 
                             when (renderedPhase) {
                                 HouseholdAnimPhase.MOOD -> transitionTo(HouseholdAnimPhase.IDLE)

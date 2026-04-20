@@ -167,6 +167,9 @@
     <string name="stat_needs_nap">Needs Nap Soon</string>
     <string name="stat_exhausted">Exhausted!</string>
     <string name="stat_sleeping">Sleeping</string>
+    <string name="pet_sleep_remaining_hours_minutes">Wakes up in %1$dh %2$dm</string>
+    <string name="pet_sleep_remaining_minutes">Wakes up in %1$dm</string>
+    <string name="pet_sleep_remaining_done">Waking up now</string>
 
     <!-- Pet screen dialogs -->
     <string name="pet_sleep_dialog_title">Put Choreboo to Sleep?</string>

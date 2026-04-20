@@ -191,16 +191,15 @@ fun HabitCard(
                         }
                     }
                     Spacer(modifier = Modifier.height(4.dp))
-                    if (isVisuallyComplete) {
+                    if (isVisuallyComplete && householdCompleterName != null) {
                         Text(
-                            text = if (householdCompleterName != null)
-                                stringResource(R.string.habit_card_completed_by, householdCompleterName)
-                            else
-                                stringResource(R.string.habit_card_completed),
+                            text = stringResource(R.string.habit_card_completed_by, householdCompleterName),
                             style = MaterialTheme.typography.labelSmall,
                             fontWeight = FontWeight.Bold,
                             color = MaterialTheme.colorScheme.primary,
                         )
+                    }
+                    if (isVisuallyComplete) {
                         Row(
                             verticalAlignment = Alignment.CenterVertically,
                             horizontalArrangement = Arrangement.spacedBy(8.dp),

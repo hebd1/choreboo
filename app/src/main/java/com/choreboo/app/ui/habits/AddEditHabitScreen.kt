@@ -191,23 +191,7 @@ fun AddEditHabitScreen(
                     .fillMaxWidth()
                     .padding(horizontal = 24.dp),
             ) {
-                Spacer(modifier = Modifier.height(16.dp))
-
-                // Title Section
-                Text(
-                    text = if (formState.isEditing) stringResource(R.string.add_habit_title_edit) else stringResource(R.string.add_habit_title_new),
-                    style = MaterialTheme.typography.displaySmall,
-                    fontWeight = FontWeight.ExtraBold,
-                    color = MaterialTheme.colorScheme.onSurface,
-                )
-                Spacer(modifier = Modifier.height(4.dp))
-                Text(
-                    text = stringResource(R.string.add_habit_motivational),
-                    style = MaterialTheme.typography.bodyLarge,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                )
-
-                Spacer(modifier = Modifier.height(24.dp))
+                Spacer(modifier = Modifier.height(12.dp))
 
                 // Habit Icon & Name Input
                 Row(

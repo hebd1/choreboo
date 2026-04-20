@@ -77,8 +77,8 @@ fun BackgroundPickerSheet(
     ModalBottomSheet(
         onDismissRequest = onDismiss,
         sheetState = sheetState,
-        containerColor = MaterialTheme.colorScheme.tertiaryContainer.copy(alpha = 0.96f),
-        contentColor = MaterialTheme.colorScheme.onTertiaryContainer,
+        containerColor = MaterialTheme.colorScheme.surfaceContainerHigh.copy(alpha = 0.92f),
+        contentColor = MaterialTheme.colorScheme.onSurface,
     ) {
         Column(modifier = Modifier.fillMaxWidth()) {
             // Header
@@ -252,14 +252,14 @@ private fun BackgroundCell(
                             Icon(
                                 Icons.Default.WorkspacePremium,
                                 contentDescription = null,
-                                tint = MaterialTheme.colorScheme.onTertiaryContainer,
+                                tint = MaterialTheme.colorScheme.onSurface,
                                 modifier = Modifier.size(10.dp),
                             )
                             Text(
                                 text = stringResource(R.string.bg_picker_premium_label),
                                 style = MaterialTheme.typography.labelSmall,
                                 fontWeight = FontWeight.Bold,
-                                color = MaterialTheme.colorScheme.onTertiaryContainer,
+                                color = MaterialTheme.colorScheme.onSurface,
                             )
                         }
                     }
@@ -282,7 +282,7 @@ private fun BackgroundCell(
                             Icon(
                                 Icons.Default.Stars,
                                 contentDescription = null,
-                                tint = if (canAfford) MaterialTheme.colorScheme.onTertiary
+                                tint = if (canAfford) MaterialTheme.colorScheme.onPrimary
                                 else MaterialTheme.colorScheme.onSurfaceVariant,
                                 modifier = Modifier.size(10.dp),
                             )
@@ -290,7 +290,7 @@ private fun BackgroundCell(
                                 text = "${item.cost}",
                                 style = MaterialTheme.typography.labelSmall,
                                 fontWeight = FontWeight.Bold,
-                                color = if (canAfford) MaterialTheme.colorScheme.onTertiary
+                                color = if (canAfford) MaterialTheme.colorScheme.onPrimary
                                 else MaterialTheme.colorScheme.onSurfaceVariant,
                             )
                         }

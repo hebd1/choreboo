@@ -60,6 +60,7 @@ import androidx.compose.runtime.key
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.mutableIntStateOf
+import androidx.compose.runtime.produceState
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
@@ -129,17 +130,20 @@ import com.choreboo.app.ui.theme.XpPurple
 import com.choreboo.app.ui.theme.softGlassSurface
 import com.choreboo.app.ui.util.displayName
 import com.choreboo.app.ui.util.hasLocalizedLabel
+import kotlinx.coroutines.Job
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.delay
 import java.time.LocalDate
 import java.time.format.DateTimeFormatter
 import java.time.format.TextStyle
 import java.util.Locale
+import java.util.concurrent.TimeUnit
 
 private enum class AnimationPhase { MOOD, IDLE, EATING, INTERACTING, THUMBS_UP, START_SLEEPING, SLEEPING }
 
 private val PET_SCENE_OFFSET_X = 0.dp
 private val PET_SCENE_OFFSET_Y = (-10).dp
+private const val ANIMATION_TRANSITION_MASK_LEAD_MS = 320L
 private const val HABIT_COMPLETE_HOLD_MS = 240L
 
 private fun formatNextScheduledDay(nextDate: LocalDate, today: LocalDate): String {
@@ -211,6 +215,37 @@ fun PetScreen(
     val deleteErrorMsg = stringResource(R.string.pet_snack_delete_error)
     val purchaseErrorMsg = stringResource(R.string.pet_snack_purchase_error)
     val nextScheduledFmt = stringResource(R.string.habit_card_next_scheduled)
+    val sleepRemainingText by produceState<String?>(
+        initialValue = null,
+        key1 = showDetailedStats,
+        key2 = isSleeping,
+        key3 = choreboo?.sleepUntil,
+    ) {
+        if (!showDetailedStats || !isSleeping) {
+            value = null
+            return@produceState
+        }
+
+        while (showDetailedStats && isSleeping) {
+            val sleepUntil = choreboo?.sleepUntil ?: 0L
+            val remainingMillis = (sleepUntil - System.currentTimeMillis()).coerceAtLeast(0L)
+            val totalMinutes = TimeUnit.MILLISECONDS.toMinutes(remainingMillis)
+            val hours = totalMinutes / 60
+            val minutes = totalMinutes % 60
+            value = when {
+                remainingMillis <= 0L -> context.getString(R.string.pet_sleep_remaining_done)
+                hours > 0L -> context.getString(R.string.pet_sleep_remaining_hours_minutes, hours, minutes)
+                else -> context.getString(R.string.pet_sleep_remaining_minutes, minutes.coerceAtLeast(1L))
+            }
+
+            if (remainingMillis <= 0L) {
+                break
+            }
+
+            delay(1_000L)
+        }
+    }
+
     LaunchedEffect(Unit) {
         viewModel.events.collect { event ->
             when (event) {
@@ -787,6 +822,13 @@ fun PetScreen(
                                                 fontWeight = FontWeight.Bold,
                                                 color = MaterialTheme.colorScheme.onSurface,
                                             )
+                                            if (sleepRemainingText != null) {
+                                                Text(
+                                                    text = sleepRemainingText!!,
+                                                    style = MaterialTheme.typography.labelMedium,
+                                                    color = MaterialTheme.colorScheme.primary,
+                                                )
+                                            }
                                             Text(
                                                 text = stringResource(R.string.pet_stats_header, stats.name),
                                                 style = MaterialTheme.typography.labelSmall,
@@ -1302,13 +1344,23 @@ private fun PetAnimation(
 ) {
     if (petType == PetType.FOX) {
         var phase by remember { mutableStateOf(AnimationPhase.MOOD) }
+        var pendingPhase by remember { mutableStateOf<AnimationPhase?>(null) }
         var animationKey by remember { mutableIntStateOf(0) }
+        var transitionJob by remember { mutableStateOf<Job?>(null) }
+        val transitionScope = rememberCoroutineScope()
 
         fun transitionTo(nextPhase: AnimationPhase) {
-            if (phase != nextPhase) {
+            if (phase == nextPhase && pendingPhase == null) return
+            if (pendingPhase == nextPhase) return
+
+            pendingPhase = nextPhase
+            onTransition()
+            transitionJob?.cancel()
+            transitionJob = transitionScope.launch {
+                delay(ANIMATION_TRANSITION_MASK_LEAD_MS)
                 phase = nextPhase
+                pendingPhase = null
                 animationKey++
-                onTransition()
             }
         }
 
@@ -1355,7 +1407,7 @@ private fun PetAnimation(
                     assetPath = assetPath,
                     iterations = iterations,
                     onComplete = {
-                        if (phase != renderedPhase) return@WebmAnimationView
+                        if (phase != renderedPhase || pendingPhase != null) return@WebmAnimationView
 
                         when (renderedPhase) {
                             AnimationPhase.MOOD -> {
@@ -1395,13 +1447,23 @@ private fun PetAnimation(
         }
     } else if (petType == PetType.PANDA) {
         var phase by remember { mutableStateOf(AnimationPhase.MOOD) }
+        var pendingPhase by remember { mutableStateOf<AnimationPhase?>(null) }
         var animationKey by remember { mutableIntStateOf(0) }
+        var transitionJob by remember { mutableStateOf<Job?>(null) }
+        val transitionScope = rememberCoroutineScope()
 
         fun transitionTo(nextPhase: AnimationPhase) {
-            if (phase != nextPhase) {
+            if (phase == nextPhase && pendingPhase == null) return
+            if (pendingPhase == nextPhase) return
+
+            pendingPhase = nextPhase
+            onTransition()
+            transitionJob?.cancel()
+            transitionJob = transitionScope.launch {
+                delay(ANIMATION_TRANSITION_MASK_LEAD_MS)
                 phase = nextPhase
+                pendingPhase = null
                 animationKey++
-                onTransition()
             }
         }
 
@@ -1448,7 +1510,7 @@ private fun PetAnimation(
                     assetPath = assetPath,
                     iterations = iterations,
                     onComplete = {
-                        if (phase != renderedPhase) return@WebmAnimationView
+                        if (phase != renderedPhase || pendingPhase != null) return@WebmAnimationView
 
                         when (renderedPhase) {
                             AnimationPhase.MOOD -> {

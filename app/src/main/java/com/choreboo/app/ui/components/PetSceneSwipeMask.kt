@@ -18,7 +18,7 @@ import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import kotlin.math.abs
 
-private const val SHIMMER_DURATION_MS = 260
+private const val SHIMMER_DURATION_MS = 1_000
 private const val SHIMMER_BAND_WIDTH_RATIO = 0.7f
 
 @Composable
